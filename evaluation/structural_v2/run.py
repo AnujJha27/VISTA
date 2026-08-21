@@ -13,7 +13,7 @@ from dftcert.structural import (assemble_structural_certificate, assess_structur
     verify_structural_certificate)
 
 def dump(path, value):
-    path.parent.mkdir(parents=True, exist_ok=True); path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")
+    path.parent.mkdir(parents=True, exist_ok=True); path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 def constraints(case):
     value = {"adjacency_state_name":"adjacency", "adjacency_convention":"target_source",
@@ -71,7 +71,7 @@ def run_case(case, artifact, output, repeat):
         certificate_status, lean_status = "ineligible", "not_run"
         if status == "supported-and-compatible":
             proofs = [{"id":x["id"],"status":"verified","winner":{"patch":"by decide"}} for x in obligations["obligations"]]
-            source, certificate = assemble_structural_certificate(ir, proofs); output.mkdir(parents=True, exist_ok=True); source_path = output / "Certificate.lean"; source_path.write_text(source)
+            source, certificate = assemble_structural_certificate(ir, proofs); output.mkdir(parents=True, exist_ok=True); source_path = output / "Certificate.lean"; source_path.write_text(source, encoding="utf-8")
             verification = verify_structural_certificate(project_root=ROOT / "examples" / "dft" / "lean", certificate_source=source_path, trusted_local=True)
             evidence.update({"certificate":certificate, "lean_verification":verification}); lean_status = verification["status"]; certificate_status = "verified" if lean_status == "verified" else "not_verified"
         if repeat == 0 and case["class"] != "malformed": evidence["tampering"] = tamper(ir, raw["inventory"], evidence["input_constraints"])
