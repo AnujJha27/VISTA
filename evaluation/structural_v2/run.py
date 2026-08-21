@@ -27,6 +27,8 @@ def constraints(case):
     if role == "missing_operator": value["output_contracts"] = [value["output_contracts"][0], value["output_contracts"][2]]
     if role == "missing_xc": value["output_contracts"] = value["output_contracts"][1:]
     if role == "duplicate": value["output_contracts"].append({"index":0,"role":"xc_energy"})
+    if role == "duplicate_operator": value["output_contracts"].append({"index":1,"role":"learned_self_energy"})
+    if role == "duplicate_xc": value["output_contracts"].append({"index":0,"role":"xc_energy"})
     if role == "wrong_operator": value["output_contracts"][1]["index"] = 0
     if role == "wrong_xc": value["output_contracts"][0]["index"] = 1
     return value

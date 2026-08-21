@@ -46,8 +46,13 @@ class CorpusModel(nn.Module):
         elif self.xc == "tanh": xc = torch.tanh(density.sum())
         elif self.xc == "none": xc = density.sum()
         elif self.xc == "mixed": xc = torch.sigmoid(F.relu(density.sum()))
+        elif self.xc == "reversed_mixed": xc = F.relu(torch.sigmoid(density.sum()))
+        elif self.xc == "double_relu": xc = F.relu(F.relu(density.sum()))
+        elif self.xc == "gelu": xc = F.gelu(density.sum())
         else: xc = torch.sin(density.sum())
         if self.operator == "symmetrized": operator = self.base + self.base.T
+        elif self.operator == "adjoint_first": operator = self.base.T + self.base
+        elif self.operator == "diagonal": operator = torch.diag(self.base)
         elif self.operator == "zero": operator = torch.zeros_like(self.base)
         elif self.operator == "identity": operator = torch.eye(self.base.shape[0], dtype=density.dtype, device=density.device)
         elif self.operator == "cross": operator = self.base + self.other.T
