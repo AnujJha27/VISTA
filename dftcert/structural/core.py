@@ -53,6 +53,7 @@ def _observed_ops(nodes: list[dict[str, Any]]) -> list[str]:
 def _derivation(
     *, claim: str, value: Any, root: str | None, evidence_nodes: list[str],
     rule: str, observed_nodes: list[dict[str, Any]], metadata: dict[str, Any] | None = None,
+    rule_version: int = 1,
 ) -> dict[str, Any]:
     """Compact, hash-bound explanation for one semantic lowering result."""
     result = {
@@ -61,7 +62,7 @@ def _derivation(
         "root": root,
         "evidence_nodes": evidence_nodes,
         "rule": rule,
-        "rule_version": 1,
+        "rule_version": rule_version,
         "observed_ops": _observed_ops(observed_nodes),
     }
     if metadata:
@@ -101,8 +102,13 @@ def _semantic_derivations(
             claim="xc.form", value=xc_form, root=roles["xc_energy"],
             evidence_nodes=xc_nodes,
             rule={"hinge": "xc.hinge_activation", "smooth": "xc.smooth_activation"}.get(xc_form, "xc.unrecognized_composition"),
+            rule_version=2,
             observed_nodes=xc_graph,
-            metadata=({"reason": "no supported hinge or smooth activation"} if xc_form == "unsupported" else None),
+            metadata=(
+                {"reason": "mixed hinge and smooth activation composition"}
+                if (xc_form == "unsupported" and _has_target(xc_graph, _HINGE_TARGETS) and _has_target(xc_graph, _SMOOTH_TARGETS))
+                else {"reason": "no supported hinge or smooth activation"} if xc_form == "unsupported" else None
+            ),
         ),
         "operator": _derivation(
             claim="operator.construction", value=operator, root=roles["learned_self_energy"],
@@ -196,9 +202,13 @@ def _operator_construction(
 def _xc_form(nodes: list[dict[str, Any]], root: str) -> tuple[str, list[str]]:
     ancestors = _ancestors(nodes, root)
     provenance = [node["name"] for node in ancestors]
-    if _has_target(ancestors, _HINGE_TARGETS):
+    hinge = _has_target(ancestors, _HINGE_TARGETS)
+    smooth = _has_target(ancestors, _SMOOTH_TARGETS)
+    if hinge and smooth:
+        return "unsupported", provenance
+    if hinge:
         return "hinge", provenance
-    if _has_target(ancestors, _SMOOTH_TARGETS):
+    if smooth:
         return "smooth", provenance
     return "unsupported", provenance
 
@@ -311,6 +321,8 @@ def _role_roots(
         if role in result:
             raise ManifestError(f"duplicate output contract role {role!r}")
         result[role] = roots[index]
+    if len(set(result.values())) != len(result):
+        raise ManifestError("output contract roles must resolve to distinct outputs")
     required = {"xc_energy", "learned_self_energy", "message_state"}
     if set(result) != required:
         raise ManifestError("output_contracts must map xc_energy, learned_self_energy, and message_state")
@@ -398,6 +410,7 @@ def structural_ir_from_inventory(
     validate_structural_ir(value)
     value["translation_validation"] = validate_translation(
         inventory=inventory, value=value, input_constraints=input_constraints,
+        artifact_sha256=artifact_sha256,
     )
     return value
 
@@ -454,11 +467,14 @@ def validate_structural_ir(value: dict[str, Any]) -> None:
 
 def validate_translation(
     *, inventory: dict[str, Any], value: dict[str, Any], input_constraints: dict[str, Any],
+    artifact_sha256: str | None = None,
 ) -> dict[str, Any]:
     """Independently recheck an artifact IR's derivation against raw graph inventory."""
     validate_structural_ir(value)
     if value["source"]["kind"] != "torch_export":
         raise ManifestError("only exported artifacts have a translation derivation")
+    if artifact_sha256 is not None and value["source"].get("artifact_sha256") != artifact_sha256:
+        raise ManifestError("structural IR source artifact hash does not match the extracted artifact")
     translation = value["translation"]
     if translation.get("schema_version") != 2:
         raise ManifestError("unsupported translation derivation schema")

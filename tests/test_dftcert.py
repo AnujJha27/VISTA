@@ -904,6 +904,50 @@ class StructuralV2Tests(unittest.TestCase):
                 extractor_version="test", input_constraints=constraints,
             )
 
+    def test_translation_rejects_roles_resolving_to_the_same_output(self):
+        constraints = self.constraints()
+        constraints["output_contracts"][1]["index"] = 0
+        with self.assertRaises(ManifestError):
+            structural_ir_from_inventory(
+                inventory=self.inventory(), artifact_sha256="artifact",
+                extractor_version="test", input_constraints=constraints,
+            )
+
+    def test_translation_binds_ir_source_hash_to_extracted_artifact(self):
+        inventory = self.inventory()
+        ir = structural_ir_from_inventory(
+            inventory=inventory, artifact_sha256="artifact",
+            extractor_version="test", input_constraints=self.constraints(),
+        )
+        validate_translation(
+            inventory=inventory, value=ir,
+            input_constraints=self.constraints(), artifact_sha256="artifact",
+        )
+        ir["source"]["artifact_sha256"] = "0" * 64
+        with self.assertRaises(ManifestError):
+            validate_translation(
+                inventory=inventory, value=ir,
+                input_constraints=self.constraints(), artifact_sha256="artifact",
+            )
+
+    def test_mixed_hinge_smooth_composition_is_unsupported(self):
+        inventory = self.inventory()
+        nodes = inventory["nodes"]
+        nodes.append({"name": "sigmoid", "op": "call_function",
+                      "target": "aten.sigmoid.default", "args": [{"node": "relu"}], "kwargs": {}})
+        for node in nodes:
+            if node.get("name") == "output":
+                node["args"][0] = [{"node": "sigmoid"}, {"node": "add"}, {"node": "matmul_2"}]
+        ir = structural_ir_from_inventory(
+            inventory=inventory, artifact_sha256="artifact",
+            extractor_version="test", input_constraints=self.constraints(),
+        )
+        xc = ir["translation"]["semantic_derivations"]["xc"]
+        self.assertEqual(xc["value"], "unsupported")
+        self.assertEqual(xc["rule"], "xc.unrecognized_composition")
+        self.assertEqual(xc["rule_version"], 2)
+        self.assertEqual(xc["metadata"]["reason"], "mixed hinge and smooth activation composition")
+
     def ir(self, *, depth=3, xc="hinge", operator="symmetrized"):
         return confirmed_description_ir(
             description="Reviewed six-site structural model",

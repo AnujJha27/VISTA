@@ -39,7 +39,7 @@ def extract(artifact):
     process = subprocess.run([sys.executable, str(ROOT / "extractors/torch_export_worker.py"), str(artifact)], text=True, capture_output=True)
     return json.loads(process.stdout)
 
-def tamper(ir, inventory, input_constraints):
+def tamper(ir, inventory, input_constraints, artifact_sha256):
     mutations = {
       "message_depth": lambda x: x.__setitem__("message_passing", {**x["message_passing"], "depth": x["message_passing"]["depth"] + 1}),
       "xc_form": lambda x: x["xc"].__setitem__("form", "smooth" if x["xc"]["form"] != "smooth" else "hinge"),
@@ -54,7 +54,7 @@ def tamper(ir, inventory, input_constraints):
     output = []
     for name, change in mutations.items():
         altered = copy.deepcopy(ir); change(altered)
-        try: validate_translation(inventory=inventory, value=altered, input_constraints=input_constraints); result = "accepted"
+        try: validate_translation(inventory=inventory, value=altered, input_constraints=input_constraints, artifact_sha256=artifact_sha256); result = "accepted"
         except ManifestError as error: result = "rejected:" + str(error)
         output.append({"tamper_id":name, "result":result, "detected":result.startswith("rejected:")})
     return output
@@ -76,7 +76,7 @@ def run_case(case, artifact, output, repeat):
             source, certificate = assemble_structural_certificate(ir, proofs); output.mkdir(parents=True, exist_ok=True); source_path = output / "Certificate.lean"; source_path.write_text(source, encoding="utf-8")
             verification = verify_structural_certificate(project_root=ROOT / "examples" / "dft" / "lean", certificate_source=source_path, trusted_local=True)
             evidence.update({"certificate":certificate, "lean_verification":verification}); lean_status = verification["status"]; certificate_status = "verified" if lean_status == "verified" else "not_verified"
-        if repeat == 0 and case["class"] != "malformed": evidence["tampering"] = tamper(ir, raw["inventory"], evidence["input_constraints"])
+        if repeat == 0 and case["class"] != "malformed": evidence["tampering"] = tamper(ir, raw["inventory"], evidence["input_constraints"], evidence["artifact_sha256"])
     except Exception as error:
         status, reason, lean_status, certificate_status = "malformed", f"{type(error).__name__}: {error}", "not_run", "ineligible"
     expected = case["expected"]["semantic_status"]
