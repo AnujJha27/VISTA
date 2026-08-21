@@ -1,0 +1,11 @@
+{
+  "cases": 48,
+  "false_certification": "0/36 (0.0%)",
+  "positive_acceptance": "12/12 (100.0%)",
+  "near_miss_rejection": "12/12 (100.0%)",
+  "unsupported_withheld": "13/13 (100.0%)",
+  "malformed_rejection": "12/12 (100.0%)",
+  "tamper_detection": "324/324 (100.0%)",
+  "deterministic_obligation": "48/48 (100.0%)",
+  "reproducible_disposition": "48/48 (100.0%)"
+}
