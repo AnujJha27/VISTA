@@ -1,0 +1,11 @@
+{
+  "total_cases": 36,
+  "false_certification": "1/27 (3.7%)",
+  "positive_acceptance": "9/9 (100.0%)",
+  "near_miss_rejection": "9/9 (100.0%)",
+  "unsupported_withheld": "9/10 (90.0%)",
+  "malformed_rejection": "7/9 (77.8%)",
+  "tamper_detection": "216/243 (88.9%)",
+  "reproducible_disposition": "36/36 (100.0%)",
+  "stable_obligation_hash": "29/29 (100.0%)"
+}
