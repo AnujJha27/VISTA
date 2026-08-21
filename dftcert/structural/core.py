@@ -893,7 +893,8 @@ def verify_structural_certificate(
         check.write_text(source, encoding="utf-8")
         try:
             process = subprocess.run(
-                [*lean_command, str(check)], cwd=root, text=True,
+                [*lean_command, str(check)], cwd=root,
+                encoding="utf-8", errors="replace",
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                 timeout=timeout_s, check=False,
             )
