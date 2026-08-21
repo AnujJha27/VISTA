@@ -64,6 +64,8 @@ def run_case(case, artifact, output, repeat):
     try:
         raw = extract(artifact); evidence["raw_extraction"] = raw
         if raw.get("status") != "ok": raise ManifestError(raw.get("diagnostics", "extractor failed"))
+        if case.get("constraints", {}).get("adjacency") == "invalid":
+            raw["inventory"]["state"]["adjacency"]["structural_values"][0][1] = "corrupted"
         ir = structural_ir_from_inventory(inventory=raw["inventory"], artifact_sha256=raw["artifact_sha256"], extractor_version=raw["extractor_version"], input_constraints=evidence["input_constraints"])
         assessment, obligations = assess_structural_ir(ir), generate_structural_obligations(ir)
         evidence.update({"structural_ir":ir, "semantic_derivations":ir["translation"]["semantic_derivations"], "translation_validation":ir["translation_validation"], "policy":assessment, "generated_obligations":obligations})
