@@ -271,7 +271,11 @@ def _topology(
     if not entry:
         raise ManifestError("artifact has no extractable structural adjacency buffer")
     values = entry.get("structural_values")
-    if not isinstance(values, list) or not values or any(not isinstance(row, list) for row in values):
+    if (
+        not isinstance(values, list) or not values
+        or any(not isinstance(row, list) for row in values)
+        or any(not isinstance(cell, (bool, int)) for row in values for cell in row)
+    ):
         raise ManifestError("adjacency buffer must be a small exported boolean/integer matrix")
     size = len(values)
     if any(len(row) != size for row in values):
@@ -304,6 +308,8 @@ def _role_roots(
         index, role = contract.get("index"), contract.get("role")
         if not isinstance(index, int) or not isinstance(role, str) or index < 0 or index >= len(roots):
             raise ManifestError("output contract index or role is invalid")
+        if role in result:
+            raise ManifestError(f"duplicate output contract role {role!r}")
         result[role] = roots[index]
     required = {"xc_energy", "learned_self_energy", "message_state"}
     if set(result) != required:

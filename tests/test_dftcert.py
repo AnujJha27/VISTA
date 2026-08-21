@@ -887,6 +887,23 @@ class StructuralV2Tests(unittest.TestCase):
         inventory["nodes"][5]["target"] = "custom.matmul"
         self.assertEqual(translate(inventory)["message_passing"]["depth"], 0)
 
+    def test_translation_rejects_malformed_adjacency_and_output_contracts(self):
+        inventory = self.inventory()
+        inventory["state"]["adjacency"]["structural_values"][0][1] = "false"
+        with self.assertRaises(ManifestError):
+            structural_ir_from_inventory(
+                inventory=inventory, artifact_sha256="artifact",
+                extractor_version="test", input_constraints=self.constraints(),
+            )
+
+        constraints = self.constraints()
+        constraints["output_contracts"].append({"index": 0, "role": "xc_energy"})
+        with self.assertRaises(ManifestError):
+            structural_ir_from_inventory(
+                inventory=self.inventory(), artifact_sha256="artifact",
+                extractor_version="test", input_constraints=constraints,
+            )
+
     def ir(self, *, depth=3, xc="hinge", operator="symmetrized"):
         return confirmed_description_ir(
             description="Reviewed six-site structural model",

@@ -72,7 +72,7 @@ def run_case(case, artifact, output, repeat):
         if status == "supported-and-compatible":
             proofs = [{"id":x["id"],"status":"verified","winner":{"patch":"by decide"}} for x in obligations["obligations"]]
             source, certificate = assemble_structural_certificate(ir, proofs); source_path = output / "Certificate.lean"; source_path.write_text(source)
-            verification = verify_structural_certificate(project_root=ROOT / "lean", certificate_source=source_path, trusted_local=True)
+            verification = verify_structural_certificate(project_root=ROOT / "examples" / "dft" / "lean", certificate_source=source_path, trusted_local=True)
             evidence.update({"certificate":certificate, "lean_verification":verification}); lean_status = verification["status"]; certificate_status = "verified" if lean_status == "verified" else "not_verified"
         if repeat == 0 and case["class"] != "malformed": evidence["tampering"] = tamper(ir, raw["inventory"], evidence["input_constraints"])
     except Exception as error:
