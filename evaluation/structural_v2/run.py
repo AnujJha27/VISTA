@@ -43,7 +43,7 @@ def tamper(ir, inventory, input_constraints):
     mutations = {
       "message_depth": lambda x: x.__setitem__("message_passing", {**x["message_passing"], "depth": x["message_passing"]["depth"] + 1}),
       "xc_form": lambda x: x["xc"].__setitem__("form", "smooth" if x["xc"]["form"] != "smooth" else "hinge"),
-      "operator_form": lambda x: x["operator"].__setitem__("construction", "unsupported"),
+      "operator_form": lambda x: x["operator"].__setitem__("construction", "zero" if x["operator"]["construction"] != "zero" else "identity"),
       "evidence_node": lambda x: x["translation"]["semantic_derivations"]["xc"]["evidence_nodes"].append("forged"),
       "root_node": lambda x: x["translation"]["semantic_derivations"]["operator"].__setitem__("root", "forged"),
       "rule_identifier": lambda x: x["translation"]["semantic_derivations"]["operator"].__setitem__("rule", "operator.forged"),
@@ -71,7 +71,7 @@ def run_case(case, artifact, output, repeat):
         certificate_status, lean_status = "ineligible", "not_run"
         if status == "supported-and-compatible":
             proofs = [{"id":x["id"],"status":"verified","winner":{"patch":"by decide"}} for x in obligations["obligations"]]
-            source, certificate = assemble_structural_certificate(ir, proofs); source_path = output / "Certificate.lean"; source_path.write_text(source)
+            source, certificate = assemble_structural_certificate(ir, proofs); output.mkdir(parents=True, exist_ok=True); source_path = output / "Certificate.lean"; source_path.write_text(source)
             verification = verify_structural_certificate(project_root=ROOT / "examples" / "dft" / "lean", certificate_source=source_path, trusted_local=True)
             evidence.update({"certificate":certificate, "lean_verification":verification}); lean_status = verification["status"]; certificate_status = "verified" if lean_status == "verified" else "not_verified"
         if repeat == 0 and case["class"] != "malformed": evidence["tampering"] = tamper(ir, raw["inventory"], evidence["input_constraints"])
