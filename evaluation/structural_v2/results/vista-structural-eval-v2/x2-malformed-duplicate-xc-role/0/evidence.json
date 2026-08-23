@@ -1,6 +1,6 @@
 {
   "artifact": "D:\\fun stuff\\proof_vibe\\build\\vista-structural-v2-corpus\\x2-malformed-duplicate-xc-role.pt2",
-  "artifact_sha256": "2724aef8e024c93f5069963f6d9cb9c661f14a24b422bc503d70bc3e6b6b857a",
+  "artifact_sha256": "8899d159a189467e4dd6809fab9c287ff792f7a01f4f3d47484e3fc90790d1f0",
   "case_id": "x2-malformed-duplicate-xc-role",
   "experiment": {
     "analyzer_version": "dft-structural-analysis-v5",
@@ -24,10 +24,10 @@
     },
     "policy_version": "dft-structural-v2",
     "semantic_rules": {
-      "message.adjacency_fed_matmul": 1,
+      "message.adjacency_fed_matmul": 2,
       "operator.add_adjoint_pair": 1,
       "operator.identity_root": 1,
-      "operator.unconstrained_root": 1,
+      "operator.unconstrained_root": 2,
       "operator.unrecognized_composition": 1,
       "operator.zero_root": 1,
       "topology.adjacency_state": 1,
@@ -66,7 +66,7 @@
     ]
   },
   "raw_extraction": {
-    "artifact_sha256": "2724aef8e024c93f5069963f6d9cb9c661f14a24b422bc503d70bc3e6b6b857a",
+    "artifact_sha256": "8899d159a189467e4dd6809fab9c287ff792f7a01f4f3d47484e3fc90790d1f0",
     "extractor_version": "torch-export-inventory-v2",
     "facts": {},
     "inventory": {

@@ -1,6 +1,6 @@
 {
   "cases": 48,
-  "exact_semantic_classification": "45/48 (93.8%)",
+  "exact_semantic_classification": "48/48 (100.0%)",
   "false_certification": "0/36 (0.0%)",
   "positive_acceptance": "12/12 (100.0%)",
   "near_miss_certificate_withheld": "12/12 (100.0%)",

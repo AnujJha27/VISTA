@@ -1,6 +1,6 @@
 [
   {
-    "artifact_hash": "5b23d995fe5e37096c94a6f236f82d312ab7aaedf8ca1823cad600a9066537a0",
+    "artifact_hash": "06a24b80cbaab1588bfbd0c4550821eb319fa9e8706db4bcd3c9d94419704e8f",
     "case_id": "spatial-positive-chain",
     "certificate_status": "verified",
     "class": "positive",
@@ -17,7 +17,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "5b23d995fe5e37096c94a6f236f82d312ab7aaedf8ca1823cad600a9066537a0",
+    "artifact_hash": "06a24b80cbaab1588bfbd0c4550821eb319fa9e8706db4bcd3c9d94419704e8f",
     "case_id": "spatial-positive-chain",
     "certificate_status": "verified",
     "class": "positive",
@@ -34,7 +34,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "5b23d995fe5e37096c94a6f236f82d312ab7aaedf8ca1823cad600a9066537a0",
+    "artifact_hash": "06a24b80cbaab1588bfbd0c4550821eb319fa9e8706db4bcd3c9d94419704e8f",
     "case_id": "spatial-positive-chain",
     "certificate_status": "verified",
     "class": "positive",
@@ -51,7 +51,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "d468309986704b4042dc43ee73a44353b764f21ae3bc170e0f5dbefae7ac0291",
+    "artifact_hash": "f0c6c07be9102f0b610a4be0eb5b86909c563813d19c81a215d36e35a7a3ce51",
     "case_id": "spatial-positive-ring-alias",
     "certificate_status": "verified",
     "class": "positive",
@@ -68,7 +68,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "d468309986704b4042dc43ee73a44353b764f21ae3bc170e0f5dbefae7ac0291",
+    "artifact_hash": "f0c6c07be9102f0b610a4be0eb5b86909c563813d19c81a215d36e35a7a3ce51",
     "case_id": "spatial-positive-ring-alias",
     "certificate_status": "verified",
     "class": "positive",
@@ -85,7 +85,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "d468309986704b4042dc43ee73a44353b764f21ae3bc170e0f5dbefae7ac0291",
+    "artifact_hash": "f0c6c07be9102f0b610a4be0eb5b86909c563813d19c81a215d36e35a7a3ce51",
     "case_id": "spatial-positive-ring-alias",
     "certificate_status": "verified",
     "class": "positive",
@@ -102,7 +102,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "5f6b0693188d2548327695ab837130af1fbae2159ccc7be7887f8e3f31ad4281",
+    "artifact_hash": "fa65580ae237bf7c2d3dd86fd5fb383b89a538c4fb293f4e6c8ca7338444e30c",
     "case_id": "spatial-positive-irregular",
     "certificate_status": "verified",
     "class": "positive",
@@ -119,7 +119,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "5f6b0693188d2548327695ab837130af1fbae2159ccc7be7887f8e3f31ad4281",
+    "artifact_hash": "fa65580ae237bf7c2d3dd86fd5fb383b89a538c4fb293f4e6c8ca7338444e30c",
     "case_id": "spatial-positive-irregular",
     "certificate_status": "verified",
     "class": "positive",
@@ -136,7 +136,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "5f6b0693188d2548327695ab837130af1fbae2159ccc7be7887f8e3f31ad4281",
+    "artifact_hash": "fa65580ae237bf7c2d3dd86fd5fb383b89a538c4fb293f4e6c8ca7338444e30c",
     "case_id": "spatial-positive-irregular",
     "certificate_status": "verified",
     "class": "positive",
@@ -153,7 +153,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "933dbb04cc0740a5afedfdec73d6f134c65b034d57340fdcc171cbdf39056b90",
+    "artifact_hash": "d54a480d0a64bfb54cc94a328c3621d68b1f1439bf73d762b210410d982b81c6",
     "case_id": "spatial-nearmiss-one-hop-short",
     "certificate_status": "ineligible",
     "class": "near_miss",
@@ -170,7 +170,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "933dbb04cc0740a5afedfdec73d6f134c65b034d57340fdcc171cbdf39056b90",
+    "artifact_hash": "d54a480d0a64bfb54cc94a328c3621d68b1f1439bf73d762b210410d982b81c6",
     "case_id": "spatial-nearmiss-one-hop-short",
     "certificate_status": "ineligible",
     "class": "near_miss",
@@ -187,7 +187,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "933dbb04cc0740a5afedfdec73d6f134c65b034d57340fdcc171cbdf39056b90",
+    "artifact_hash": "d54a480d0a64bfb54cc94a328c3621d68b1f1439bf73d762b210410d982b81c6",
     "case_id": "spatial-nearmiss-one-hop-short",
     "certificate_status": "ineligible",
     "class": "near_miss",
@@ -204,7 +204,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "a6e13c034dc1efd295a1e278da1c3e71b96a39028cf5db101e048331c0238098",
+    "artifact_hash": "b85caecdfe9c8972fb98b169f66eba1a0846535ddf288ba70c04b7bfe1f5c056",
     "case_id": "spatial-nearmiss-irrelevant-matmul",
     "certificate_status": "ineligible",
     "class": "near_miss",
@@ -221,7 +221,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "a6e13c034dc1efd295a1e278da1c3e71b96a39028cf5db101e048331c0238098",
+    "artifact_hash": "b85caecdfe9c8972fb98b169f66eba1a0846535ddf288ba70c04b7bfe1f5c056",
     "case_id": "spatial-nearmiss-irrelevant-matmul",
     "certificate_status": "ineligible",
     "class": "near_miss",
@@ -238,7 +238,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "a6e13c034dc1efd295a1e278da1c3e71b96a39028cf5db101e048331c0238098",
+    "artifact_hash": "b85caecdfe9c8972fb98b169f66eba1a0846535ddf288ba70c04b7bfe1f5c056",
     "case_id": "spatial-nearmiss-irrelevant-matmul",
     "certificate_status": "ineligible",
     "class": "near_miss",
@@ -255,7 +255,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "ba3a32b102b586b9b4ac523e2d97e4f00caf4b4e859f997e1be0b3563ff78e77",
+    "artifact_hash": "efcad9acaf774a77a1d65feb2f0f6e8715b2a292628932ca362985713094b49a",
     "case_id": "spatial-nearmiss-directedness",
     "certificate_status": "ineligible",
     "class": "near_miss",
@@ -272,7 +272,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "ba3a32b102b586b9b4ac523e2d97e4f00caf4b4e859f997e1be0b3563ff78e77",
+    "artifact_hash": "efcad9acaf774a77a1d65feb2f0f6e8715b2a292628932ca362985713094b49a",
     "case_id": "spatial-nearmiss-directedness",
     "certificate_status": "ineligible",
     "class": "near_miss",
@@ -289,7 +289,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "ba3a32b102b586b9b4ac523e2d97e4f00caf4b4e859f997e1be0b3563ff78e77",
+    "artifact_hash": "efcad9acaf774a77a1d65feb2f0f6e8715b2a292628932ca362985713094b49a",
     "case_id": "spatial-nearmiss-directedness",
     "certificate_status": "ineligible",
     "class": "near_miss",
@@ -306,58 +306,58 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "8e4eaea34c034b9cb002e5651f40a27da3e84de952ceb5d110534d637d216537",
+    "artifact_hash": "b3ebd4b2d9a1003a860dd8ddffdbd5db52536e081ae975e02660966f007b57fc",
     "case_id": "spatial-unsupported-nonlinear",
     "certificate_status": "ineligible",
     "class": "unsupported",
-    "correct": false,
+    "correct": true,
     "domain": "spatial",
     "expected_status": "unsupported",
     "failure_reason": "",
     "lean_status": "not_run",
     "observed_ir_value": "{\"depth\": 1, \"operator\": \"symmetrized\", \"xc\": \"hinge\"}",
-    "observed_semantic_status": "supported-but-incompatible",
-    "policy_status": "structural_requirements_not_met",
+    "observed_semantic_status": "unsupported",
+    "policy_status": "formalization_required",
     "repeat": 0,
     "split": "evaluation",
     "translation_valid": true
   },
   {
-    "artifact_hash": "8e4eaea34c034b9cb002e5651f40a27da3e84de952ceb5d110534d637d216537",
+    "artifact_hash": "b3ebd4b2d9a1003a860dd8ddffdbd5db52536e081ae975e02660966f007b57fc",
     "case_id": "spatial-unsupported-nonlinear",
     "certificate_status": "ineligible",
     "class": "unsupported",
-    "correct": false,
+    "correct": true,
     "domain": "spatial",
     "expected_status": "unsupported",
     "failure_reason": "",
     "lean_status": "not_run",
     "observed_ir_value": "{\"depth\": 1, \"operator\": \"symmetrized\", \"xc\": \"hinge\"}",
-    "observed_semantic_status": "supported-but-incompatible",
-    "policy_status": "structural_requirements_not_met",
+    "observed_semantic_status": "unsupported",
+    "policy_status": "formalization_required",
     "repeat": 1,
     "split": "evaluation",
     "translation_valid": true
   },
   {
-    "artifact_hash": "8e4eaea34c034b9cb002e5651f40a27da3e84de952ceb5d110534d637d216537",
+    "artifact_hash": "b3ebd4b2d9a1003a860dd8ddffdbd5db52536e081ae975e02660966f007b57fc",
     "case_id": "spatial-unsupported-nonlinear",
     "certificate_status": "ineligible",
     "class": "unsupported",
-    "correct": false,
+    "correct": true,
     "domain": "spatial",
     "expected_status": "unsupported",
     "failure_reason": "",
     "lean_status": "not_run",
     "observed_ir_value": "{\"depth\": 1, \"operator\": \"symmetrized\", \"xc\": \"hinge\"}",
-    "observed_semantic_status": "supported-but-incompatible",
-    "policy_status": "structural_requirements_not_met",
+    "observed_semantic_status": "unsupported",
+    "policy_status": "formalization_required",
     "repeat": 2,
     "split": "evaluation",
     "translation_valid": true
   },
   {
-    "artifact_hash": "63f86504398b9bb606aedce330b7f62444a38f014c8f030d19189a74bd1350c0",
+    "artifact_hash": "3138e98404135a247111f695271ad4f009e848450235c7a23328f2250efaa638",
     "case_id": "spatial-unsupported-sine-xc",
     "certificate_status": "ineligible",
     "class": "unsupported",
@@ -374,7 +374,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "63f86504398b9bb606aedce330b7f62444a38f014c8f030d19189a74bd1350c0",
+    "artifact_hash": "3138e98404135a247111f695271ad4f009e848450235c7a23328f2250efaa638",
     "case_id": "spatial-unsupported-sine-xc",
     "certificate_status": "ineligible",
     "class": "unsupported",
@@ -391,7 +391,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "63f86504398b9bb606aedce330b7f62444a38f014c8f030d19189a74bd1350c0",
+    "artifact_hash": "3138e98404135a247111f695271ad4f009e848450235c7a23328f2250efaa638",
     "case_id": "spatial-unsupported-sine-xc",
     "certificate_status": "ineligible",
     "class": "unsupported",
@@ -408,7 +408,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "7889e6ac961d4c451bfc2269388febf9a3c3f00d1f394ba6dd7f1d5c70974c86",
+    "artifact_hash": "52aa495c8cf7b1c978d1b01df01963d2911ed17a960a9fe30ac7937b78d7c4a5",
     "case_id": "spatial-unsupported-nested-operator",
     "certificate_status": "ineligible",
     "class": "unsupported",
@@ -425,7 +425,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "7889e6ac961d4c451bfc2269388febf9a3c3f00d1f394ba6dd7f1d5c70974c86",
+    "artifact_hash": "52aa495c8cf7b1c978d1b01df01963d2911ed17a960a9fe30ac7937b78d7c4a5",
     "case_id": "spatial-unsupported-nested-operator",
     "certificate_status": "ineligible",
     "class": "unsupported",
@@ -442,7 +442,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "7889e6ac961d4c451bfc2269388febf9a3c3f00d1f394ba6dd7f1d5c70974c86",
+    "artifact_hash": "52aa495c8cf7b1c978d1b01df01963d2911ed17a960a9fe30ac7937b78d7c4a5",
     "case_id": "spatial-unsupported-nested-operator",
     "certificate_status": "ineligible",
     "class": "unsupported",
@@ -459,7 +459,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "a66ebbecdaa42d52a7e7301dabd69321f369c04c0caa5f636c29be1d87063cbf",
+    "artifact_hash": "b148a58ae829a51489539c10664156816310e6274c73f852664a0c47428a71ca",
     "case_id": "spatial-malformed-missing-message-role",
     "certificate_status": "ineligible",
     "class": "malformed",
@@ -476,7 +476,7 @@
     "translation_valid": false
   },
   {
-    "artifact_hash": "a66ebbecdaa42d52a7e7301dabd69321f369c04c0caa5f636c29be1d87063cbf",
+    "artifact_hash": "b148a58ae829a51489539c10664156816310e6274c73f852664a0c47428a71ca",
     "case_id": "spatial-malformed-missing-message-role",
     "certificate_status": "ineligible",
     "class": "malformed",
@@ -493,7 +493,7 @@
     "translation_valid": false
   },
   {
-    "artifact_hash": "a66ebbecdaa42d52a7e7301dabd69321f369c04c0caa5f636c29be1d87063cbf",
+    "artifact_hash": "b148a58ae829a51489539c10664156816310e6274c73f852664a0c47428a71ca",
     "case_id": "spatial-malformed-missing-message-role",
     "certificate_status": "ineligible",
     "class": "malformed",
@@ -510,7 +510,7 @@
     "translation_valid": false
   },
   {
-    "artifact_hash": "5cca1482c6475c9ade93f8559fe7b3ab4220f550ad3a4500e9781fafbc657169",
+    "artifact_hash": "91cb9bdbee66dde39f43ea2cd9df2ee2958a55abf818eba11132da21602428e3",
     "case_id": "spatial-malformed-duplicate-role",
     "certificate_status": "ineligible",
     "class": "malformed",
@@ -527,7 +527,7 @@
     "translation_valid": false
   },
   {
-    "artifact_hash": "5cca1482c6475c9ade93f8559fe7b3ab4220f550ad3a4500e9781fafbc657169",
+    "artifact_hash": "91cb9bdbee66dde39f43ea2cd9df2ee2958a55abf818eba11132da21602428e3",
     "case_id": "spatial-malformed-duplicate-role",
     "certificate_status": "ineligible",
     "class": "malformed",
@@ -544,7 +544,7 @@
     "translation_valid": false
   },
   {
-    "artifact_hash": "5cca1482c6475c9ade93f8559fe7b3ab4220f550ad3a4500e9781fafbc657169",
+    "artifact_hash": "91cb9bdbee66dde39f43ea2cd9df2ee2958a55abf818eba11132da21602428e3",
     "case_id": "spatial-malformed-duplicate-role",
     "certificate_status": "ineligible",
     "class": "malformed",
@@ -561,7 +561,7 @@
     "translation_valid": false
   },
   {
-    "artifact_hash": "5cac2dd1ade1b34be723e95a005a736f741f225e25e8e196961e9776ec1411a0",
+    "artifact_hash": "410af8a2e60363f131e12c6f7abb2e6b034a40fd9651989b0d62b13efd22300b",
     "case_id": "spatial-malformed-invalid-convention",
     "certificate_status": "ineligible",
     "class": "malformed",
@@ -578,7 +578,7 @@
     "translation_valid": false
   },
   {
-    "artifact_hash": "5cac2dd1ade1b34be723e95a005a736f741f225e25e8e196961e9776ec1411a0",
+    "artifact_hash": "410af8a2e60363f131e12c6f7abb2e6b034a40fd9651989b0d62b13efd22300b",
     "case_id": "spatial-malformed-invalid-convention",
     "certificate_status": "ineligible",
     "class": "malformed",
@@ -595,7 +595,7 @@
     "translation_valid": false
   },
   {
-    "artifact_hash": "5cac2dd1ade1b34be723e95a005a736f741f225e25e8e196961e9776ec1411a0",
+    "artifact_hash": "410af8a2e60363f131e12c6f7abb2e6b034a40fd9651989b0d62b13efd22300b",
     "case_id": "spatial-malformed-invalid-convention",
     "certificate_status": "ineligible",
     "class": "malformed",
@@ -612,7 +612,7 @@
     "translation_valid": false
   },
   {
-    "artifact_hash": "ed39b8bcb7da8f9148044b948c0f68c12f1467b75b3610424dc0b8d840449ec9",
+    "artifact_hash": "08ea55c044fcd9d11f8156874763790398bd40501553a8e8661eacd122d7e0bb",
     "case_id": "operator-positive-symmetrized",
     "certificate_status": "verified",
     "class": "positive",
@@ -629,7 +629,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "ed39b8bcb7da8f9148044b948c0f68c12f1467b75b3610424dc0b8d840449ec9",
+    "artifact_hash": "08ea55c044fcd9d11f8156874763790398bd40501553a8e8661eacd122d7e0bb",
     "case_id": "operator-positive-symmetrized",
     "certificate_status": "verified",
     "class": "positive",
@@ -646,7 +646,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "ed39b8bcb7da8f9148044b948c0f68c12f1467b75b3610424dc0b8d840449ec9",
+    "artifact_hash": "08ea55c044fcd9d11f8156874763790398bd40501553a8e8661eacd122d7e0bb",
     "case_id": "operator-positive-symmetrized",
     "certificate_status": "verified",
     "class": "positive",
@@ -663,7 +663,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "65104f83370706f1ef1faa02ca65f98fddf5f1ebb4c1b44662a43498ca9c9cc5",
+    "artifact_hash": "3b4b372ec9ee60cbfe796153aa0d8954f267f7462569f65728665386802ebf4e",
     "case_id": "operator-positive-zero",
     "certificate_status": "verified",
     "class": "positive",
@@ -680,7 +680,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "65104f83370706f1ef1faa02ca65f98fddf5f1ebb4c1b44662a43498ca9c9cc5",
+    "artifact_hash": "3b4b372ec9ee60cbfe796153aa0d8954f267f7462569f65728665386802ebf4e",
     "case_id": "operator-positive-zero",
     "certificate_status": "verified",
     "class": "positive",
@@ -697,7 +697,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "65104f83370706f1ef1faa02ca65f98fddf5f1ebb4c1b44662a43498ca9c9cc5",
+    "artifact_hash": "3b4b372ec9ee60cbfe796153aa0d8954f267f7462569f65728665386802ebf4e",
     "case_id": "operator-positive-zero",
     "certificate_status": "verified",
     "class": "positive",
@@ -714,7 +714,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "1c8279fc14a6d55302d77a0b8e53ef28ad7c010e33117b4f9337bc7f8531d34b",
+    "artifact_hash": "21f8dbe6d9dfc71832fdc3bc05272eead06d51f1c86efaf0b788fbb706d1612f",
     "case_id": "operator-positive-identity",
     "certificate_status": "verified",
     "class": "positive",
@@ -731,7 +731,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "1c8279fc14a6d55302d77a0b8e53ef28ad7c010e33117b4f9337bc7f8531d34b",
+    "artifact_hash": "21f8dbe6d9dfc71832fdc3bc05272eead06d51f1c86efaf0b788fbb706d1612f",
     "case_id": "operator-positive-identity",
     "certificate_status": "verified",
     "class": "positive",
@@ -748,7 +748,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "1c8279fc14a6d55302d77a0b8e53ef28ad7c010e33117b4f9337bc7f8531d34b",
+    "artifact_hash": "21f8dbe6d9dfc71832fdc3bc05272eead06d51f1c86efaf0b788fbb706d1612f",
     "case_id": "operator-positive-identity",
     "certificate_status": "verified",
     "class": "positive",
@@ -765,58 +765,58 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "ce282f891a3b6c115eae7aba74e9c7428e4dd9155e450c7f7534896d529d00ee",
+    "artifact_hash": "55cc756b53e1ce69d2a3931f0169952bedf1a30b9fce78572becce4282da6149",
     "case_id": "operator-nearmiss-b-plus-cT",
     "certificate_status": "ineligible",
     "class": "near_miss",
-    "correct": false,
+    "correct": true,
     "domain": "operator",
     "expected_status": "supported-but-incompatible",
     "failure_reason": "",
     "lean_status": "not_run",
-    "observed_ir_value": "{\"depth\": 3, \"operator\": \"unsupported\", \"xc\": \"hinge\"}",
-    "observed_semantic_status": "unsupported",
-    "policy_status": "formalization_required",
+    "observed_ir_value": "{\"depth\": 3, \"operator\": \"unconstrained_parameter\", \"xc\": \"hinge\"}",
+    "observed_semantic_status": "supported-but-incompatible",
+    "policy_status": "structural_requirements_not_met",
     "repeat": 0,
     "split": "development",
     "translation_valid": true
   },
   {
-    "artifact_hash": "ce282f891a3b6c115eae7aba74e9c7428e4dd9155e450c7f7534896d529d00ee",
+    "artifact_hash": "55cc756b53e1ce69d2a3931f0169952bedf1a30b9fce78572becce4282da6149",
     "case_id": "operator-nearmiss-b-plus-cT",
     "certificate_status": "ineligible",
     "class": "near_miss",
-    "correct": false,
+    "correct": true,
     "domain": "operator",
     "expected_status": "supported-but-incompatible",
     "failure_reason": "",
     "lean_status": "not_run",
-    "observed_ir_value": "{\"depth\": 3, \"operator\": \"unsupported\", \"xc\": \"hinge\"}",
-    "observed_semantic_status": "unsupported",
-    "policy_status": "formalization_required",
+    "observed_ir_value": "{\"depth\": 3, \"operator\": \"unconstrained_parameter\", \"xc\": \"hinge\"}",
+    "observed_semantic_status": "supported-but-incompatible",
+    "policy_status": "structural_requirements_not_met",
     "repeat": 1,
     "split": "development",
     "translation_valid": true
   },
   {
-    "artifact_hash": "ce282f891a3b6c115eae7aba74e9c7428e4dd9155e450c7f7534896d529d00ee",
+    "artifact_hash": "55cc756b53e1ce69d2a3931f0169952bedf1a30b9fce78572becce4282da6149",
     "case_id": "operator-nearmiss-b-plus-cT",
     "certificate_status": "ineligible",
     "class": "near_miss",
-    "correct": false,
+    "correct": true,
     "domain": "operator",
     "expected_status": "supported-but-incompatible",
     "failure_reason": "",
     "lean_status": "not_run",
-    "observed_ir_value": "{\"depth\": 3, \"operator\": \"unsupported\", \"xc\": \"hinge\"}",
-    "observed_semantic_status": "unsupported",
-    "policy_status": "formalization_required",
+    "observed_ir_value": "{\"depth\": 3, \"operator\": \"unconstrained_parameter\", \"xc\": \"hinge\"}",
+    "observed_semantic_status": "supported-but-incompatible",
+    "policy_status": "structural_requirements_not_met",
     "repeat": 2,
     "split": "development",
     "translation_valid": true
   },
   {
-    "artifact_hash": "07c534ca34a0ae7491d456ebffd2f5b074138b34d95f6706d0723bb28d239970",
+    "artifact_hash": "d01238cfe92a4193d7d633634bbfc1d368799f37c7f0043349d80597a9203e35",
     "case_id": "operator-nearmiss-indirect-transpose",
     "certificate_status": "ineligible",
     "class": "near_miss",
@@ -833,7 +833,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "07c534ca34a0ae7491d456ebffd2f5b074138b34d95f6706d0723bb28d239970",
+    "artifact_hash": "d01238cfe92a4193d7d633634bbfc1d368799f37c7f0043349d80597a9203e35",
     "case_id": "operator-nearmiss-indirect-transpose",
     "certificate_status": "ineligible",
     "class": "near_miss",
@@ -850,7 +850,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "07c534ca34a0ae7491d456ebffd2f5b074138b34d95f6706d0723bb28d239970",
+    "artifact_hash": "d01238cfe92a4193d7d633634bbfc1d368799f37c7f0043349d80597a9203e35",
     "case_id": "operator-nearmiss-indirect-transpose",
     "certificate_status": "ineligible",
     "class": "near_miss",
@@ -867,7 +867,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "a1e75d946db3e4e91c9ca78aa9c87b07ee57554c35ab2934278ada46e9b01075",
+    "artifact_hash": "3bf6b0e217d8310e07dd7fb084f1819d631324786e6bbf8ce429ae3cfa055546",
     "case_id": "operator-nearmiss-free",
     "certificate_status": "ineligible",
     "class": "near_miss",
@@ -884,7 +884,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "a1e75d946db3e4e91c9ca78aa9c87b07ee57554c35ab2934278ada46e9b01075",
+    "artifact_hash": "3bf6b0e217d8310e07dd7fb084f1819d631324786e6bbf8ce429ae3cfa055546",
     "case_id": "operator-nearmiss-free",
     "certificate_status": "ineligible",
     "class": "near_miss",
@@ -901,7 +901,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "a1e75d946db3e4e91c9ca78aa9c87b07ee57554c35ab2934278ada46e9b01075",
+    "artifact_hash": "3bf6b0e217d8310e07dd7fb084f1819d631324786e6bbf8ce429ae3cfa055546",
     "case_id": "operator-nearmiss-free",
     "certificate_status": "ineligible",
     "class": "near_miss",
@@ -918,7 +918,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "2246b5c343b19cd25a4e72fe5bc0c3490648a70a6941309a1a448f0cd54a1b27",
+    "artifact_hash": "4a5414be1396eecfcd2e7490990b789a7094d37707d9eb7d8f4cb9b91cb02c3f",
     "case_id": "operator-unsupported-nested",
     "certificate_status": "ineligible",
     "class": "unsupported",
@@ -935,7 +935,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "2246b5c343b19cd25a4e72fe5bc0c3490648a70a6941309a1a448f0cd54a1b27",
+    "artifact_hash": "4a5414be1396eecfcd2e7490990b789a7094d37707d9eb7d8f4cb9b91cb02c3f",
     "case_id": "operator-unsupported-nested",
     "certificate_status": "ineligible",
     "class": "unsupported",
@@ -952,7 +952,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "2246b5c343b19cd25a4e72fe5bc0c3490648a70a6941309a1a448f0cd54a1b27",
+    "artifact_hash": "4a5414be1396eecfcd2e7490990b789a7094d37707d9eb7d8f4cb9b91cb02c3f",
     "case_id": "operator-unsupported-nested",
     "certificate_status": "ineligible",
     "class": "unsupported",
@@ -969,7 +969,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "d4cb84a71d6fe7c3caf7822a8ab8375d974fe221c19ffb12d87e7caf1f2847e4",
+    "artifact_hash": "a2aab798be51d32ef83085c36ca19d5e955ff8e4c64282c215c599a5e0d3b680",
     "case_id": "operator-unsupported-transformed",
     "certificate_status": "ineligible",
     "class": "unsupported",
@@ -986,7 +986,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "d4cb84a71d6fe7c3caf7822a8ab8375d974fe221c19ffb12d87e7caf1f2847e4",
+    "artifact_hash": "a2aab798be51d32ef83085c36ca19d5e955ff8e4c64282c215c599a5e0d3b680",
     "case_id": "operator-unsupported-transformed",
     "certificate_status": "ineligible",
     "class": "unsupported",
@@ -1003,7 +1003,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "d4cb84a71d6fe7c3caf7822a8ab8375d974fe221c19ffb12d87e7caf1f2847e4",
+    "artifact_hash": "a2aab798be51d32ef83085c36ca19d5e955ff8e4c64282c215c599a5e0d3b680",
     "case_id": "operator-unsupported-transformed",
     "certificate_status": "ineligible",
     "class": "unsupported",
@@ -1020,7 +1020,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "29e815d66a069d4ebdda5d712503ed1c8c007c74c718e1f5aef4a4c5e5715d67",
+    "artifact_hash": "30ab14892a52d32f52d13e53d58aece7692fd40be939317aace3dd0ae67295c5",
     "case_id": "operator-unsupported-product",
     "certificate_status": "ineligible",
     "class": "unsupported",
@@ -1037,7 +1037,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "29e815d66a069d4ebdda5d712503ed1c8c007c74c718e1f5aef4a4c5e5715d67",
+    "artifact_hash": "30ab14892a52d32f52d13e53d58aece7692fd40be939317aace3dd0ae67295c5",
     "case_id": "operator-unsupported-product",
     "certificate_status": "ineligible",
     "class": "unsupported",
@@ -1054,7 +1054,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "29e815d66a069d4ebdda5d712503ed1c8c007c74c718e1f5aef4a4c5e5715d67",
+    "artifact_hash": "30ab14892a52d32f52d13e53d58aece7692fd40be939317aace3dd0ae67295c5",
     "case_id": "operator-unsupported-product",
     "certificate_status": "ineligible",
     "class": "unsupported",
@@ -1071,7 +1071,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "c3c1c4c2e04f1c3861576d4c9a50f540c8ae0227cf7f98e10ec808e1a6f6d8c3",
+    "artifact_hash": "16d040b5935432194a8d53bbac3cf632b12a1b110d2156a10e6efb4d488e0a03",
     "case_id": "operator-malformed-wrong-role",
     "certificate_status": "ineligible",
     "class": "malformed",
@@ -1088,7 +1088,7 @@
     "translation_valid": false
   },
   {
-    "artifact_hash": "c3c1c4c2e04f1c3861576d4c9a50f540c8ae0227cf7f98e10ec808e1a6f6d8c3",
+    "artifact_hash": "16d040b5935432194a8d53bbac3cf632b12a1b110d2156a10e6efb4d488e0a03",
     "case_id": "operator-malformed-wrong-role",
     "certificate_status": "ineligible",
     "class": "malformed",
@@ -1105,7 +1105,7 @@
     "translation_valid": false
   },
   {
-    "artifact_hash": "c3c1c4c2e04f1c3861576d4c9a50f540c8ae0227cf7f98e10ec808e1a6f6d8c3",
+    "artifact_hash": "16d040b5935432194a8d53bbac3cf632b12a1b110d2156a10e6efb4d488e0a03",
     "case_id": "operator-malformed-wrong-role",
     "certificate_status": "ineligible",
     "class": "malformed",
@@ -1122,7 +1122,7 @@
     "translation_valid": false
   },
   {
-    "artifact_hash": "3ff9e4f72528537824b24fcd27c09bf383b3114f5abc007579c5fe85bc39b29c",
+    "artifact_hash": "4d866c80c243ff83453144ba6196e5417c175273d3e76612d68b3519c4ad4441",
     "case_id": "operator-malformed-missing-output",
     "certificate_status": "ineligible",
     "class": "malformed",
@@ -1139,7 +1139,7 @@
     "translation_valid": false
   },
   {
-    "artifact_hash": "3ff9e4f72528537824b24fcd27c09bf383b3114f5abc007579c5fe85bc39b29c",
+    "artifact_hash": "4d866c80c243ff83453144ba6196e5417c175273d3e76612d68b3519c4ad4441",
     "case_id": "operator-malformed-missing-output",
     "certificate_status": "ineligible",
     "class": "malformed",
@@ -1156,7 +1156,7 @@
     "translation_valid": false
   },
   {
-    "artifact_hash": "3ff9e4f72528537824b24fcd27c09bf383b3114f5abc007579c5fe85bc39b29c",
+    "artifact_hash": "4d866c80c243ff83453144ba6196e5417c175273d3e76612d68b3519c4ad4441",
     "case_id": "operator-malformed-missing-output",
     "certificate_status": "ineligible",
     "class": "malformed",
@@ -1173,7 +1173,7 @@
     "translation_valid": false
   },
   {
-    "artifact_hash": "0cf0612dea9064089644390b1789cadb933668151c9ecf2f2c735fc6a92fd2ad",
+    "artifact_hash": "1ccc3ddb48d4bc52d8e6b71a07360c0ce659c6acfe9969041c22ad5be58d1686",
     "case_id": "operator-malformed-invalid-adjacency",
     "certificate_status": "ineligible",
     "class": "malformed",
@@ -1190,7 +1190,7 @@
     "translation_valid": false
   },
   {
-    "artifact_hash": "0cf0612dea9064089644390b1789cadb933668151c9ecf2f2c735fc6a92fd2ad",
+    "artifact_hash": "1ccc3ddb48d4bc52d8e6b71a07360c0ce659c6acfe9969041c22ad5be58d1686",
     "case_id": "operator-malformed-invalid-adjacency",
     "certificate_status": "ineligible",
     "class": "malformed",
@@ -1207,7 +1207,7 @@
     "translation_valid": false
   },
   {
-    "artifact_hash": "0cf0612dea9064089644390b1789cadb933668151c9ecf2f2c735fc6a92fd2ad",
+    "artifact_hash": "1ccc3ddb48d4bc52d8e6b71a07360c0ce659c6acfe9969041c22ad5be58d1686",
     "case_id": "operator-malformed-invalid-adjacency",
     "certificate_status": "ineligible",
     "class": "malformed",
@@ -1224,7 +1224,7 @@
     "translation_valid": false
   },
   {
-    "artifact_hash": "8dd997b58b1e6c7b590db45f439c744aa76eae3659241e5a8bf30d0a031f5004",
+    "artifact_hash": "4ed83e37d73214d3e0e53a0878d988bd7c30fab30da98a23485da9ea913b4502",
     "case_id": "xc-positive-relu",
     "certificate_status": "verified",
     "class": "positive",
@@ -1241,7 +1241,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "8dd997b58b1e6c7b590db45f439c744aa76eae3659241e5a8bf30d0a031f5004",
+    "artifact_hash": "4ed83e37d73214d3e0e53a0878d988bd7c30fab30da98a23485da9ea913b4502",
     "case_id": "xc-positive-relu",
     "certificate_status": "verified",
     "class": "positive",
@@ -1258,7 +1258,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "8dd997b58b1e6c7b590db45f439c744aa76eae3659241e5a8bf30d0a031f5004",
+    "artifact_hash": "4ed83e37d73214d3e0e53a0878d988bd7c30fab30da98a23485da9ea913b4502",
     "case_id": "xc-positive-relu",
     "certificate_status": "verified",
     "class": "positive",
@@ -1275,7 +1275,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "09771905136e7fdbaa6cbf3459fe1090df8def42e2a6e486600dc9d2204bab7e",
+    "artifact_hash": "240e7aa2003a984bc6feaec1620213e0710f09417eec97dd2b10bf179c20ae96",
     "case_id": "xc-positive-leaky",
     "certificate_status": "verified",
     "class": "positive",
@@ -1292,7 +1292,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "09771905136e7fdbaa6cbf3459fe1090df8def42e2a6e486600dc9d2204bab7e",
+    "artifact_hash": "240e7aa2003a984bc6feaec1620213e0710f09417eec97dd2b10bf179c20ae96",
     "case_id": "xc-positive-leaky",
     "certificate_status": "verified",
     "class": "positive",
@@ -1309,7 +1309,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "09771905136e7fdbaa6cbf3459fe1090df8def42e2a6e486600dc9d2204bab7e",
+    "artifact_hash": "240e7aa2003a984bc6feaec1620213e0710f09417eec97dd2b10bf179c20ae96",
     "case_id": "xc-positive-leaky",
     "certificate_status": "verified",
     "class": "positive",
@@ -1326,7 +1326,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "0603663612875bd6a3e58e005d50427c1a2bccf4417a64d67ab707cd3be152b5",
+    "artifact_hash": "3b8760a75752db2b5e6047ce4b3c116ecfa6a2a2165ca714a442ed5bcb6af051",
     "case_id": "xc-positive-relu-irregular",
     "certificate_status": "verified",
     "class": "positive",
@@ -1343,7 +1343,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "0603663612875bd6a3e58e005d50427c1a2bccf4417a64d67ab707cd3be152b5",
+    "artifact_hash": "3b8760a75752db2b5e6047ce4b3c116ecfa6a2a2165ca714a442ed5bcb6af051",
     "case_id": "xc-positive-relu-irregular",
     "certificate_status": "verified",
     "class": "positive",
@@ -1360,7 +1360,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "0603663612875bd6a3e58e005d50427c1a2bccf4417a64d67ab707cd3be152b5",
+    "artifact_hash": "3b8760a75752db2b5e6047ce4b3c116ecfa6a2a2165ca714a442ed5bcb6af051",
     "case_id": "xc-positive-relu-irregular",
     "certificate_status": "verified",
     "class": "positive",
@@ -1377,7 +1377,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "7bed9f091cbc66247a5f268aeac3bcb5d8b1ede11115df5c7045aaf7da37a3cc",
+    "artifact_hash": "0a0db9f6050479f920926c65891d2376fc7f3ebf8176a10c0d8d667a82a163e6",
     "case_id": "xc-negative-sigmoid",
     "certificate_status": "ineligible",
     "class": "near_miss",
@@ -1394,7 +1394,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "7bed9f091cbc66247a5f268aeac3bcb5d8b1ede11115df5c7045aaf7da37a3cc",
+    "artifact_hash": "0a0db9f6050479f920926c65891d2376fc7f3ebf8176a10c0d8d667a82a163e6",
     "case_id": "xc-negative-sigmoid",
     "certificate_status": "ineligible",
     "class": "near_miss",
@@ -1411,7 +1411,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "7bed9f091cbc66247a5f268aeac3bcb5d8b1ede11115df5c7045aaf7da37a3cc",
+    "artifact_hash": "0a0db9f6050479f920926c65891d2376fc7f3ebf8176a10c0d8d667a82a163e6",
     "case_id": "xc-negative-sigmoid",
     "certificate_status": "ineligible",
     "class": "near_miss",
@@ -1428,7 +1428,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "cf332f9bf2135c68f191f870a64c222ba421b3a600948bef3edf774eb0369941",
+    "artifact_hash": "a4b914c984fc809484e86efc9b86a0fccfea74113716bfb38bcbe8b7f46cc4c6",
     "case_id": "xc-negative-tanh",
     "certificate_status": "ineligible",
     "class": "near_miss",
@@ -1445,7 +1445,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "cf332f9bf2135c68f191f870a64c222ba421b3a600948bef3edf774eb0369941",
+    "artifact_hash": "a4b914c984fc809484e86efc9b86a0fccfea74113716bfb38bcbe8b7f46cc4c6",
     "case_id": "xc-negative-tanh",
     "certificate_status": "ineligible",
     "class": "near_miss",
@@ -1462,7 +1462,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "cf332f9bf2135c68f191f870a64c222ba421b3a600948bef3edf774eb0369941",
+    "artifact_hash": "a4b914c984fc809484e86efc9b86a0fccfea74113716bfb38bcbe8b7f46cc4c6",
     "case_id": "xc-negative-tanh",
     "certificate_status": "ineligible",
     "class": "near_miss",
@@ -1479,58 +1479,58 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "19e85a0575360a7d01d56d1811fba0ccb542243588c7cb3b83c66606efc765a9",
+    "artifact_hash": "7150b3b742e5097ceb16c1712f286207004314c41511bef5309968fbf7c499de",
     "case_id": "xc-negative-hinge-elsewhere",
     "certificate_status": "ineligible",
-    "class": "near_miss",
+    "class": "unsupported",
     "correct": true,
     "domain": "xc",
-    "expected_status": "supported-but-incompatible",
+    "expected_status": "unsupported",
     "failure_reason": "",
     "lean_status": "not_run",
     "observed_ir_value": "{\"depth\": 1, \"operator\": \"symmetrized\", \"xc\": \"smooth\"}",
-    "observed_semantic_status": "supported-but-incompatible",
-    "policy_status": "structural_requirements_not_met",
+    "observed_semantic_status": "unsupported",
+    "policy_status": "formalization_required",
     "repeat": 0,
     "split": "evaluation",
     "translation_valid": true
   },
   {
-    "artifact_hash": "19e85a0575360a7d01d56d1811fba0ccb542243588c7cb3b83c66606efc765a9",
+    "artifact_hash": "7150b3b742e5097ceb16c1712f286207004314c41511bef5309968fbf7c499de",
     "case_id": "xc-negative-hinge-elsewhere",
     "certificate_status": "ineligible",
-    "class": "near_miss",
+    "class": "unsupported",
     "correct": true,
     "domain": "xc",
-    "expected_status": "supported-but-incompatible",
+    "expected_status": "unsupported",
     "failure_reason": "",
     "lean_status": "not_run",
     "observed_ir_value": "{\"depth\": 1, \"operator\": \"symmetrized\", \"xc\": \"smooth\"}",
-    "observed_semantic_status": "supported-but-incompatible",
-    "policy_status": "structural_requirements_not_met",
+    "observed_semantic_status": "unsupported",
+    "policy_status": "formalization_required",
     "repeat": 1,
     "split": "evaluation",
     "translation_valid": true
   },
   {
-    "artifact_hash": "19e85a0575360a7d01d56d1811fba0ccb542243588c7cb3b83c66606efc765a9",
+    "artifact_hash": "7150b3b742e5097ceb16c1712f286207004314c41511bef5309968fbf7c499de",
     "case_id": "xc-negative-hinge-elsewhere",
     "certificate_status": "ineligible",
-    "class": "near_miss",
+    "class": "unsupported",
     "correct": true,
     "domain": "xc",
-    "expected_status": "supported-but-incompatible",
+    "expected_status": "unsupported",
     "failure_reason": "",
     "lean_status": "not_run",
     "observed_ir_value": "{\"depth\": 1, \"operator\": \"symmetrized\", \"xc\": \"smooth\"}",
-    "observed_semantic_status": "supported-but-incompatible",
-    "policy_status": "structural_requirements_not_met",
+    "observed_semantic_status": "unsupported",
+    "policy_status": "formalization_required",
     "repeat": 2,
     "split": "evaluation",
     "translation_valid": true
   },
   {
-    "artifact_hash": "46147e80d0ca0e4576aa074dee49158d0564951b65dd423de066248124a800ab",
+    "artifact_hash": "dd98fe40a678a7e8d28e2a7c926c3327d9fc48ed3c48892dca404275e852dcbc",
     "case_id": "xc-unsupported-sine",
     "certificate_status": "ineligible",
     "class": "unsupported",
@@ -1547,7 +1547,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "46147e80d0ca0e4576aa074dee49158d0564951b65dd423de066248124a800ab",
+    "artifact_hash": "dd98fe40a678a7e8d28e2a7c926c3327d9fc48ed3c48892dca404275e852dcbc",
     "case_id": "xc-unsupported-sine",
     "certificate_status": "ineligible",
     "class": "unsupported",
@@ -1564,7 +1564,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "46147e80d0ca0e4576aa074dee49158d0564951b65dd423de066248124a800ab",
+    "artifact_hash": "dd98fe40a678a7e8d28e2a7c926c3327d9fc48ed3c48892dca404275e852dcbc",
     "case_id": "xc-unsupported-sine",
     "certificate_status": "ineligible",
     "class": "unsupported",
@@ -1581,7 +1581,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "864f406d2292033c2254469b7ca746b255909e961a161a0d8491fecce32a975a",
+    "artifact_hash": "9ea5246d03379190f431b682b5b2c09a648406c61265bb015bb7981065bb951b",
     "case_id": "xc-unsupported-none",
     "certificate_status": "ineligible",
     "class": "unsupported",
@@ -1598,7 +1598,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "864f406d2292033c2254469b7ca746b255909e961a161a0d8491fecce32a975a",
+    "artifact_hash": "9ea5246d03379190f431b682b5b2c09a648406c61265bb015bb7981065bb951b",
     "case_id": "xc-unsupported-none",
     "certificate_status": "ineligible",
     "class": "unsupported",
@@ -1615,7 +1615,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "864f406d2292033c2254469b7ca746b255909e961a161a0d8491fecce32a975a",
+    "artifact_hash": "9ea5246d03379190f431b682b5b2c09a648406c61265bb015bb7981065bb951b",
     "case_id": "xc-unsupported-none",
     "certificate_status": "ineligible",
     "class": "unsupported",
@@ -1632,7 +1632,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "19099f8cc45d9f3b966fd3240990786636ee7c0444e1287277308f123a1412f3",
+    "artifact_hash": "b872c841f7345b176cff8be30be0f716887c5f963ba5e2e83d249229f6c44132",
     "case_id": "xc-unsupported-mixed",
     "certificate_status": "ineligible",
     "class": "unsupported",
@@ -1649,7 +1649,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "19099f8cc45d9f3b966fd3240990786636ee7c0444e1287277308f123a1412f3",
+    "artifact_hash": "b872c841f7345b176cff8be30be0f716887c5f963ba5e2e83d249229f6c44132",
     "case_id": "xc-unsupported-mixed",
     "certificate_status": "ineligible",
     "class": "unsupported",
@@ -1666,7 +1666,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "19099f8cc45d9f3b966fd3240990786636ee7c0444e1287277308f123a1412f3",
+    "artifact_hash": "b872c841f7345b176cff8be30be0f716887c5f963ba5e2e83d249229f6c44132",
     "case_id": "xc-unsupported-mixed",
     "certificate_status": "ineligible",
     "class": "unsupported",
@@ -1683,7 +1683,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "8de060d23635e6c99bc976faac0afbd5f277c6f8fa20f8d404829c48ad5e148e",
+    "artifact_hash": "8e827c2dd479e24075502cbbc7b958ffa49883aa29c2c4fdce773d29cab26561",
     "case_id": "xc-malformed-wrong-role",
     "certificate_status": "ineligible",
     "class": "malformed",
@@ -1700,7 +1700,7 @@
     "translation_valid": false
   },
   {
-    "artifact_hash": "8de060d23635e6c99bc976faac0afbd5f277c6f8fa20f8d404829c48ad5e148e",
+    "artifact_hash": "8e827c2dd479e24075502cbbc7b958ffa49883aa29c2c4fdce773d29cab26561",
     "case_id": "xc-malformed-wrong-role",
     "certificate_status": "ineligible",
     "class": "malformed",
@@ -1717,7 +1717,7 @@
     "translation_valid": false
   },
   {
-    "artifact_hash": "8de060d23635e6c99bc976faac0afbd5f277c6f8fa20f8d404829c48ad5e148e",
+    "artifact_hash": "8e827c2dd479e24075502cbbc7b958ffa49883aa29c2c4fdce773d29cab26561",
     "case_id": "xc-malformed-wrong-role",
     "certificate_status": "ineligible",
     "class": "malformed",
@@ -1734,7 +1734,7 @@
     "translation_valid": false
   },
   {
-    "artifact_hash": "1cd3e97cc1e865fedaa7847b1f464f90806e0c9926edc5756c290c9edb27684c",
+    "artifact_hash": "d08104104ef8ec4427e60e1d880571a31763b7a6911c50a62c38624bbf89fea2",
     "case_id": "xc-malformed-missing-role",
     "certificate_status": "ineligible",
     "class": "malformed",
@@ -1751,7 +1751,7 @@
     "translation_valid": false
   },
   {
-    "artifact_hash": "1cd3e97cc1e865fedaa7847b1f464f90806e0c9926edc5756c290c9edb27684c",
+    "artifact_hash": "d08104104ef8ec4427e60e1d880571a31763b7a6911c50a62c38624bbf89fea2",
     "case_id": "xc-malformed-missing-role",
     "certificate_status": "ineligible",
     "class": "malformed",
@@ -1768,7 +1768,7 @@
     "translation_valid": false
   },
   {
-    "artifact_hash": "1cd3e97cc1e865fedaa7847b1f464f90806e0c9926edc5756c290c9edb27684c",
+    "artifact_hash": "d08104104ef8ec4427e60e1d880571a31763b7a6911c50a62c38624bbf89fea2",
     "case_id": "xc-malformed-missing-role",
     "certificate_status": "ineligible",
     "class": "malformed",
@@ -1785,7 +1785,7 @@
     "translation_valid": false
   },
   {
-    "artifact_hash": "b05fe0fea315b9a98a68aa0180185b26a811839e9f9bc4e79130a665b6bda138",
+    "artifact_hash": "4eecfe5bf0eb09e108a612bf24a901e2611fe02245e7d58b2a5fcb3ed2845a04",
     "case_id": "xc-malformed-invalid-convention",
     "certificate_status": "ineligible",
     "class": "malformed",
@@ -1802,7 +1802,7 @@
     "translation_valid": false
   },
   {
-    "artifact_hash": "b05fe0fea315b9a98a68aa0180185b26a811839e9f9bc4e79130a665b6bda138",
+    "artifact_hash": "4eecfe5bf0eb09e108a612bf24a901e2611fe02245e7d58b2a5fcb3ed2845a04",
     "case_id": "xc-malformed-invalid-convention",
     "certificate_status": "ineligible",
     "class": "malformed",
@@ -1819,7 +1819,7 @@
     "translation_valid": false
   },
   {
-    "artifact_hash": "b05fe0fea315b9a98a68aa0180185b26a811839e9f9bc4e79130a665b6bda138",
+    "artifact_hash": "4eecfe5bf0eb09e108a612bf24a901e2611fe02245e7d58b2a5fcb3ed2845a04",
     "case_id": "xc-malformed-invalid-convention",
     "certificate_status": "ineligible",
     "class": "malformed",
@@ -1836,7 +1836,7 @@
     "translation_valid": false
   },
   {
-    "artifact_hash": "61bde6dd3e3206b984339f0317ad45db63d2d755ec0457c947eef6f1d3aeb517",
+    "artifact_hash": "73448d8c6204ff71a4cf59fce0807985d61c98ed276d8bb89d8f08dd4a5b545f",
     "case_id": "s2-positive-extra-depth",
     "certificate_status": "verified",
     "class": "positive",
@@ -1853,7 +1853,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "61bde6dd3e3206b984339f0317ad45db63d2d755ec0457c947eef6f1d3aeb517",
+    "artifact_hash": "73448d8c6204ff71a4cf59fce0807985d61c98ed276d8bb89d8f08dd4a5b545f",
     "case_id": "s2-positive-extra-depth",
     "certificate_status": "verified",
     "class": "positive",
@@ -1870,7 +1870,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "61bde6dd3e3206b984339f0317ad45db63d2d755ec0457c947eef6f1d3aeb517",
+    "artifact_hash": "73448d8c6204ff71a4cf59fce0807985d61c98ed276d8bb89d8f08dd4a5b545f",
     "case_id": "s2-positive-extra-depth",
     "certificate_status": "verified",
     "class": "positive",
@@ -1887,7 +1887,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "9d07e966adfdb624e0add20209758d8f248396bbe4f9156e4146bb61342f685d",
+    "artifact_hash": "e4b166c69c9ffd45fa07d6566097221f9f4e84e6dc8f74372a8cc8beeab4a3cd",
     "case_id": "s2-nearmiss-single-hop",
     "certificate_status": "ineligible",
     "class": "near_miss",
@@ -1904,7 +1904,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "9d07e966adfdb624e0add20209758d8f248396bbe4f9156e4146bb61342f685d",
+    "artifact_hash": "e4b166c69c9ffd45fa07d6566097221f9f4e84e6dc8f74372a8cc8beeab4a3cd",
     "case_id": "s2-nearmiss-single-hop",
     "certificate_status": "ineligible",
     "class": "near_miss",
@@ -1921,7 +1921,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "9d07e966adfdb624e0add20209758d8f248396bbe4f9156e4146bb61342f685d",
+    "artifact_hash": "e4b166c69c9ffd45fa07d6566097221f9f4e84e6dc8f74372a8cc8beeab4a3cd",
     "case_id": "s2-nearmiss-single-hop",
     "certificate_status": "ineligible",
     "class": "near_miss",
@@ -1938,7 +1938,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "38cdb0aae91e32fe0cd8d449f45158c2f80bad864b54bda7734c1efff35b2f5b",
+    "artifact_hash": "9ff1add79d69264655de2f9b4657a7658c70d3c4dada289811f0431c149430af",
     "case_id": "s2-nearmiss-alias-short",
     "certificate_status": "ineligible",
     "class": "near_miss",
@@ -1955,7 +1955,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "38cdb0aae91e32fe0cd8d449f45158c2f80bad864b54bda7734c1efff35b2f5b",
+    "artifact_hash": "9ff1add79d69264655de2f9b4657a7658c70d3c4dada289811f0431c149430af",
     "case_id": "s2-nearmiss-alias-short",
     "certificate_status": "ineligible",
     "class": "near_miss",
@@ -1972,7 +1972,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "38cdb0aae91e32fe0cd8d449f45158c2f80bad864b54bda7734c1efff35b2f5b",
+    "artifact_hash": "9ff1add79d69264655de2f9b4657a7658c70d3c4dada289811f0431c149430af",
     "case_id": "s2-nearmiss-alias-short",
     "certificate_status": "ineligible",
     "class": "near_miss",
@@ -1989,7 +1989,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "a15e623c4ca6e658529d9b12525375e219510dd97db545aa59b3e16f470df26a",
+    "artifact_hash": "d284d6b56005c234fa58bd1aa20328bce2fa4c5168f264ddb6728f2e81061321",
     "case_id": "s2-malformed-invalid-adjacency",
     "certificate_status": "ineligible",
     "class": "malformed",
@@ -2006,7 +2006,7 @@
     "translation_valid": false
   },
   {
-    "artifact_hash": "a15e623c4ca6e658529d9b12525375e219510dd97db545aa59b3e16f470df26a",
+    "artifact_hash": "d284d6b56005c234fa58bd1aa20328bce2fa4c5168f264ddb6728f2e81061321",
     "case_id": "s2-malformed-invalid-adjacency",
     "certificate_status": "ineligible",
     "class": "malformed",
@@ -2023,7 +2023,7 @@
     "translation_valid": false
   },
   {
-    "artifact_hash": "a15e623c4ca6e658529d9b12525375e219510dd97db545aa59b3e16f470df26a",
+    "artifact_hash": "d284d6b56005c234fa58bd1aa20328bce2fa4c5168f264ddb6728f2e81061321",
     "case_id": "s2-malformed-invalid-adjacency",
     "certificate_status": "ineligible",
     "class": "malformed",
@@ -2040,7 +2040,7 @@
     "translation_valid": false
   },
   {
-    "artifact_hash": "fb0f7db49770420befee74236e0d35f2a839e4fb5b1245f8ca0c72aae3a51e8a",
+    "artifact_hash": "cfe30b33a78c0163dbeaca8c171f324fb61757ea7e0d479e0eddcb07f4c322e6",
     "case_id": "o2-positive-adjoint-first",
     "certificate_status": "verified",
     "class": "positive",
@@ -2057,7 +2057,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "fb0f7db49770420befee74236e0d35f2a839e4fb5b1245f8ca0c72aae3a51e8a",
+    "artifact_hash": "cfe30b33a78c0163dbeaca8c171f324fb61757ea7e0d479e0eddcb07f4c322e6",
     "case_id": "o2-positive-adjoint-first",
     "certificate_status": "verified",
     "class": "positive",
@@ -2074,7 +2074,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "fb0f7db49770420befee74236e0d35f2a839e4fb5b1245f8ca0c72aae3a51e8a",
+    "artifact_hash": "cfe30b33a78c0163dbeaca8c171f324fb61757ea7e0d479e0eddcb07f4c322e6",
     "case_id": "o2-positive-adjoint-first",
     "certificate_status": "verified",
     "class": "positive",
@@ -2091,7 +2091,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "02c5ba067564202e9040f202507ed862e81c3e4564876b75befdfea4292fe1df",
+    "artifact_hash": "85b5833e8ea1d084146a4498daa86e30f7904aba9d403f4f1e7346ddb3aa34d4",
     "case_id": "o2-nearmiss-loose-parameter",
     "certificate_status": "ineligible",
     "class": "near_miss",
@@ -2108,7 +2108,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "02c5ba067564202e9040f202507ed862e81c3e4564876b75befdfea4292fe1df",
+    "artifact_hash": "85b5833e8ea1d084146a4498daa86e30f7904aba9d403f4f1e7346ddb3aa34d4",
     "case_id": "o2-nearmiss-loose-parameter",
     "certificate_status": "ineligible",
     "class": "near_miss",
@@ -2125,7 +2125,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "02c5ba067564202e9040f202507ed862e81c3e4564876b75befdfea4292fe1df",
+    "artifact_hash": "85b5833e8ea1d084146a4498daa86e30f7904aba9d403f4f1e7346ddb3aa34d4",
     "case_id": "o2-nearmiss-loose-parameter",
     "certificate_status": "ineligible",
     "class": "near_miss",
@@ -2142,7 +2142,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "420720d947a2f5702c5778afb2c58d2809d901f2950a82ae4583be33897c7a11",
+    "artifact_hash": "94809ce3dca40ac2c7b03a55852d46b7ae3377313a2c51dbc5d8ae1a54780de5",
     "case_id": "o2-unsupported-diagonal",
     "certificate_status": "ineligible",
     "class": "unsupported",
@@ -2159,7 +2159,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "420720d947a2f5702c5778afb2c58d2809d901f2950a82ae4583be33897c7a11",
+    "artifact_hash": "94809ce3dca40ac2c7b03a55852d46b7ae3377313a2c51dbc5d8ae1a54780de5",
     "case_id": "o2-unsupported-diagonal",
     "certificate_status": "ineligible",
     "class": "unsupported",
@@ -2176,7 +2176,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "420720d947a2f5702c5778afb2c58d2809d901f2950a82ae4583be33897c7a11",
+    "artifact_hash": "94809ce3dca40ac2c7b03a55852d46b7ae3377313a2c51dbc5d8ae1a54780de5",
     "case_id": "o2-unsupported-diagonal",
     "certificate_status": "ineligible",
     "class": "unsupported",
@@ -2193,7 +2193,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "89eb6bdf502d7f745cb284e4cc6d2033aa7e594d41c28984bb5ff4c9f9ba5746",
+    "artifact_hash": "ce4406e42905bebe84b310d2a59d004c2fcdc68d760001b93f52ad890f853008",
     "case_id": "o2-malformed-duplicate-operator-role",
     "certificate_status": "ineligible",
     "class": "malformed",
@@ -2210,7 +2210,7 @@
     "translation_valid": false
   },
   {
-    "artifact_hash": "89eb6bdf502d7f745cb284e4cc6d2033aa7e594d41c28984bb5ff4c9f9ba5746",
+    "artifact_hash": "ce4406e42905bebe84b310d2a59d004c2fcdc68d760001b93f52ad890f853008",
     "case_id": "o2-malformed-duplicate-operator-role",
     "certificate_status": "ineligible",
     "class": "malformed",
@@ -2227,7 +2227,7 @@
     "translation_valid": false
   },
   {
-    "artifact_hash": "89eb6bdf502d7f745cb284e4cc6d2033aa7e594d41c28984bb5ff4c9f9ba5746",
+    "artifact_hash": "ce4406e42905bebe84b310d2a59d004c2fcdc68d760001b93f52ad890f853008",
     "case_id": "o2-malformed-duplicate-operator-role",
     "certificate_status": "ineligible",
     "class": "malformed",
@@ -2244,7 +2244,7 @@
     "translation_valid": false
   },
   {
-    "artifact_hash": "81ea48a0c860789aa0c042ba1a46a173af67fd50cc5ce395b68970eae936da91",
+    "artifact_hash": "58faeb876d0ee1ca901eb1d58232a1dcccbc77ca5df952c8871ff882f5659b7b",
     "case_id": "x2-positive-nested-hinge",
     "certificate_status": "verified",
     "class": "positive",
@@ -2261,7 +2261,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "81ea48a0c860789aa0c042ba1a46a173af67fd50cc5ce395b68970eae936da91",
+    "artifact_hash": "58faeb876d0ee1ca901eb1d58232a1dcccbc77ca5df952c8871ff882f5659b7b",
     "case_id": "x2-positive-nested-hinge",
     "certificate_status": "verified",
     "class": "positive",
@@ -2278,7 +2278,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "81ea48a0c860789aa0c042ba1a46a173af67fd50cc5ce395b68970eae936da91",
+    "artifact_hash": "58faeb876d0ee1ca901eb1d58232a1dcccbc77ca5df952c8871ff882f5659b7b",
     "case_id": "x2-positive-nested-hinge",
     "certificate_status": "verified",
     "class": "positive",
@@ -2295,7 +2295,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "9868e0605b41d1a0effdd9fb93b28b4335bc05c2dcda1d502dc9019fb34cae9d",
+    "artifact_hash": "61ae21bcf65bb48de2f6a8d36a5b761b3850c5fb8bbcf6cc8bf2a088d9c13f5b",
     "case_id": "x2-unsupported-reversed-mixed",
     "certificate_status": "ineligible",
     "class": "unsupported",
@@ -2312,7 +2312,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "9868e0605b41d1a0effdd9fb93b28b4335bc05c2dcda1d502dc9019fb34cae9d",
+    "artifact_hash": "61ae21bcf65bb48de2f6a8d36a5b761b3850c5fb8bbcf6cc8bf2a088d9c13f5b",
     "case_id": "x2-unsupported-reversed-mixed",
     "certificate_status": "ineligible",
     "class": "unsupported",
@@ -2329,7 +2329,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "9868e0605b41d1a0effdd9fb93b28b4335bc05c2dcda1d502dc9019fb34cae9d",
+    "artifact_hash": "61ae21bcf65bb48de2f6a8d36a5b761b3850c5fb8bbcf6cc8bf2a088d9c13f5b",
     "case_id": "x2-unsupported-reversed-mixed",
     "certificate_status": "ineligible",
     "class": "unsupported",
@@ -2346,13 +2346,13 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "a1e3363f83608d65bb916f66d059dcb339acf584f04489379d804f13cc13142b",
+    "artifact_hash": "fd7977671917eb224d4ee5a2569235686684428af1dbd3ea1e72912a8956536d",
     "case_id": "x2-unsupported-gelu",
     "certificate_status": "ineligible",
-    "class": "unsupported",
-    "correct": false,
+    "class": "near_miss",
+    "correct": true,
     "domain": "xc",
-    "expected_status": "unsupported",
+    "expected_status": "supported-but-incompatible",
     "failure_reason": "",
     "lean_status": "not_run",
     "observed_ir_value": "{\"depth\": 3, \"operator\": \"symmetrized\", \"xc\": \"smooth\"}",
@@ -2363,13 +2363,13 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "a1e3363f83608d65bb916f66d059dcb339acf584f04489379d804f13cc13142b",
+    "artifact_hash": "fd7977671917eb224d4ee5a2569235686684428af1dbd3ea1e72912a8956536d",
     "case_id": "x2-unsupported-gelu",
     "certificate_status": "ineligible",
-    "class": "unsupported",
-    "correct": false,
+    "class": "near_miss",
+    "correct": true,
     "domain": "xc",
-    "expected_status": "unsupported",
+    "expected_status": "supported-but-incompatible",
     "failure_reason": "",
     "lean_status": "not_run",
     "observed_ir_value": "{\"depth\": 3, \"operator\": \"symmetrized\", \"xc\": \"smooth\"}",
@@ -2380,13 +2380,13 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "a1e3363f83608d65bb916f66d059dcb339acf584f04489379d804f13cc13142b",
+    "artifact_hash": "fd7977671917eb224d4ee5a2569235686684428af1dbd3ea1e72912a8956536d",
     "case_id": "x2-unsupported-gelu",
     "certificate_status": "ineligible",
-    "class": "unsupported",
-    "correct": false,
+    "class": "near_miss",
+    "correct": true,
     "domain": "xc",
-    "expected_status": "unsupported",
+    "expected_status": "supported-but-incompatible",
     "failure_reason": "",
     "lean_status": "not_run",
     "observed_ir_value": "{\"depth\": 3, \"operator\": \"symmetrized\", \"xc\": \"smooth\"}",
@@ -2397,7 +2397,7 @@
     "translation_valid": true
   },
   {
-    "artifact_hash": "2724aef8e024c93f5069963f6d9cb9c661f14a24b422bc503d70bc3e6b6b857a",
+    "artifact_hash": "8899d159a189467e4dd6809fab9c287ff792f7a01f4f3d47484e3fc90790d1f0",
     "case_id": "x2-malformed-duplicate-xc-role",
     "certificate_status": "ineligible",
     "class": "malformed",
@@ -2414,7 +2414,7 @@
     "translation_valid": false
   },
   {
-    "artifact_hash": "2724aef8e024c93f5069963f6d9cb9c661f14a24b422bc503d70bc3e6b6b857a",
+    "artifact_hash": "8899d159a189467e4dd6809fab9c287ff792f7a01f4f3d47484e3fc90790d1f0",
     "case_id": "x2-malformed-duplicate-xc-role",
     "certificate_status": "ineligible",
     "class": "malformed",
@@ -2431,7 +2431,7 @@
     "translation_valid": false
   },
   {
-    "artifact_hash": "2724aef8e024c93f5069963f6d9cb9c661f14a24b422bc503d70bc3e6b6b857a",
+    "artifact_hash": "8899d159a189467e4dd6809fab9c287ff792f7a01f4f3d47484e3fc90790d1f0",
     "case_id": "x2-malformed-duplicate-xc-role",
     "certificate_status": "ineligible",
     "class": "malformed",

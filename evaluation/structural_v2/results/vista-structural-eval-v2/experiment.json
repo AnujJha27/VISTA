@@ -20,15 +20,15 @@
   },
   "policy_version": "dft-structural-v2",
   "runtime": {
-    "executed_at": "2026-08-23T11:48:35.249118+00:00",
+    "executed_at": "2026-08-23T12:58:32.686449+00:00",
     "platform": "Windows-11-10.0.26200-SP0",
     "python": "3.12.5 (tags/v3.12.5:ff3bc82, Aug  6 2024, 20:45:27) [MSC v.1940 64 bit (AMD64)]"
   },
   "semantic_rules": {
-    "message.adjacency_fed_matmul": 1,
+    "message.adjacency_fed_matmul": 2,
     "operator.add_adjoint_pair": 1,
     "operator.identity_root": 1,
-    "operator.unconstrained_root": 1,
+    "operator.unconstrained_root": 2,
     "operator.unrecognized_composition": 1,
     "operator.zero_root": 1,
     "topology.adjacency_state": 1,

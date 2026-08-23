@@ -1,6 +1,6 @@
 {
   "artifact": "D:\\fun stuff\\proof_vibe\\build\\vista-structural-v2-corpus\\xc-malformed-missing-role.pt2",
-  "artifact_sha256": "1cd3e97cc1e865fedaa7847b1f464f90806e0c9926edc5756c290c9edb27684c",
+  "artifact_sha256": "d08104104ef8ec4427e60e1d880571a31763b7a6911c50a62c38624bbf89fea2",
   "case_id": "xc-malformed-missing-role",
   "experiment": {
     "analyzer_version": "dft-structural-analysis-v5",
@@ -24,10 +24,10 @@
     },
     "policy_version": "dft-structural-v2",
     "semantic_rules": {
-      "message.adjacency_fed_matmul": 1,
+      "message.adjacency_fed_matmul": 2,
       "operator.add_adjoint_pair": 1,
       "operator.identity_root": 1,
-      "operator.unconstrained_root": 1,
+      "operator.unconstrained_root": 2,
       "operator.unrecognized_composition": 1,
       "operator.zero_root": 1,
       "topology.adjacency_state": 1,
@@ -58,7 +58,7 @@
     ]
   },
   "raw_extraction": {
-    "artifact_sha256": "1cd3e97cc1e865fedaa7847b1f464f90806e0c9926edc5756c290c9edb27684c",
+    "artifact_sha256": "d08104104ef8ec4427e60e1d880571a31763b7a6911c50a62c38624bbf89fea2",
     "extractor_version": "torch-export-inventory-v2",
     "facts": {},
     "inventory": {

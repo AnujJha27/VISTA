@@ -1,6 +1,6 @@
 {
   "artifact": "D:\\fun stuff\\proof_vibe\\build\\vista-structural-v2-corpus\\operator-malformed-invalid-adjacency.pt2",
-  "artifact_sha256": "0cf0612dea9064089644390b1789cadb933668151c9ecf2f2c735fc6a92fd2ad",
+  "artifact_sha256": "1ccc3ddb48d4bc52d8e6b71a07360c0ce659c6acfe9969041c22ad5be58d1686",
   "case_id": "operator-malformed-invalid-adjacency",
   "experiment": {
     "analyzer_version": "dft-structural-analysis-v5",
@@ -24,10 +24,10 @@
     },
     "policy_version": "dft-structural-v2",
     "semantic_rules": {
-      "message.adjacency_fed_matmul": 1,
+      "message.adjacency_fed_matmul": 2,
       "operator.add_adjoint_pair": 1,
       "operator.identity_root": 1,
-      "operator.unconstrained_root": 1,
+      "operator.unconstrained_root": 2,
       "operator.unrecognized_composition": 1,
       "operator.zero_root": 1,
       "topology.adjacency_state": 1,
@@ -62,7 +62,7 @@
     ]
   },
   "raw_extraction": {
-    "artifact_sha256": "0cf0612dea9064089644390b1789cadb933668151c9ecf2f2c735fc6a92fd2ad",
+    "artifact_sha256": "1ccc3ddb48d4bc52d8e6b71a07360c0ce659c6acfe9969041c22ad5be58d1686",
     "extractor_version": "torch-export-inventory-v2",
     "facts": {},
     "inventory": {

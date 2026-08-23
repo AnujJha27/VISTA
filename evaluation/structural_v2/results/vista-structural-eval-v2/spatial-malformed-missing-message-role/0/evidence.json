@@ -1,6 +1,6 @@
 {
   "artifact": "D:\\fun stuff\\proof_vibe\\build\\vista-structural-v2-corpus\\spatial-malformed-missing-message-role.pt2",
-  "artifact_sha256": "a66ebbecdaa42d52a7e7301dabd69321f369c04c0caa5f636c29be1d87063cbf",
+  "artifact_sha256": "b148a58ae829a51489539c10664156816310e6274c73f852664a0c47428a71ca",
   "case_id": "spatial-malformed-missing-message-role",
   "experiment": {
     "analyzer_version": "dft-structural-analysis-v5",
@@ -24,10 +24,10 @@
     },
     "policy_version": "dft-structural-v2",
     "semantic_rules": {
-      "message.adjacency_fed_matmul": 1,
+      "message.adjacency_fed_matmul": 2,
       "operator.add_adjoint_pair": 1,
       "operator.identity_root": 1,
-      "operator.unconstrained_root": 1,
+      "operator.unconstrained_root": 2,
       "operator.unrecognized_composition": 1,
       "operator.zero_root": 1,
       "topology.adjacency_state": 1,
@@ -58,7 +58,7 @@
     ]
   },
   "raw_extraction": {
-    "artifact_sha256": "a66ebbecdaa42d52a7e7301dabd69321f369c04c0caa5f636c29be1d87063cbf",
+    "artifact_sha256": "b148a58ae829a51489539c10664156816310e6274c73f852664a0c47428a71ca",
     "extractor_version": "torch-export-inventory-v2",
     "facts": {},
     "inventory": {

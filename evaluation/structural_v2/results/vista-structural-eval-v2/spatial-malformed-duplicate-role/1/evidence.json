@@ -1,6 +1,6 @@
 {
   "artifact": "D:\\fun stuff\\proof_vibe\\build\\vista-structural-v2-corpus\\spatial-malformed-duplicate-role.pt2",
-  "artifact_sha256": "5cca1482c6475c9ade93f8559fe7b3ab4220f550ad3a4500e9781fafbc657169",
+  "artifact_sha256": "91cb9bdbee66dde39f43ea2cd9df2ee2958a55abf818eba11132da21602428e3",
   "case_id": "spatial-malformed-duplicate-role",
   "experiment": {
     "analyzer_version": "dft-structural-analysis-v5",
@@ -24,10 +24,10 @@
     },
     "policy_version": "dft-structural-v2",
     "semantic_rules": {
-      "message.adjacency_fed_matmul": 1,
+      "message.adjacency_fed_matmul": 2,
       "operator.add_adjoint_pair": 1,
       "operator.identity_root": 1,
-      "operator.unconstrained_root": 1,
+      "operator.unconstrained_root": 2,
       "operator.unrecognized_composition": 1,
       "operator.zero_root": 1,
       "topology.adjacency_state": 1,
@@ -66,7 +66,7 @@
     ]
   },
   "raw_extraction": {
-    "artifact_sha256": "5cca1482c6475c9ade93f8559fe7b3ab4220f550ad3a4500e9781fafbc657169",
+    "artifact_sha256": "91cb9bdbee66dde39f43ea2cd9df2ee2958a55abf818eba11132da21602428e3",
     "extractor_version": "torch-export-inventory-v2",
     "facts": {},
     "inventory": {

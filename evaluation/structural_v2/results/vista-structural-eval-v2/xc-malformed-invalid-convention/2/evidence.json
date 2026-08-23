@@ -1,6 +1,6 @@
 {
   "artifact": "D:\\fun stuff\\proof_vibe\\build\\vista-structural-v2-corpus\\xc-malformed-invalid-convention.pt2",
-  "artifact_sha256": "b05fe0fea315b9a98a68aa0180185b26a811839e9f9bc4e79130a665b6bda138",
+  "artifact_sha256": "4eecfe5bf0eb09e108a612bf24a901e2611fe02245e7d58b2a5fcb3ed2845a04",
   "case_id": "xc-malformed-invalid-convention",
   "experiment": {
     "analyzer_version": "dft-structural-analysis-v5",
@@ -24,10 +24,10 @@
     },
     "policy_version": "dft-structural-v2",
     "semantic_rules": {
-      "message.adjacency_fed_matmul": 1,
+      "message.adjacency_fed_matmul": 2,
       "operator.add_adjoint_pair": 1,
       "operator.identity_root": 1,
-      "operator.unconstrained_root": 1,
+      "operator.unconstrained_root": 2,
       "operator.unrecognized_composition": 1,
       "operator.zero_root": 1,
       "topology.adjacency_state": 1,
@@ -62,7 +62,7 @@
     ]
   },
   "raw_extraction": {
-    "artifact_sha256": "b05fe0fea315b9a98a68aa0180185b26a811839e9f9bc4e79130a665b6bda138",
+    "artifact_sha256": "4eecfe5bf0eb09e108a612bf24a901e2611fe02245e7d58b2a5fcb3ed2845a04",
     "extractor_version": "torch-export-inventory-v2",
     "facts": {},
     "inventory": {

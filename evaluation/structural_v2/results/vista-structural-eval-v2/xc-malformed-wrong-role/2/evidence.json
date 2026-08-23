@@ -1,6 +1,6 @@
 {
   "artifact": "D:\\fun stuff\\proof_vibe\\build\\vista-structural-v2-corpus\\xc-malformed-wrong-role.pt2",
-  "artifact_sha256": "8de060d23635e6c99bc976faac0afbd5f277c6f8fa20f8d404829c48ad5e148e",
+  "artifact_sha256": "8e827c2dd479e24075502cbbc7b958ffa49883aa29c2c4fdce773d29cab26561",
   "case_id": "xc-malformed-wrong-role",
   "experiment": {
     "analyzer_version": "dft-structural-analysis-v5",
@@ -24,10 +24,10 @@
     },
     "policy_version": "dft-structural-v2",
     "semantic_rules": {
-      "message.adjacency_fed_matmul": 1,
+      "message.adjacency_fed_matmul": 2,
       "operator.add_adjoint_pair": 1,
       "operator.identity_root": 1,
-      "operator.unconstrained_root": 1,
+      "operator.unconstrained_root": 2,
       "operator.unrecognized_composition": 1,
       "operator.zero_root": 1,
       "topology.adjacency_state": 1,
@@ -62,7 +62,7 @@
     ]
   },
   "raw_extraction": {
-    "artifact_sha256": "8de060d23635e6c99bc976faac0afbd5f277c6f8fa20f8d404829c48ad5e148e",
+    "artifact_sha256": "8e827c2dd479e24075502cbbc7b958ffa49883aa29c2c4fdce773d29cab26561",
     "extractor_version": "torch-export-inventory-v2",
     "facts": {},
     "inventory": {

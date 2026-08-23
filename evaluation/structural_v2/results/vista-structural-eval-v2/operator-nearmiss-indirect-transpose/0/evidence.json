@@ -1,6 +1,6 @@
 {
   "artifact": "D:\\fun stuff\\proof_vibe\\build\\vista-structural-v2-corpus\\operator-nearmiss-indirect-transpose.pt2",
-  "artifact_sha256": "07c534ca34a0ae7491d456ebffd2f5b074138b34d95f6706d0723bb28d239970",
+  "artifact_sha256": "d01238cfe92a4193d7d633634bbfc1d368799f37c7f0043349d80597a9203e35",
   "case_id": "operator-nearmiss-indirect-transpose",
   "experiment": {
     "analyzer_version": "dft-structural-analysis-v5",
@@ -24,10 +24,10 @@
     },
     "policy_version": "dft-structural-v2",
     "semantic_rules": {
-      "message.adjacency_fed_matmul": 1,
+      "message.adjacency_fed_matmul": 2,
       "operator.add_adjoint_pair": 1,
       "operator.identity_root": 1,
-      "operator.unconstrained_root": 1,
+      "operator.unconstrained_root": 2,
       "operator.unrecognized_composition": 1,
       "operator.zero_root": 1,
       "topology.adjacency_state": 1,
@@ -84,15 +84,15 @@
           "satisfied": true
         }
       },
-      "ir_sha256": "dce2a1761d81f46efa670c563e45c5193f220f7b0b7bc7ced07b11099349dcf1",
+      "ir_sha256": "80530abaf7084442e232d0c060ab0ba9e632ca344e0a78a8278d42014fa5fa03",
       "source": {
         "analyzer_version": "dft-structural-analysis-v5",
-        "artifact_sha256": "07c534ca34a0ae7491d456ebffd2f5b074138b34d95f6706d0723bb28d239970",
+        "artifact_sha256": "d01238cfe92a4193d7d633634bbfc1d368799f37c7f0043349d80597a9203e35",
         "extractor_version": "torch-export-inventory-v2",
         "inventory_sha256": "de15dd451b419f72d2022c0c44d238660ed54c18b19649080b10b4dc9a6ae00c",
         "kind": "torch_export",
         "parameter_structure_sha256": "f3cda0507518307c411de679123f48a49a94c6e70f50f2efc52a08bdff412adc",
-        "translation_sha256": "7e9a3f5d41367a51404384e505a175e2d6625ca0170c430153b89efa945c2244"
+        "translation_sha256": "07341be16de793a4abf67f2b967a16f14e6cadcf21f38b160c323506dc8bd73f"
       },
       "status": "formalization_required"
     },
@@ -116,23 +116,23 @@
         ]
       }
     ],
-    "ir_sha256": "dce2a1761d81f46efa670c563e45c5193f220f7b0b7bc7ced07b11099349dcf1",
+    "ir_sha256": "80530abaf7084442e232d0c060ab0ba9e632ca344e0a78a8278d42014fa5fa03",
     "obligations": [
       {
-        "context": "Artifact-derived model description (not an LLM interpretation):\n- Source: torch_export; binding hash: 07c534ca34a0ae7491d456ebffd2f5b074138b34d95f6706d0723bb28d239970.\n- Topology: 5 sites and 5 directed edges.\n- Required couplings: [{'source': 0, 'target': 2}].\n- Message passing: 3 consecutive adjacency-fed stage(s): ['matmul_2', 'matmul_1', 'matmul'].\n- XC output construction: hinge; supporting graph nodes: ['relu', 'add', 'mul', 'sum_1', 'density', 'sum_2'].\n- Self-energy construction: unsupported; supporting graph nodes: ['add_1', 'clone', 'numpy_t', 'p_base'].\n- Declared output roots: {'xc_energy': 'relu', 'learned_self_energy': 'add_1', 'message_state': 'matmul_2'}.\n- Adjacency evidence: state 'adjacency'; graph nodes ['b_adjacency', 'to'].\n- Translation validation rechecked these claims against the raw exported inventory.\nScope: structural compatibility only; this does not assess numerical outputs, trained weights, convergence, or experiment.\n\nDFT Structural V2 obligation generated deterministically from the common IR. Prove the exact Boolean structural result. Prefer `by decide`, whose result is reduced by Lean's kernel for this small finite input.",
+        "context": "Artifact-derived model description (not an LLM interpretation):\n- Source: torch_export; binding hash: d01238cfe92a4193d7d633634bbfc1d368799f37c7f0043349d80597a9203e35.\n- Topology: 5 sites and 5 directed edges.\n- Required couplings: [{'source': 0, 'target': 2}].\n- Message passing: 3 consecutive adjacency-fed stage(s): ['matmul_2', 'matmul_1', 'matmul'].\n- XC output construction: hinge; supporting graph nodes: ['relu', 'add', 'mul', 'sum_1', 'density', 'sum_2'].\n- Self-energy construction: unsupported; supporting graph nodes: ['add_1', 'clone', 'numpy_t', 'p_base'].\n- Declared output roots: {'xc_energy': 'relu', 'learned_self_energy': 'add_1', 'message_state': 'matmul_2'}.\n- Adjacency evidence: state 'adjacency'; graph nodes ['b_adjacency', 'to'].\n- Translation validation rechecked these claims against the raw exported inventory.\nScope: structural compatibility only; this does not assess numerical outputs, trained weights, convergence, or experiment.\n\nDFT Structural V2 obligation generated deterministically from the common IR. Prove the exact Boolean structural result. Prefer `by decide`, whose result is reduced by Lean's kernel for this small finite input.",
         "fact": "xc_discontinuity_compatible",
-        "id": "dce2a1761d81-xc_discontinuity_compatible",
-        "ir_sha256": "dce2a1761d81f46efa670c563e45c5193f220f7b0b7bc7ced07b11099349dcf1",
+        "id": "80530abaf708-xc_discontinuity_compatible",
+        "ir_sha256": "80530abaf7084442e232d0c060ab0ba9e632ca344e0a78a8278d42014fa5fa03",
         "limits": {
           "cpu_time_s": 480,
           "memory_mb": 8192,
           "wall_time_ms": 600000
         },
         "module": "Testv2.StructuralV2",
-        "preamble": "namespace DFTCert.StructuralRun_dce2a1761d81\n\ndef sourceSha256 : String := \"07c534ca34a0ae7491d456ebffd2f5b074138b34d95f6706d0723bb28d239970\"\ndef irSha256 : String := \"dce2a1761d81f46efa670c563e45c5193f220f7b0b7bc7ced07b11099349dcf1\"\ndef edges : List (Nat \u00d7 Nat) := [(4, 0), (0, 1), (1, 2), (2, 3), (3, 4)]\ndef messageDepth : Nat := 3\ndef requiredCouplings : List (Nat \u00d7 Nat) := [(0, 2)]\ndef xcForm : Testv2.StructuralV2.XCForm := .hinge\ndef operatorForm : Testv2.StructuralV2.OperatorForm := .unsupported\n\nend DFTCert.StructuralRun_dce2a1761d81\n",
-        "preamble_sha256": "233fb50c598866cd646297db817dadfea5f7c9b0f56b4fa1ab505413a0c8f90f",
+        "preamble": "namespace DFTCert.StructuralRun_80530abaf708\n\ndef sourceSha256 : String := \"d01238cfe92a4193d7d633634bbfc1d368799f37c7f0043349d80597a9203e35\"\ndef irSha256 : String := \"80530abaf7084442e232d0c060ab0ba9e632ca344e0a78a8278d42014fa5fa03\"\ndef edges : List (Nat \u00d7 Nat) := [(4, 0), (0, 1), (1, 2), (2, 3), (3, 4)]\ndef messageDepth : Nat := 3\ndef requiredCouplings : List (Nat \u00d7 Nat) := [(0, 2)]\ndef xcForm : Testv2.StructuralV2.XCForm := .hinge\ndef operatorForm : Testv2.StructuralV2.OperatorForm := .unsupported\n\nend DFTCert.StructuralRun_80530abaf708\n",
+        "preamble_sha256": "44c02a70e19cd17541adb92712b7f24f2bf100a4754dfae9869ee7e15002fee4",
         "project": "testv2",
-        "source_sha256": "07c534ca34a0ae7491d456ebffd2f5b074138b34d95f6706d0723bb28d239970",
+        "source_sha256": "d01238cfe92a4193d7d633634bbfc1d368799f37c7f0043349d80597a9203e35",
         "status": "proof_required",
         "structural_expected": true,
         "subgoals": [
@@ -140,27 +140,27 @@
             "context": "Reduce the generic structural checker on the generated finite data.",
             "depends_on": [],
             "id": "evaluate-xc_discontinuity_compatible",
-            "theorem": "theorem generated_xc_structure : Testv2.StructuralV2.xcSupportsDiscontinuity DFTCert.StructuralRun_dce2a1761d81.xcForm = true"
+            "theorem": "theorem generated_xc_structure : Testv2.StructuralV2.xcSupportsDiscontinuity DFTCert.StructuralRun_80530abaf708.xcForm = true"
           }
         ],
-        "theorem": "theorem generated_xc_structure : Testv2.StructuralV2.xcSupportsDiscontinuity DFTCert.StructuralRun_dce2a1761d81.xcForm = true",
+        "theorem": "theorem generated_xc_structure : Testv2.StructuralV2.xcSupportsDiscontinuity DFTCert.StructuralRun_80530abaf708.xcForm = true",
         "verification_mode": "generated_obligation"
       },
       {
-        "context": "Artifact-derived model description (not an LLM interpretation):\n- Source: torch_export; binding hash: 07c534ca34a0ae7491d456ebffd2f5b074138b34d95f6706d0723bb28d239970.\n- Topology: 5 sites and 5 directed edges.\n- Required couplings: [{'source': 0, 'target': 2}].\n- Message passing: 3 consecutive adjacency-fed stage(s): ['matmul_2', 'matmul_1', 'matmul'].\n- XC output construction: hinge; supporting graph nodes: ['relu', 'add', 'mul', 'sum_1', 'density', 'sum_2'].\n- Self-energy construction: unsupported; supporting graph nodes: ['add_1', 'clone', 'numpy_t', 'p_base'].\n- Declared output roots: {'xc_energy': 'relu', 'learned_self_energy': 'add_1', 'message_state': 'matmul_2'}.\n- Adjacency evidence: state 'adjacency'; graph nodes ['b_adjacency', 'to'].\n- Translation validation rechecked these claims against the raw exported inventory.\nScope: structural compatibility only; this does not assess numerical outputs, trained weights, convergence, or experiment.\n\nDFT Structural V2 obligation generated deterministically from the common IR. Prove the exact Boolean structural result. Prefer `by decide`, whose result is reduced by Lean's kernel for this small finite input.",
+        "context": "Artifact-derived model description (not an LLM interpretation):\n- Source: torch_export; binding hash: d01238cfe92a4193d7d633634bbfc1d368799f37c7f0043349d80597a9203e35.\n- Topology: 5 sites and 5 directed edges.\n- Required couplings: [{'source': 0, 'target': 2}].\n- Message passing: 3 consecutive adjacency-fed stage(s): ['matmul_2', 'matmul_1', 'matmul'].\n- XC output construction: hinge; supporting graph nodes: ['relu', 'add', 'mul', 'sum_1', 'density', 'sum_2'].\n- Self-energy construction: unsupported; supporting graph nodes: ['add_1', 'clone', 'numpy_t', 'p_base'].\n- Declared output roots: {'xc_energy': 'relu', 'learned_self_energy': 'add_1', 'message_state': 'matmul_2'}.\n- Adjacency evidence: state 'adjacency'; graph nodes ['b_adjacency', 'to'].\n- Translation validation rechecked these claims against the raw exported inventory.\nScope: structural compatibility only; this does not assess numerical outputs, trained weights, convergence, or experiment.\n\nDFT Structural V2 obligation generated deterministically from the common IR. Prove the exact Boolean structural result. Prefer `by decide`, whose result is reduced by Lean's kernel for this small finite input.",
         "fact": "spatial_nonlocality_compatible",
-        "id": "dce2a1761d81-spatial_nonlocality_compatible",
-        "ir_sha256": "dce2a1761d81f46efa670c563e45c5193f220f7b0b7bc7ced07b11099349dcf1",
+        "id": "80530abaf708-spatial_nonlocality_compatible",
+        "ir_sha256": "80530abaf7084442e232d0c060ab0ba9e632ca344e0a78a8278d42014fa5fa03",
         "limits": {
           "cpu_time_s": 480,
           "memory_mb": 8192,
           "wall_time_ms": 600000
         },
         "module": "Testv2.StructuralV2",
-        "preamble": "namespace DFTCert.StructuralRun_dce2a1761d81\n\ndef sourceSha256 : String := \"07c534ca34a0ae7491d456ebffd2f5b074138b34d95f6706d0723bb28d239970\"\ndef irSha256 : String := \"dce2a1761d81f46efa670c563e45c5193f220f7b0b7bc7ced07b11099349dcf1\"\ndef edges : List (Nat \u00d7 Nat) := [(4, 0), (0, 1), (1, 2), (2, 3), (3, 4)]\ndef messageDepth : Nat := 3\ndef requiredCouplings : List (Nat \u00d7 Nat) := [(0, 2)]\ndef xcForm : Testv2.StructuralV2.XCForm := .hinge\ndef operatorForm : Testv2.StructuralV2.OperatorForm := .unsupported\n\nend DFTCert.StructuralRun_dce2a1761d81\n",
-        "preamble_sha256": "233fb50c598866cd646297db817dadfea5f7c9b0f56b4fa1ab505413a0c8f90f",
+        "preamble": "namespace DFTCert.StructuralRun_80530abaf708\n\ndef sourceSha256 : String := \"d01238cfe92a4193d7d633634bbfc1d368799f37c7f0043349d80597a9203e35\"\ndef irSha256 : String := \"80530abaf7084442e232d0c060ab0ba9e632ca344e0a78a8278d42014fa5fa03\"\ndef edges : List (Nat \u00d7 Nat) := [(4, 0), (0, 1), (1, 2), (2, 3), (3, 4)]\ndef messageDepth : Nat := 3\ndef requiredCouplings : List (Nat \u00d7 Nat) := [(0, 2)]\ndef xcForm : Testv2.StructuralV2.XCForm := .hinge\ndef operatorForm : Testv2.StructuralV2.OperatorForm := .unsupported\n\nend DFTCert.StructuralRun_80530abaf708\n",
+        "preamble_sha256": "44c02a70e19cd17541adb92712b7f24f2bf100a4754dfae9869ee7e15002fee4",
         "project": "testv2",
-        "source_sha256": "07c534ca34a0ae7491d456ebffd2f5b074138b34d95f6706d0723bb28d239970",
+        "source_sha256": "d01238cfe92a4193d7d633634bbfc1d368799f37c7f0043349d80597a9203e35",
         "status": "proof_required",
         "structural_expected": true,
         "subgoals": [
@@ -168,27 +168,27 @@
             "context": "Reduce the generic structural checker on the generated finite data.",
             "depends_on": [],
             "id": "evaluate-spatial_nonlocality_compatible",
-            "theorem": "theorem generated_spatial_structure : Testv2.StructuralV2.allCovered DFTCert.StructuralRun_dce2a1761d81.edges DFTCert.StructuralRun_dce2a1761d81.messageDepth DFTCert.StructuralRun_dce2a1761d81.requiredCouplings = true"
+            "theorem": "theorem generated_spatial_structure : Testv2.StructuralV2.allCovered DFTCert.StructuralRun_80530abaf708.edges DFTCert.StructuralRun_80530abaf708.messageDepth DFTCert.StructuralRun_80530abaf708.requiredCouplings = true"
           }
         ],
-        "theorem": "theorem generated_spatial_structure : Testv2.StructuralV2.allCovered DFTCert.StructuralRun_dce2a1761d81.edges DFTCert.StructuralRun_dce2a1761d81.messageDepth DFTCert.StructuralRun_dce2a1761d81.requiredCouplings = true",
+        "theorem": "theorem generated_spatial_structure : Testv2.StructuralV2.allCovered DFTCert.StructuralRun_80530abaf708.edges DFTCert.StructuralRun_80530abaf708.messageDepth DFTCert.StructuralRun_80530abaf708.requiredCouplings = true",
         "verification_mode": "generated_obligation"
       },
       {
-        "context": "Artifact-derived model description (not an LLM interpretation):\n- Source: torch_export; binding hash: 07c534ca34a0ae7491d456ebffd2f5b074138b34d95f6706d0723bb28d239970.\n- Topology: 5 sites and 5 directed edges.\n- Required couplings: [{'source': 0, 'target': 2}].\n- Message passing: 3 consecutive adjacency-fed stage(s): ['matmul_2', 'matmul_1', 'matmul'].\n- XC output construction: hinge; supporting graph nodes: ['relu', 'add', 'mul', 'sum_1', 'density', 'sum_2'].\n- Self-energy construction: unsupported; supporting graph nodes: ['add_1', 'clone', 'numpy_t', 'p_base'].\n- Declared output roots: {'xc_energy': 'relu', 'learned_self_energy': 'add_1', 'message_state': 'matmul_2'}.\n- Adjacency evidence: state 'adjacency'; graph nodes ['b_adjacency', 'to'].\n- Translation validation rechecked these claims against the raw exported inventory.\nScope: structural compatibility only; this does not assess numerical outputs, trained weights, convergence, or experiment.\n\nDFT Structural V2 obligation generated deterministically from the common IR. Prove the exact Boolean structural result. Prefer `by decide`, whose result is reduced by Lean's kernel for this small finite input.",
+        "context": "Artifact-derived model description (not an LLM interpretation):\n- Source: torch_export; binding hash: d01238cfe92a4193d7d633634bbfc1d368799f37c7f0043349d80597a9203e35.\n- Topology: 5 sites and 5 directed edges.\n- Required couplings: [{'source': 0, 'target': 2}].\n- Message passing: 3 consecutive adjacency-fed stage(s): ['matmul_2', 'matmul_1', 'matmul'].\n- XC output construction: hinge; supporting graph nodes: ['relu', 'add', 'mul', 'sum_1', 'density', 'sum_2'].\n- Self-energy construction: unsupported; supporting graph nodes: ['add_1', 'clone', 'numpy_t', 'p_base'].\n- Declared output roots: {'xc_energy': 'relu', 'learned_self_energy': 'add_1', 'message_state': 'matmul_2'}.\n- Adjacency evidence: state 'adjacency'; graph nodes ['b_adjacency', 'to'].\n- Translation validation rechecked these claims against the raw exported inventory.\nScope: structural compatibility only; this does not assess numerical outputs, trained weights, convergence, or experiment.\n\nDFT Structural V2 obligation generated deterministically from the common IR. Prove the exact Boolean structural result. Prefer `by decide`, whose result is reduced by Lean's kernel for this small finite input.",
         "fact": "self_adjoint",
-        "id": "dce2a1761d81-self_adjoint",
-        "ir_sha256": "dce2a1761d81f46efa670c563e45c5193f220f7b0b7bc7ced07b11099349dcf1",
+        "id": "80530abaf708-self_adjoint",
+        "ir_sha256": "80530abaf7084442e232d0c060ab0ba9e632ca344e0a78a8278d42014fa5fa03",
         "limits": {
           "cpu_time_s": 480,
           "memory_mb": 8192,
           "wall_time_ms": 600000
         },
         "module": "Testv2.StructuralV2",
-        "preamble": "namespace DFTCert.StructuralRun_dce2a1761d81\n\ndef sourceSha256 : String := \"07c534ca34a0ae7491d456ebffd2f5b074138b34d95f6706d0723bb28d239970\"\ndef irSha256 : String := \"dce2a1761d81f46efa670c563e45c5193f220f7b0b7bc7ced07b11099349dcf1\"\ndef edges : List (Nat \u00d7 Nat) := [(4, 0), (0, 1), (1, 2), (2, 3), (3, 4)]\ndef messageDepth : Nat := 3\ndef requiredCouplings : List (Nat \u00d7 Nat) := [(0, 2)]\ndef xcForm : Testv2.StructuralV2.XCForm := .hinge\ndef operatorForm : Testv2.StructuralV2.OperatorForm := .unsupported\n\nend DFTCert.StructuralRun_dce2a1761d81\n",
-        "preamble_sha256": "233fb50c598866cd646297db817dadfea5f7c9b0f56b4fa1ab505413a0c8f90f",
+        "preamble": "namespace DFTCert.StructuralRun_80530abaf708\n\ndef sourceSha256 : String := \"d01238cfe92a4193d7d633634bbfc1d368799f37c7f0043349d80597a9203e35\"\ndef irSha256 : String := \"80530abaf7084442e232d0c060ab0ba9e632ca344e0a78a8278d42014fa5fa03\"\ndef edges : List (Nat \u00d7 Nat) := [(4, 0), (0, 1), (1, 2), (2, 3), (3, 4)]\ndef messageDepth : Nat := 3\ndef requiredCouplings : List (Nat \u00d7 Nat) := [(0, 2)]\ndef xcForm : Testv2.StructuralV2.XCForm := .hinge\ndef operatorForm : Testv2.StructuralV2.OperatorForm := .unsupported\n\nend DFTCert.StructuralRun_80530abaf708\n",
+        "preamble_sha256": "44c02a70e19cd17541adb92712b7f24f2bf100a4754dfae9869ee7e15002fee4",
         "project": "testv2",
-        "source_sha256": "07c534ca34a0ae7491d456ebffd2f5b074138b34d95f6706d0723bb28d239970",
+        "source_sha256": "d01238cfe92a4193d7d633634bbfc1d368799f37c7f0043349d80597a9203e35",
         "status": "proof_required",
         "structural_expected": false,
         "subgoals": [
@@ -196,15 +196,15 @@
             "context": "Reduce the generic structural checker on the generated finite data.",
             "depends_on": [],
             "id": "evaluate-self_adjoint",
-            "theorem": "theorem generated_operator_structure : Testv2.StructuralV2.guaranteedSelfAdjoint DFTCert.StructuralRun_dce2a1761d81.operatorForm = false"
+            "theorem": "theorem generated_operator_structure : Testv2.StructuralV2.guaranteedSelfAdjoint DFTCert.StructuralRun_80530abaf708.operatorForm = false"
           }
         ],
-        "theorem": "theorem generated_operator_structure : Testv2.StructuralV2.guaranteedSelfAdjoint DFTCert.StructuralRun_dce2a1761d81.operatorForm = false",
+        "theorem": "theorem generated_operator_structure : Testv2.StructuralV2.guaranteedSelfAdjoint DFTCert.StructuralRun_80530abaf708.operatorForm = false",
         "verification_mode": "generated_obligation"
       }
     ],
     "policy_version": "dft-structural-v2",
-    "source_sha256": "07c534ca34a0ae7491d456ebffd2f5b074138b34d95f6706d0723bb28d239970",
+    "source_sha256": "d01238cfe92a4193d7d633634bbfc1d368799f37c7f0043349d80597a9203e35",
     "status": "obligations_generated"
   },
   "input_constraints": {
@@ -277,20 +277,20 @@
         "satisfied": true
       }
     },
-    "ir_sha256": "dce2a1761d81f46efa670c563e45c5193f220f7b0b7bc7ced07b11099349dcf1",
+    "ir_sha256": "80530abaf7084442e232d0c060ab0ba9e632ca344e0a78a8278d42014fa5fa03",
     "source": {
       "analyzer_version": "dft-structural-analysis-v5",
-      "artifact_sha256": "07c534ca34a0ae7491d456ebffd2f5b074138b34d95f6706d0723bb28d239970",
+      "artifact_sha256": "d01238cfe92a4193d7d633634bbfc1d368799f37c7f0043349d80597a9203e35",
       "extractor_version": "torch-export-inventory-v2",
       "inventory_sha256": "de15dd451b419f72d2022c0c44d238660ed54c18b19649080b10b4dc9a6ae00c",
       "kind": "torch_export",
       "parameter_structure_sha256": "f3cda0507518307c411de679123f48a49a94c6e70f50f2efc52a08bdff412adc",
-      "translation_sha256": "7e9a3f5d41367a51404384e505a175e2d6625ca0170c430153b89efa945c2244"
+      "translation_sha256": "07341be16de793a4abf67f2b967a16f14e6cadcf21f38b160c323506dc8bd73f"
     },
     "status": "formalization_required"
   },
   "raw_extraction": {
-    "artifact_sha256": "07c534ca34a0ae7491d456ebffd2f5b074138b34d95f6706d0723bb28d239970",
+    "artifact_sha256": "d01238cfe92a4193d7d633634bbfc1d368799f37c7f0043349d80597a9203e35",
     "extractor_version": "torch-export-inventory-v2",
     "facts": {},
     "inventory": {
@@ -671,6 +671,7 @@
         "matmul"
       ],
       "metadata": {
+        "recognized": true,
         "stages": [
           "matmul_2",
           "matmul_1",
@@ -682,7 +683,7 @@
       ],
       "root": "matmul_2",
       "rule": "message.adjacency_fed_matmul",
-      "rule_version": 1,
+      "rule_version": 2,
       "value": 3
     },
     "operator": {
@@ -784,7 +785,8 @@
         "matmul_2",
         "matmul_1",
         "matmul"
-      ]
+      ],
+      "recognized": true
     },
     "operator": {
       "construction": "unsupported",
@@ -805,12 +807,12 @@
     },
     "source": {
       "analyzer_version": "dft-structural-analysis-v5",
-      "artifact_sha256": "07c534ca34a0ae7491d456ebffd2f5b074138b34d95f6706d0723bb28d239970",
+      "artifact_sha256": "d01238cfe92a4193d7d633634bbfc1d368799f37c7f0043349d80597a9203e35",
       "extractor_version": "torch-export-inventory-v2",
       "inventory_sha256": "de15dd451b419f72d2022c0c44d238660ed54c18b19649080b10b4dc9a6ae00c",
       "kind": "torch_export",
       "parameter_structure_sha256": "f3cda0507518307c411de679123f48a49a94c6e70f50f2efc52a08bdff412adc",
-      "translation_sha256": "7e9a3f5d41367a51404384e505a175e2d6625ca0170c430153b89efa945c2244"
+      "translation_sha256": "07341be16de793a4abf67f2b967a16f14e6cadcf21f38b160c323506dc8bd73f"
     },
     "topology": {
       "directed_edges": [
@@ -843,6 +845,7 @@
     "translation": {
       "inventory_sha256": "de15dd451b419f72d2022c0c44d238660ed54c18b19649080b10b4dc9a6ae00c",
       "message_passing": {
+        "recognized": true,
         "root": "matmul_2",
         "stages": [
           "matmul_2",
@@ -869,6 +872,7 @@
             "matmul"
           ],
           "metadata": {
+            "recognized": true,
             "stages": [
               "matmul_2",
               "matmul_1",
@@ -880,7 +884,7 @@
           ],
           "root": "matmul_2",
           "rule": "message.adjacency_fed_matmul",
-          "rule_version": 1,
+          "rule_version": 2,
           "value": 3
         },
         "operator": {
@@ -1001,7 +1005,7 @@
       ],
       "inventory_sha256": "de15dd451b419f72d2022c0c44d238660ed54c18b19649080b10b4dc9a6ae00c",
       "status": "translation_validated",
-      "translation_sha256": "7e9a3f5d41367a51404384e505a175e2d6625ca0170c430153b89efa945c2244"
+      "translation_sha256": "07341be16de793a4abf67f2b967a16f14e6cadcf21f38b160c323506dc8bd73f"
     },
     "xc": {
       "form": "hinge",
@@ -1073,6 +1077,6 @@
     ],
     "inventory_sha256": "de15dd451b419f72d2022c0c44d238660ed54c18b19649080b10b4dc9a6ae00c",
     "status": "translation_validated",
-    "translation_sha256": "7e9a3f5d41367a51404384e505a175e2d6625ca0170c430153b89efa945c2244"
+    "translation_sha256": "07341be16de793a4abf67f2b967a16f14e6cadcf21f38b160c323506dc8bd73f"
   }
 }

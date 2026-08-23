@@ -1,6 +1,6 @@
 {
   "artifact": "D:\\fun stuff\\proof_vibe\\build\\vista-structural-v2-corpus\\o2-malformed-duplicate-operator-role.pt2",
-  "artifact_sha256": "89eb6bdf502d7f745cb284e4cc6d2033aa7e594d41c28984bb5ff4c9f9ba5746",
+  "artifact_sha256": "ce4406e42905bebe84b310d2a59d004c2fcdc68d760001b93f52ad890f853008",
   "case_id": "o2-malformed-duplicate-operator-role",
   "experiment": {
     "analyzer_version": "dft-structural-analysis-v5",
@@ -24,10 +24,10 @@
     },
     "policy_version": "dft-structural-v2",
     "semantic_rules": {
-      "message.adjacency_fed_matmul": 1,
+      "message.adjacency_fed_matmul": 2,
       "operator.add_adjoint_pair": 1,
       "operator.identity_root": 1,
-      "operator.unconstrained_root": 1,
+      "operator.unconstrained_root": 2,
       "operator.unrecognized_composition": 1,
       "operator.zero_root": 1,
       "topology.adjacency_state": 1,
@@ -66,7 +66,7 @@
     ]
   },
   "raw_extraction": {
-    "artifact_sha256": "89eb6bdf502d7f745cb284e4cc6d2033aa7e594d41c28984bb5ff4c9f9ba5746",
+    "artifact_sha256": "ce4406e42905bebe84b310d2a59d004c2fcdc68d760001b93f52ad890f853008",
     "extractor_version": "torch-export-inventory-v2",
     "facts": {},
     "inventory": {
