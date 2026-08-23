@@ -1,6 +1,6 @@
 {
   "artifact": "D:\\fun stuff\\proof_vibe\\build\\vista-structural-v2-corpus\\s2-malformed-invalid-adjacency.pt2",
-  "artifact_sha256": "aa27c786fae03d7087ca300315d441e7ae9155bceb26292bdecfd5ea6cfcd73e",
+  "artifact_sha256": "a15e623c4ca6e658529d9b12525375e219510dd97db545aa59b3e16f470df26a",
   "case_id": "s2-malformed-invalid-adjacency",
   "experiment": {
     "analyzer_version": "dft-structural-analysis-v5",
@@ -62,7 +62,7 @@
     ]
   },
   "raw_extraction": {
-    "artifact_sha256": "aa27c786fae03d7087ca300315d441e7ae9155bceb26292bdecfd5ea6cfcd73e",
+    "artifact_sha256": "a15e623c4ca6e658529d9b12525375e219510dd97db545aa59b3e16f470df26a",
     "extractor_version": "torch-export-inventory-v2",
     "facts": {},
     "inventory": {
@@ -390,7 +390,7 @@
           "graph_inputs": [
             "p_base"
           ],
-          "sha256": "179b2f0e08e580b308c483afb9d0d5450294991d2872767d4000ce9874d597da",
+          "sha256": "04d0b3cf208dffa5435ba2764b2efa98ca171b0d71c104fd9776382a936e8819",
           "shape": [
             5,
             5
@@ -403,7 +403,7 @@
           ],
           "dtype": "torch.float32",
           "graph_inputs": [],
-          "sha256": "9a31cebeed01528920554323e8d43fabefe6f7fe3fcdf07dbb2d6af76c130bca",
+          "sha256": "5f2ed48c4afa9794ba2a218c0dd1a1de0fd1092e0af715900de1a80ab8cd0132",
           "shape": [
             5,
             5

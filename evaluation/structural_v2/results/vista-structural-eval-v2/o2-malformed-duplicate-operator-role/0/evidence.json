@@ -1,6 +1,6 @@
 {
   "artifact": "D:\\fun stuff\\proof_vibe\\build\\vista-structural-v2-corpus\\o2-malformed-duplicate-operator-role.pt2",
-  "artifact_sha256": "43a92b5ede677b31a27b46176bdd8d8a5056776dd65ecd7f4ce5c93fd1faca05",
+  "artifact_sha256": "89eb6bdf502d7f745cb284e4cc6d2033aa7e594d41c28984bb5ff4c9f9ba5746",
   "case_id": "o2-malformed-duplicate-operator-role",
   "experiment": {
     "analyzer_version": "dft-structural-analysis-v5",
@@ -66,7 +66,7 @@
     ]
   },
   "raw_extraction": {
-    "artifact_sha256": "43a92b5ede677b31a27b46176bdd8d8a5056776dd65ecd7f4ce5c93fd1faca05",
+    "artifact_sha256": "89eb6bdf502d7f745cb284e4cc6d2033aa7e594d41c28984bb5ff4c9f9ba5746",
     "extractor_version": "torch-export-inventory-v2",
     "facts": {},
     "inventory": {
@@ -394,7 +394,7 @@
           "graph_inputs": [
             "p_base"
           ],
-          "sha256": "666662508c5b9da7108b8929c11c4d2a996fc0339e208f8beb0ff70261814d52",
+          "sha256": "06f53662a811b4a39ba231b11aa56603a35a72724e9d4d66308994bd7c17f4ac",
           "shape": [
             5,
             5
@@ -407,7 +407,7 @@
           ],
           "dtype": "torch.float32",
           "graph_inputs": [],
-          "sha256": "15d384b10c68ef0f53d37f5d63af7d71f58fdd0bb99443124c4b2540a3aecebc",
+          "sha256": "12ec9e5a2ab6d239040028ecbf1c8257093274450e2cec5979d18a0c53ff7cd1",
           "shape": [
             5,
             5

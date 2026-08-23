@@ -1,6 +1,6 @@
 {
   "artifact": "D:\\fun stuff\\proof_vibe\\build\\vista-structural-v2-corpus\\spatial-malformed-duplicate-role.pt2",
-  "artifact_sha256": "4618edb64a98e248ffdf30703a5aed9a2e5f29d28b16b8a07b74f98a0a961837",
+  "artifact_sha256": "5cca1482c6475c9ade93f8559fe7b3ab4220f550ad3a4500e9781fafbc657169",
   "case_id": "spatial-malformed-duplicate-role",
   "experiment": {
     "analyzer_version": "dft-structural-analysis-v5",
@@ -66,7 +66,7 @@
     ]
   },
   "raw_extraction": {
-    "artifact_sha256": "4618edb64a98e248ffdf30703a5aed9a2e5f29d28b16b8a07b74f98a0a961837",
+    "artifact_sha256": "5cca1482c6475c9ade93f8559fe7b3ab4220f550ad3a4500e9781fafbc657169",
     "extractor_version": "torch-export-inventory-v2",
     "facts": {},
     "inventory": {
@@ -394,7 +394,7 @@
           "graph_inputs": [
             "p_base"
           ],
-          "sha256": "1f643757f8abe26f847063815bb287bbe7a6532fda38f0b98cb9d640055ca847",
+          "sha256": "20c96e70fbe1ba59b79d63c088d7838db82d7e6c872c2f4fe37847cc3f6796af",
           "shape": [
             5,
             5
@@ -407,7 +407,7 @@
           ],
           "dtype": "torch.float32",
           "graph_inputs": [],
-          "sha256": "4f4d22a9f034de9572aff711245db6f5f29f0f0e77519aa7d4e4be69cd1c72f3",
+          "sha256": "4735760e9d959d063fbeb41f96c8e3cc177266eba24909322c0ae6b5ec8c91d5",
           "shape": [
             5,
             5

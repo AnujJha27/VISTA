@@ -1,6 +1,6 @@
 {
   "artifact": "D:\\fun stuff\\proof_vibe\\build\\vista-structural-v2-corpus\\xc-malformed-invalid-convention.pt2",
-  "artifact_sha256": "10e97e76ca306a56f26c6e1592b918c30aeaf4e592b99ed8ada820d7effcec6e",
+  "artifact_sha256": "b05fe0fea315b9a98a68aa0180185b26a811839e9f9bc4e79130a665b6bda138",
   "case_id": "xc-malformed-invalid-convention",
   "experiment": {
     "analyzer_version": "dft-structural-analysis-v5",
@@ -62,7 +62,7 @@
     ]
   },
   "raw_extraction": {
-    "artifact_sha256": "10e97e76ca306a56f26c6e1592b918c30aeaf4e592b99ed8ada820d7effcec6e",
+    "artifact_sha256": "b05fe0fea315b9a98a68aa0180185b26a811839e9f9bc4e79130a665b6bda138",
     "extractor_version": "torch-export-inventory-v2",
     "facts": {},
     "inventory": {
@@ -390,7 +390,7 @@
           "graph_inputs": [
             "p_base"
           ],
-          "sha256": "a93d8e59fcab4f41738cde5552a6d7469cbc650d3e659d1cfe0952dd20564655",
+          "sha256": "300596107257a1b4cc3ccf7e9a86a7a1e1dddaeab8ff41a825f48948ec39a4f1",
           "shape": [
             5,
             5
@@ -403,7 +403,7 @@
           ],
           "dtype": "torch.float32",
           "graph_inputs": [],
-          "sha256": "dfe61b8adf7e6f1b5d9d9a78c46599d4047965f5e0f51b0858372aa77985ffb0",
+          "sha256": "c81a183f21d4a73ee08a7f4d137cd3ea04b8e4f623abac45888fd78bafa4b16e",
           "shape": [
             5,
             5

@@ -1,25 +1,25 @@
 import Testv2.StructuralV2
 
-namespace DFTCert.StructuralRun_b43123b32346
+namespace DFTCert.StructuralRun_98d963805dec
 
-def sourceSha256 : String := "f893c9b8d3d326ca9977d7476ce27d228862f51316547c56a23acdde61275b3a"
-def irSha256 : String := "b43123b32346276bbf5f15b4f1c0e87a776576393a93609dae9a7ca57d220e11"
+def sourceSha256 : String := "09771905136e7fdbaa6cbf3459fe1090df8def42e2a6e486600dc9d2204bab7e"
+def irSha256 : String := "98d963805decb9d24a39cfead3c6e536b90f50239e548198b7628fc04f016f1b"
 def edges : List (Nat × Nat) := [(4, 0), (0, 1), (1, 2), (2, 3), (3, 4)]
 def messageDepth : Nat := 3
 def requiredCouplings : List (Nat × Nat) := [(0, 2)]
 def xcForm : Testv2.StructuralV2.XCForm := .hinge
 def operatorForm : Testv2.StructuralV2.OperatorForm := .add (.parameter "base") (.adjoint (.parameter "base"))
 
-end DFTCert.StructuralRun_b43123b32346
+end DFTCert.StructuralRun_98d963805dec
 
-theorem generated_xc_structure : Testv2.StructuralV2.xcSupportsDiscontinuity DFTCert.StructuralRun_b43123b32346.xcForm = true := by decide
+theorem generated_xc_structure : Testv2.StructuralV2.xcSupportsDiscontinuity DFTCert.StructuralRun_98d963805dec.xcForm = true := by decide
 
-theorem generated_spatial_structure : Testv2.StructuralV2.allCovered DFTCert.StructuralRun_b43123b32346.edges DFTCert.StructuralRun_b43123b32346.messageDepth DFTCert.StructuralRun_b43123b32346.requiredCouplings = true := by decide
+theorem generated_spatial_structure : Testv2.StructuralV2.allCovered DFTCert.StructuralRun_98d963805dec.edges DFTCert.StructuralRun_98d963805dec.messageDepth DFTCert.StructuralRun_98d963805dec.requiredCouplings = true := by decide
 
-theorem generated_operator_structure : Testv2.StructuralV2.guaranteedSelfAdjoint DFTCert.StructuralRun_b43123b32346.operatorForm = true := by decide
+theorem generated_operator_structure : Testv2.StructuralV2.guaranteedSelfAdjoint DFTCert.StructuralRun_98d963805dec.operatorForm = true := by decide
 
-theorem generated_source_binding : DFTCert.StructuralRun_b43123b32346.sourceSha256 = "f893c9b8d3d326ca9977d7476ce27d228862f51316547c56a23acdde61275b3a" := rfl
-theorem generated_ir_binding : DFTCert.StructuralRun_b43123b32346.irSha256 = "b43123b32346276bbf5f15b4f1c0e87a776576393a93609dae9a7ca57d220e11" := rfl
+theorem generated_source_binding : DFTCert.StructuralRun_98d963805dec.sourceSha256 = "09771905136e7fdbaa6cbf3459fe1090df8def42e2a6e486600dc9d2204bab7e" := rfl
+theorem generated_ir_binding : DFTCert.StructuralRun_98d963805dec.irSha256 = "98d963805decb9d24a39cfead3c6e536b90f50239e548198b7628fc04f016f1b" := rfl
 
-#check (generated_source_binding : DFTCert.StructuralRun_b43123b32346.sourceSha256 = "f893c9b8d3d326ca9977d7476ce27d228862f51316547c56a23acdde61275b3a")
-#check (generated_ir_binding : DFTCert.StructuralRun_b43123b32346.irSha256 = "b43123b32346276bbf5f15b4f1c0e87a776576393a93609dae9a7ca57d220e11")
+#check (generated_source_binding : DFTCert.StructuralRun_98d963805dec.sourceSha256 = "09771905136e7fdbaa6cbf3459fe1090df8def42e2a6e486600dc9d2204bab7e")
+#check (generated_ir_binding : DFTCert.StructuralRun_98d963805dec.irSha256 = "98d963805decb9d24a39cfead3c6e536b90f50239e548198b7628fc04f016f1b")

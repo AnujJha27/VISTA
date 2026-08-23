@@ -1,6 +1,6 @@
 {
   "artifact": "D:\\fun stuff\\proof_vibe\\build\\vista-structural-v2-corpus\\x2-malformed-duplicate-xc-role.pt2",
-  "artifact_sha256": "bc19af55f3d72424b62a611f89ed5195d54c172b2ecd1ad335e6ec025b21d368",
+  "artifact_sha256": "2724aef8e024c93f5069963f6d9cb9c661f14a24b422bc503d70bc3e6b6b857a",
   "case_id": "x2-malformed-duplicate-xc-role",
   "experiment": {
     "analyzer_version": "dft-structural-analysis-v5",
@@ -66,7 +66,7 @@
     ]
   },
   "raw_extraction": {
-    "artifact_sha256": "bc19af55f3d72424b62a611f89ed5195d54c172b2ecd1ad335e6ec025b21d368",
+    "artifact_sha256": "2724aef8e024c93f5069963f6d9cb9c661f14a24b422bc503d70bc3e6b6b857a",
     "extractor_version": "torch-export-inventory-v2",
     "facts": {},
     "inventory": {
@@ -394,7 +394,7 @@
           "graph_inputs": [
             "p_base"
           ],
-          "sha256": "50a38e21a037bd7e77e0cf2f347b2ca97e7be12bab5017966b71ea7947c9d65a",
+          "sha256": "6a4490b0f6d8b018ab76382c6f0ca5d6f9ebc1a65bd72aeab1e994a11bcdc78f",
           "shape": [
             5,
             5
@@ -407,7 +407,7 @@
           ],
           "dtype": "torch.float32",
           "graph_inputs": [],
-          "sha256": "55008545425bff80ebaa955a17f0e5e1b1138f90b53cf12a9db4a5cb30e7d561",
+          "sha256": "4beb4344a7edde48c9dc7b37d4eba5f6762ac0b217e6897800c8709bace40759",
           "shape": [
             5,
             5

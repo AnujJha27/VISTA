@@ -20,7 +20,7 @@
   },
   "policy_version": "dft-structural-v2",
   "runtime": {
-    "executed_at": "2026-08-21T15:38:13.216153+00:00",
+    "executed_at": "2026-08-23T11:48:35.249118+00:00",
     "platform": "Windows-11-10.0.26200-SP0",
     "python": "3.12.5 (tags/v3.12.5:ff3bc82, Aug  6 2024, 20:45:27) [MSC v.1940 64 bit (AMD64)]"
   },

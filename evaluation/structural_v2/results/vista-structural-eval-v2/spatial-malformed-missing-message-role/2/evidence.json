@@ -1,6 +1,6 @@
 {
   "artifact": "D:\\fun stuff\\proof_vibe\\build\\vista-structural-v2-corpus\\spatial-malformed-missing-message-role.pt2",
-  "artifact_sha256": "b0022e473312e33ab0c67dbaa6063d96fabbdcfe58201fa29b337c92593f18c7",
+  "artifact_sha256": "a66ebbecdaa42d52a7e7301dabd69321f369c04c0caa5f636c29be1d87063cbf",
   "case_id": "spatial-malformed-missing-message-role",
   "experiment": {
     "analyzer_version": "dft-structural-analysis-v5",
@@ -58,7 +58,7 @@
     ]
   },
   "raw_extraction": {
-    "artifact_sha256": "b0022e473312e33ab0c67dbaa6063d96fabbdcfe58201fa29b337c92593f18c7",
+    "artifact_sha256": "a66ebbecdaa42d52a7e7301dabd69321f369c04c0caa5f636c29be1d87063cbf",
     "extractor_version": "torch-export-inventory-v2",
     "facts": {},
     "inventory": {
@@ -386,7 +386,7 @@
           "graph_inputs": [
             "p_base"
           ],
-          "sha256": "80cc4326c89b08f6b20e9e5233ef3b0a84458be29e864c44ee5761238588e7c8",
+          "sha256": "6d33b7117cc5fd505e72c0bc634d1b84581924c0d1403f7885b1f87c23d9e26b",
           "shape": [
             5,
             5
@@ -399,7 +399,7 @@
           ],
           "dtype": "torch.float32",
           "graph_inputs": [],
-          "sha256": "4a3db5bb996e30217df7dcdec52c9e6b79a61830e6ac70e10d7f456bb75ffe28",
+          "sha256": "2265f2accda75a7802a0f525b8275ae69b9f8b527d8276794e5b17dccfa770dd",
           "shape": [
             5,
             5

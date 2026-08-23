@@ -1,6 +1,6 @@
 {
   "artifact": "D:\\fun stuff\\proof_vibe\\build\\vista-structural-v2-corpus\\xc-malformed-missing-role.pt2",
-  "artifact_sha256": "bc25eaa90a2d1a962f9fa264cf3ad3a35a181840aa1ee54d63d86d0361d6f233",
+  "artifact_sha256": "1cd3e97cc1e865fedaa7847b1f464f90806e0c9926edc5756c290c9edb27684c",
   "case_id": "xc-malformed-missing-role",
   "experiment": {
     "analyzer_version": "dft-structural-analysis-v5",
@@ -58,7 +58,7 @@
     ]
   },
   "raw_extraction": {
-    "artifact_sha256": "bc25eaa90a2d1a962f9fa264cf3ad3a35a181840aa1ee54d63d86d0361d6f233",
+    "artifact_sha256": "1cd3e97cc1e865fedaa7847b1f464f90806e0c9926edc5756c290c9edb27684c",
     "extractor_version": "torch-export-inventory-v2",
     "facts": {},
     "inventory": {
@@ -386,7 +386,7 @@
           "graph_inputs": [
             "p_base"
           ],
-          "sha256": "e323453973290589ec8d4a2c63a2942970afa2275fb20805c68fd8032426582f",
+          "sha256": "796aa62d732663a05c62439231246c92078dff82be670c721ffc4e5463e15ce6",
           "shape": [
             5,
             5
@@ -399,7 +399,7 @@
           ],
           "dtype": "torch.float32",
           "graph_inputs": [],
-          "sha256": "f663b4db89d0acd9be8655893d89e98c030b1b7cdd5d682ef13313fa666d833e",
+          "sha256": "5a35c076635353a21d05614cd4151b4652573645d91402e196f5fb132f7eb317",
           "shape": [
             5,
             5

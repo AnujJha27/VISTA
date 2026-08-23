@@ -1,6 +1,6 @@
 {
   "artifact": "D:\\fun stuff\\proof_vibe\\build\\vista-structural-v2-corpus\\operator-malformed-missing-output.pt2",
-  "artifact_sha256": "b58b659184e55c8b17d3414cc32cdd30901412281fcc7c1d94ac635eef734dfa",
+  "artifact_sha256": "3ff9e4f72528537824b24fcd27c09bf383b3114f5abc007579c5fe85bc39b29c",
   "case_id": "operator-malformed-missing-output",
   "experiment": {
     "analyzer_version": "dft-structural-analysis-v5",
@@ -58,7 +58,7 @@
     ]
   },
   "raw_extraction": {
-    "artifact_sha256": "b58b659184e55c8b17d3414cc32cdd30901412281fcc7c1d94ac635eef734dfa",
+    "artifact_sha256": "3ff9e4f72528537824b24fcd27c09bf383b3114f5abc007579c5fe85bc39b29c",
     "extractor_version": "torch-export-inventory-v2",
     "facts": {},
     "inventory": {
@@ -386,7 +386,7 @@
           "graph_inputs": [
             "p_base"
           ],
-          "sha256": "421e38d819487453df246335a0954f2ab4c9e8212da5db2388cc64f0515e2075",
+          "sha256": "5a9b4e68bde3b52bffe4ef56e96675bcdc88f212161d11859e2b323295bd1e81",
           "shape": [
             5,
             5
@@ -399,7 +399,7 @@
           ],
           "dtype": "torch.float32",
           "graph_inputs": [],
-          "sha256": "2cfc9cfd7a6fd6d65e91ff0de49669b00b81d16f01a7db99f4b7173a45b56711",
+          "sha256": "46b4319df692b28e097770180f378072b32d62f17d03beb23d2ce9b4bc734b6d",
           "shape": [
             5,
             5
