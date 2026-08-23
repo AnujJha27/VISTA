@@ -17,7 +17,15 @@ def main() -> int:
     options = parser.parse_args()
     manifest = json.loads(options.manifest.read_text())
     options.output_dir.mkdir(parents=True, exist_ok=True)
-    for case in manifest["cases"]:
+    torch.manual_seed(20260822)
+    try:
+        from tqdm import tqdm
+        cases = tqdm(manifest["cases"], desc="export artifacts", unit="case")
+    except ImportError:
+        cases = manifest["cases"]
+    for index, case in enumerate(cases):
+        if not hasattr(cases, "write"):
+            print(f"[{index + 1}/{len(manifest['cases'])}] exporting {case['id']}", file=sys.stderr)
         model = make_model(case["model"]).eval()
         torch.export.save(torch.export.export(model, (torch.randn(case["model"]["sites"], 1),)), options.output_dir / f'{case["id"]}.pt2')
     return 0

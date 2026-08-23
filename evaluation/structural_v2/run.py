@@ -85,13 +85,31 @@ def run_case(case, artifact, output, repeat):
     row = {"case_id":case["id"],"domain":case["domain"],"class":case["class"],"split":case["split"],"repeat":repeat,"artifact_hash":evidence.get("artifact_sha256",""),"expected_status":expected,"observed_semantic_status":status,"observed_ir_value":"" if "structural_ir" not in evidence else json.dumps({"xc":evidence["structural_ir"]["xc"]["form"],"operator":evidence["structural_ir"]["operator"]["construction"],"depth":evidence["structural_ir"]["message_passing"]["depth"]},sort_keys=True),"translation_valid":evidence.get("translation_validation",{}).get("status") == "translation_validated","policy_status":evidence.get("policy",{}).get("status","not_run"),"lean_status":lean_status,"certificate_status":certificate_status,"correct":status == expected,"failure_reason":reason}
     dump(output / "evidence.json", evidence); return row
 
+def condition_fingerprint(manifest_path):
+    sources = [manifest_path, HERE / "corpus_models.py", HERE / "generate.py", HERE / "run.py",
+               HERE / "score.py", HERE / "report.py", HERE / "experiment.json",
+               ROOT / "dftcert" / "structural" / "core.py", ROOT / "dftcert" / "structural" / "cli.py",
+               ROOT / "extractors" / "torch_export_worker.py"]
+    return {"frozen_revision": json.loads((HERE / "experiment.json").read_text())["frozen_revision"],
+            "source_sha256": {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sources}}
+
 def main():
     parser=argparse.ArgumentParser(); parser.add_argument("--repeats",type=int,default=3); parser.add_argument("--artifacts",type=Path,default=ROOT / "build" / "vista-structural-v2-corpus"); parser.add_argument("--results",type=Path,default=HERE / "results" / "latest"); parser.add_argument("--generate",action="store_true"); options=parser.parse_args()
     if options.generate: subprocess.run([sys.executable,str(HERE / "generate.py"),"--output-dir",str(options.artifacts)],check=True)
     manifest=json.loads((HERE / "corpus_manifest.json").read_text()); options.results.mkdir(parents=True,exist_ok=True)
     experiment=json.loads((HERE / "experiment.json").read_text()); experiment["runtime"]={"python":sys.version,"platform":platform.platform(),"executed_at":datetime.now(timezone.utc).isoformat()}; dump(options.results / "experiment.json", experiment)
+    fingerprint = condition_fingerprint(HERE / "corpus_manifest.json")
+    fingerprint["artifact_sha256"] = {case["id"]: hashlib.sha256((options.artifacts / f'{case["id"]}.pt2').read_bytes()).hexdigest() if (options.artifacts / f'{case["id"]}.pt2').exists() else None for case in manifest["cases"]}
+    dump(options.results / "condition_fingerprint.json", fingerprint)
     rows=[]
-    for case in manifest["cases"]:
+    try:
+        from tqdm import tqdm
+        case_iter = tqdm(manifest["cases"], desc="eval cases", unit="case")
+    except ImportError:
+        case_iter = manifest["cases"]
+    for index, case in enumerate(case_iter):
+        if not hasattr(case_iter, "write"):
+            print(f"[{index + 1}/{len(manifest['cases'])}] {case['id']}", file=sys.stderr, flush=True)
         artifact=options.artifacts / f'{case["id"]}.pt2'
         if not artifact.exists():
             rows.append({"case_id":case["id"],"domain":case["domain"],"class":case["class"],"split":case["split"],"repeat":0,"artifact_hash":"","expected_status":case["expected"]["semantic_status"],"observed_semantic_status":"malformed","observed_ir_value":"","translation_valid":False,"policy_status":"not_run","lean_status":"not_run","certificate_status":"ineligible","correct":False,"failure_reason":"artifact missing; run with --generate in a PyTorch environment"}); continue
