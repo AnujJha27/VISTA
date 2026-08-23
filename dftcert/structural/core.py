@@ -77,7 +77,7 @@ def _semantic_derivations(
     """Lower raw inventory facts into versioned, provenance-preserving claims."""
     count, edges, graph_inputs, state_name = _topology(inventory, input_constraints)
     aliases = _adjacency_aliases(nodes, graph_inputs)
-    stages = _message_chain(nodes, roles["message_state"], graph_inputs)
+    stages, message_recognized = _message_chain(nodes, roles["message_state"], graph_inputs)
     xc_form, xc_nodes = _xc_form(nodes, roles["xc_energy"])
     operator, operator_nodes = _operator_construction(nodes, roles["learned_self_energy"])
     by_name = {node.get("name"): node for node in nodes if isinstance(node.get("name"), str)}
@@ -96,7 +96,8 @@ def _semantic_derivations(
         "message_passing": _derivation(
             claim="message_passing.depth", value=len(stages), root=roles["message_state"],
             evidence_nodes=stages, rule="message.adjacency_fed_matmul",
-            observed_nodes=stage_graph, metadata={"stages": stages},
+            observed_nodes=stage_graph, rule_version=2,
+            metadata={"stages": stages, "recognized": message_recognized},
         ),
         "xc": _derivation(
             claim="xc.form", value=xc_form, root=roles["xc_energy"],
@@ -118,6 +119,7 @@ def _semantic_derivations(
                 "symmetrized": "operator.add_adjoint_pair",
                 "unconstrained_parameter": "operator.unconstrained_root",
             }.get(operator, "operator.unrecognized_composition"),
+            rule_version=2 if operator == "unconstrained_parameter" else 1,
             observed_nodes=operator_graph,
             metadata=({"reason": "unrecognized operator composition"} if operator == "unsupported" else None),
         ),
@@ -192,8 +194,15 @@ def _operator_construction(
             for base, transformed in ((left, right), (right, left)):
                 transformed_node = by_name.get(transformed, {})
                 if _has_target([transformed_node], _ADJOINT_TARGETS):
-                    if _direct_ref(transformed_node.get("args")) == base:
+                    transformed_base = _direct_ref(transformed_node.get("args"))
+                    if transformed_base == base:
                         return "symmetrized", provenance
+                    if (
+                        transformed_base in by_name
+                        and by_name.get(base, {}).get("op") in {"placeholder", "get_attr"}
+                        and by_name[transformed_base].get("op") in {"placeholder", "get_attr"}
+                    ):
+                        return "unconstrained_parameter", provenance
     if root_node.get("op") in {"placeholder", "get_attr"}:
         return "unconstrained_parameter", provenance
     return "unsupported", provenance
@@ -230,7 +239,7 @@ def _adjacency_aliases(nodes: list[dict[str, Any]], adjacency_inputs: list[str])
 
 def _message_chain(
     nodes: list[dict[str, Any]], root: str, adjacency_inputs: list[str],
-) -> list[str]:
+) -> tuple[list[str], bool]:
     """Follow only consecutive adjacency-fed matmuls from the declared output."""
     by_name = {node["name"]: node for node in nodes if isinstance(node.get("name"), str)}
     adjacency_aliases = set(_adjacency_aliases(nodes, adjacency_inputs))
@@ -239,11 +248,11 @@ def _message_chain(
         node = by_name.get(current, {})
         refs = _refs(node.get("args"))
         if not _has_target([node], _MESSAGE_TARGETS):
-            return stages
+            return stages, node.get("op") == "placeholder"
         adjacency = [ref for ref in refs if ref in adjacency_aliases]
         state = [ref for ref in refs if ref not in adjacency_aliases]
         if len(adjacency) != 1 or len(state) != 1:
-            return stages
+            return stages, False
         stages.append(current)
         current = state[0]
 
@@ -340,8 +349,10 @@ def structural_ir_from_inventory(
     derivations, site_count, edges, topology_nodes, adjacency_state = _semantic_derivations(
         inventory=inventory, nodes=nodes, roles=roles, input_constraints=input_constraints,
     )
-    stage_nodes = derivations["message_passing"]["evidence_nodes"]
-    depth = derivations["message_passing"]["value"]
+    message_derivation = derivations["message_passing"]
+    stage_nodes = message_derivation["evidence_nodes"]
+    depth = message_derivation["value"]
+    message_recognized = message_derivation["metadata"]["recognized"]
     xc_form, xc_nodes = derivations["xc"]["value"], derivations["xc"]["evidence_nodes"]
     operator, operator_nodes = derivations["operator"]["value"], derivations["operator"]["evidence_nodes"]
     requirements = input_constraints.get("required_couplings", [])
@@ -375,7 +386,10 @@ def structural_ir_from_inventory(
             "adjacency_aliases": _adjacency_aliases(nodes, topology_nodes),
             "adjacency_convention": input_constraints.get("adjacency_convention", "target_source"),
         },
-        "message_passing": {"root": roles["message_state"], "stages": stage_nodes},
+        "message_passing": {
+            "root": roles["message_state"], "stages": stage_nodes,
+            "recognized": message_recognized,
+        },
         "xc": {"root": roles["xc_energy"], "form": xc_form},
         "operator": {"root": roles["learned_self_energy"], "construction": operator},
         "semantic_derivations": derivations,
@@ -396,7 +410,10 @@ def structural_ir_from_inventory(
             "directed_edges": edges,
             "provenance_nodes": topology_nodes,
         },
-        "message_passing": {"depth": depth, "provenance_nodes": stage_nodes},
+        "message_passing": {
+            "depth": depth, "recognized": message_recognized,
+            "provenance_nodes": stage_nodes,
+        },
         "xc": {"form": xc_form, "provenance_nodes": xc_nodes},
         "operator": {"construction": operator, "provenance_nodes": operator_nodes},
         "requirements": {
@@ -447,6 +464,8 @@ def validate_structural_ir(value: dict[str, Any]) -> None:
     depth = message.get("depth")
     if not isinstance(depth, int) or isinstance(depth, bool) or depth < 0:
         raise ManifestError("message-passing depth must be non-negative")
+    if "recognized" in message and not isinstance(message["recognized"], bool):
+        raise ManifestError("message-passing recognition must be boolean")
     if xc.get("form") not in {"hinge", "smooth", "unsupported"}:
         raise ManifestError("unsupported XC form value")
     if operator.get("construction") not in {
@@ -499,10 +518,16 @@ def validate_translation(
         "adjacency_convention": input_constraints.get("adjacency_convention", "target_source"),
     } or value["topology"]["site_count"] != count or value["topology"]["directed_edges"] != edges:
         raise ManifestError("translation topology claim does not match its adjacency evidence")
-    stages = derivations["message_passing"]["evidence_nodes"]
-    if translation.get("message_passing") != {"root": roles["message_state"], "stages": stages}:
+    message_derivation = derivations["message_passing"]
+    stages = message_derivation["evidence_nodes"]
+    message_recognized = message_derivation["metadata"]["recognized"]
+    if translation.get("message_passing") != {
+        "root": roles["message_state"], "stages": stages, "recognized": message_recognized,
+    }:
         raise ManifestError("translation message-passing derivation is invalid")
-    if value["message_passing"] != {"depth": len(stages), "provenance_nodes": stages}:
+    if value["message_passing"] != {
+        "depth": len(stages), "recognized": message_recognized, "provenance_nodes": stages,
+    }:
         raise ManifestError("IR message-passing claim does not match its derivation")
     xc_form, xc_nodes = derivations["xc"]["value"], derivations["xc"]["evidence_nodes"]
     if translation.get("xc") != {"root": roles["xc_energy"], "form": xc_form}:
@@ -560,6 +585,8 @@ def assess_structural_ir(value: dict[str, Any]) -> dict[str, Any]:
     xc = value["xc"]["form"] == "hinge"
     self_adjoint = value["operator"]["construction"] in {"zero", "identity", "symmetrized"}
     supported = (
+        value["message_passing"].get("recognized", True)
+        and
         value["xc"]["form"] != "unsupported"
         and value["operator"]["construction"] != "unsupported"
     )

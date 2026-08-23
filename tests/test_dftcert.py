@@ -887,6 +887,32 @@ class StructuralV2Tests(unittest.TestCase):
         inventory["nodes"][5]["target"] = "custom.matmul"
         self.assertEqual(translate(inventory)["message_passing"]["depth"], 0)
 
+    def test_translation_rejects_interrupted_messages_and_cross_adjoint(self):
+        inventory = self.inventory()
+        ref = lambda name: {"node": name}
+        inventory["nodes"].insert(6, {
+            "name": "message_relu", "op": "call_function", "target": "aten.relu.default",
+            "args": [ref("matmul")], "kwargs": {},
+        })
+        next(node for node in inventory["nodes"] if node["name"] == "matmul_1")["args"][1] = ref("message_relu")
+        ir = structural_ir_from_inventory(
+            inventory=inventory, artifact_sha256="artifact", extractor_version="test",
+            input_constraints=self.constraints(),
+        )
+        self.assertFalse(ir["message_passing"]["recognized"])
+        self.assertEqual(assess_structural_ir(ir)["status"], "formalization_required")
+
+        inventory = self.inventory()
+        inventory["nodes"].insert(2, {
+            "name": "p_other", "op": "placeholder", "target": "p_other", "args": [], "kwargs": {},
+        })
+        next(node for node in inventory["nodes"] if node["name"] == "numpy_t")["args"] = [ref("p_other")]
+        ir = structural_ir_from_inventory(
+            inventory=inventory, artifact_sha256="artifact", extractor_version="test",
+            input_constraints=self.constraints(),
+        )
+        self.assertEqual(ir["operator"]["construction"], "unconstrained_parameter")
+
     def test_translation_rejects_malformed_adjacency_and_output_contracts(self):
         inventory = self.inventory()
         inventory["state"]["adjacency"]["structural_values"][0][1] = "false"
