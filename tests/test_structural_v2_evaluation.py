@@ -12,3 +12,11 @@ class StructuralV2EvaluationTests(unittest.TestCase):
         self.assertEqual(Counter(item["domain"] for item in cases), {"spatial": 16, "operator": 16, "xc": 16})
         self.assertEqual(Counter(item["split"] for item in cases), {"development": 24, "evaluation": 24})
         self.assertTrue(all("expected" in item and "rationale" in item for item in cases))
+
+    def test_fresh_held_out_corpus_has_fixed_labels_before_execution(self):
+        root = Path(__file__).resolve().parents[1] / "evaluation" / "structural_v2"
+        cases = json.loads((root / "fresh_held_out_manifest.json").read_text())["cases"]
+        self.assertEqual(len(cases), 12)
+        self.assertEqual(Counter(item["domain"] for item in cases), {"spatial": 4, "operator": 4, "xc": 4})
+        self.assertTrue(all(item["split"] == "held_out" for item in cases))
+        self.assertTrue(all("semantic_status" in item["expected"] for item in cases))
