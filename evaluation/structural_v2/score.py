@@ -79,7 +79,7 @@ def verify_bundle(options, manifest_cases, primary, rows):
                     issues.append(f"{case_id}[{row['repeat']}]: certificate_status verified without verified Lean check")
                 if evidence.get("certificate", {}).get("ir_sha256") != evidence.get("policy", {}).get("ir_sha256"):
                     issues.append(f"{case_id}[{row['repeat']}]: certificate IR binding mismatch")
-            if row["translation_valid"] != bool((ir or {}).get("translation_validation", {}).get("status") == "translation_validated"):
+            if (row["translation_valid"] == "True") != bool((ir or {}).get("translation_validation", {}).get("status") == "translation_validated"):
                 issues.append(f"{case_id}[{row['repeat']}]: translation_valid column contradicts evidence")
     return issues
 
