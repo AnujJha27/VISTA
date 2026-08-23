@@ -98,7 +98,7 @@ def condition_fingerprint(manifest_path, experiment_path):
     return {"condition_name": experiment["condition_name"],
             "corpus_freeze_revision": experiment["corpus_freeze_revision"],
             "execution_revision": revision(),
-            "source_sha256": {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sources}}
+            "source_sha256": {str(p.resolve().relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sources}}
 
 def main():
     parser=argparse.ArgumentParser(); parser.add_argument("--repeats",type=int,default=3); parser.add_argument("--artifacts",type=Path,default=ROOT / "build" / "vista-structural-v2-corpus"); parser.add_argument("--results",type=Path,default=HERE / "results" / "latest"); parser.add_argument("--manifest",type=Path,default=HERE / "corpus_manifest.json"); parser.add_argument("--experiment",type=Path,default=HERE / "experiment.json"); parser.add_argument("--generate",action="store_true"); options=parser.parse_args()
