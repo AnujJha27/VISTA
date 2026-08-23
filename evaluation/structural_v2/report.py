@@ -53,12 +53,13 @@ def metrics(rows, primary, evidence, results_dir):
         if len(hashes) <= 1:
             obligation_stable += 1
     return {
+        "exact_semantic_classification": rate(sum(r["observed_semantic_status"] == r["expected_status"] for r in primary), len(primary)),
         "total_cases": len(primary),
         "false_certification": rate(len(false_certs), len(negatives)),
         "positive_acceptance": rate(sum(r["certificate_status"] == "verified" for r in positives), len(positives)),
-        "near_miss_rejection": rate(sum(r["certificate_status"] != "verified" for r in primary if r["class"] == "near_miss"), sum(r["class"] == "near_miss" for r in primary)),
-        "unsupported_withheld": rate(sum(r["certificate_status"] != "verified" for r in primary if r["expected_status"] == "unsupported"), sum(r["expected_status"] == "unsupported" for r in primary)),
-        "malformed_rejection": rate(sum(r["observed_semantic_status"] == "malformed" for r in primary if r["expected_status"] == "malformed"), sum(r["expected_status"] == "malformed" for r in primary)),
+        "near_miss_certificate_withheld": rate(sum(r["certificate_status"] != "verified" for r in primary if r["class"] == "near_miss"), sum(r["class"] == "near_miss" for r in primary)),
+        "unsupported_certificate_withheld": rate(sum(r["certificate_status"] != "verified" for r in primary if r["expected_status"] == "unsupported"), sum(r["expected_status"] == "unsupported" for r in primary)),
+        "malformed_input_rejected": rate(sum(r["observed_semantic_status"] == "malformed" for r in primary if r["expected_status"] == "malformed"), sum(r["expected_status"] == "malformed" for r in primary)),
         "tamper_detection": rate(sum(t["detected"] for t in tamper), len(tamper)),
         "reproducible_disposition": rate(stable, len(by_case)),
         "stable_obligation_hash": rate(obligation_stable, total_with_obligations),
