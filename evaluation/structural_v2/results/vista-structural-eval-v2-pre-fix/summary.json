@@ -1,0 +1,13 @@
+{
+  "cases": 48,
+  "exact_semantic_classification": "45/48 (93.8%)",
+  "false_certification": "0/36 (0.0%)",
+  "positive_acceptance": "12/12 (100.0%)",
+  "near_miss_certificate_withheld": "12/12 (100.0%)",
+  "unsupported_certificate_withheld": "13/13 (100.0%)",
+  "malformed_input_rejected": "12/12 (100.0%)",
+  "tamper_detection": "324/324 (100.0%)",
+  "reproducible_disposition": "48/48 (100.0%)",
+  "bundle_integrity_issues": 0,
+  "note": "exact_semantic_classification is the correctness headline; *_withheld metrics measure certificate refusal only"
+}
