@@ -1,12 +1,13 @@
 {
-  "artifact": "D:\\fun stuff\\proof_vibe\\build\\vista-structural-v2-corpus\\xc-malformed-missing-role.pt2",
-  "artifact_sha256": "d08104104ef8ec4427e60e1d880571a31763b7a6911c50a62c38624bbf89fea2",
+  "artifact": "build\\vista-structural-v2-r2-regression\\xc-malformed-missing-role.pt2",
+  "artifact_sha256": "d867842a2b828df9f28cd55b3f648f7925fc70d039d35b74836f0171c317c7aa",
   "case_id": "xc-malformed-missing-role",
   "experiment": {
     "analyzer_version": "dft-structural-analysis-v5",
     "compiler_version": "dft-structural-lean-v2",
-    "condition_name": "vista-structural-eval-v2",
+    "condition_name": "vista-structural-eval-v2-r2",
     "condition_version": 2,
+    "corpus_freeze_revision": "e7e0cba6762ebf090c2a7a4513261ed073426014",
     "environment": {
       "export": "torch.export.save(.pt2)",
       "platform": "recorded by runner environment",
@@ -16,7 +17,7 @@
     "experiment": "VISTA Structural V2 corpus",
     "extractor_version": "torch-export-inventory-v2",
     "frozen_revision": "c69e5746289a0ef15e8cf76289802964996d69f9",
-    "integrity": "Changing a semantic rule after inspecting this corpus requires a new condition_version and preserves prior result bundles.",
+    "integrity": "The corpus freeze revision and execution revision are recorded separately. Do not change semantic rules after observing fresh held-out results; create a new condition instead.",
     "lean_project": {
       "identity": "proof-search@0.1.0",
       "path": "lean",
@@ -58,7 +59,7 @@
     ]
   },
   "raw_extraction": {
-    "artifact_sha256": "d08104104ef8ec4427e60e1d880571a31763b7a6911c50a62c38624bbf89fea2",
+    "artifact_sha256": "d867842a2b828df9f28cd55b3f648f7925fc70d039d35b74836f0171c317c7aa",
     "extractor_version": "torch-export-inventory-v2",
     "facts": {},
     "inventory": {

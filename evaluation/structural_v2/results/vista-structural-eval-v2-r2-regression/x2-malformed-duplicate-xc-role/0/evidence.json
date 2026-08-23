@@ -1,12 +1,13 @@
 {
-  "artifact": "D:\\fun stuff\\proof_vibe\\build\\vista-structural-v2-corpus\\x2-malformed-duplicate-xc-role.pt2",
-  "artifact_sha256": "8899d159a189467e4dd6809fab9c287ff792f7a01f4f3d47484e3fc90790d1f0",
+  "artifact": "build\\vista-structural-v2-r2-regression\\x2-malformed-duplicate-xc-role.pt2",
+  "artifact_sha256": "9c5dae29d1243f75a6dc2b2da32c1c238bd90ca72a8cbd7b1016e6859eeb0730",
   "case_id": "x2-malformed-duplicate-xc-role",
   "experiment": {
     "analyzer_version": "dft-structural-analysis-v5",
     "compiler_version": "dft-structural-lean-v2",
-    "condition_name": "vista-structural-eval-v2",
+    "condition_name": "vista-structural-eval-v2-r2",
     "condition_version": 2,
+    "corpus_freeze_revision": "e7e0cba6762ebf090c2a7a4513261ed073426014",
     "environment": {
       "export": "torch.export.save(.pt2)",
       "platform": "recorded by runner environment",
@@ -16,7 +17,7 @@
     "experiment": "VISTA Structural V2 corpus",
     "extractor_version": "torch-export-inventory-v2",
     "frozen_revision": "c69e5746289a0ef15e8cf76289802964996d69f9",
-    "integrity": "Changing a semantic rule after inspecting this corpus requires a new condition_version and preserves prior result bundles.",
+    "integrity": "The corpus freeze revision and execution revision are recorded separately. Do not change semantic rules after observing fresh held-out results; create a new condition instead.",
     "lean_project": {
       "identity": "proof-search@0.1.0",
       "path": "lean",
@@ -66,7 +67,7 @@
     ]
   },
   "raw_extraction": {
-    "artifact_sha256": "8899d159a189467e4dd6809fab9c287ff792f7a01f4f3d47484e3fc90790d1f0",
+    "artifact_sha256": "9c5dae29d1243f75a6dc2b2da32c1c238bd90ca72a8cbd7b1016e6859eeb0730",
     "extractor_version": "torch-export-inventory-v2",
     "facts": {},
     "inventory": {

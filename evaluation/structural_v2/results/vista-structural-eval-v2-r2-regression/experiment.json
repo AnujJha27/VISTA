@@ -1,18 +1,20 @@
 {
   "analyzer_version": "dft-structural-analysis-v5",
   "compiler_version": "dft-structural-lean-v2",
-  "condition_name": "vista-structural-eval-v2",
+  "condition_name": "vista-structural-eval-v2-r2",
   "condition_version": 2,
+  "corpus_freeze_revision": "e7e0cba6762ebf090c2a7a4513261ed073426014",
   "environment": {
     "export": "torch.export.save(.pt2)",
     "platform": "recorded by runner environment",
     "python": "recorded by runner environment",
     "pytorch": "recorded by extractor"
   },
+  "execution_revision": "457e003b0e7de5e423cfb21245b86e10a6a66e53",
   "experiment": "VISTA Structural V2 corpus",
   "extractor_version": "torch-export-inventory-v2",
   "frozen_revision": "c69e5746289a0ef15e8cf76289802964996d69f9",
-  "integrity": "Changing a semantic rule after inspecting this corpus requires a new condition_version and preserves prior result bundles.",
+  "integrity": "The corpus freeze revision and execution revision are recorded separately. Do not change semantic rules after observing fresh held-out results; create a new condition instead.",
   "lean_project": {
     "identity": "proof-search@0.1.0",
     "path": "lean",
@@ -20,7 +22,7 @@
   },
   "policy_version": "dft-structural-v2",
   "runtime": {
-    "executed_at": "2026-08-23T12:58:32.686449+00:00",
+    "executed_at": "2026-08-23T16:41:44.270983+00:00",
     "platform": "Windows-11-10.0.26200-SP0",
     "python": "3.12.5 (tags/v3.12.5:ff3bc82, Aug  6 2024, 20:45:27) [MSC v.1940 64 bit (AMD64)]"
   },

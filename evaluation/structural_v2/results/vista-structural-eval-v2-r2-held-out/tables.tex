@@ -1,0 +1,54 @@
+% metrics
+\begin{tabular}{lr}
+\toprule
+metric & value \
+\midrule
+exact semantic classification & 12/12 (100.0%) \
+total cases & 12 \
+false certification & 0/9 (0.0%) \
+positive acceptance & 3/3 (100.0%) \
+near miss certificate withheld & 3/3 (100.0%) \
+unsupported certificate withheld & 3/3 (100.0%) \
+malformed input rejected & 3/3 (100.0%) \
+tamper detection & 81/81 (100.0%) \
+reproducible disposition & 12/12 (100.0%) \
+stable obligation hash & 9/9 (100.0%) \
+\bottomrule
+\end{tabular}
+
+% domain x class
+\begin{tabular}{llrrrrr}
+\toprule
+domain & class & cases & correct & unsupported & malformed & false certs \
+\midrule
+operator & malformed & 1 & 1 & 0 & 1 & 0 \
+operator & near miss & 1 & 1 & 0 & 0 & 0 \
+operator & positive & 1 & 1 & 0 & 0 & 0 \
+operator & unsupported & 1 & 1 & 1 & 0 & 0 \
+spatial & malformed & 1 & 1 & 0 & 1 & 0 \
+spatial & near miss & 1 & 1 & 0 & 0 & 0 \
+spatial & positive & 1 & 1 & 0 & 0 & 0 \
+spatial & unsupported & 1 & 1 & 1 & 0 & 0 \
+xc & malformed & 1 & 1 & 0 & 1 & 0 \
+xc & near miss & 1 & 1 & 0 & 0 & 0 \
+xc & positive & 1 & 1 & 0 & 0 & 0 \
+xc & unsupported & 1 & 1 & 1 & 0 & 0 \
+\bottomrule
+\end{tabular}
+
+% tampering
+\begin{tabular}{lrl}
+\toprule
+mutation & detected & rejected by \
+\midrule
+evidence\_node & 9/9 & translation validation \
+ir\_field & 9/9 & translation validation \
+message\_depth & 9/9 & translation validation \
+operator\_form & 9/9 & translation validation \
+root\_node & 9/9 & translation validation \
+rule\_identifier & 9/9 & translation validation \
+rule\_version & 9/9 & translation validation \
+source\_hash & 9/9 & translation validation \
+xc\_form & 9/9 & translation validation \
+\bottomrule
+\end{tabular}

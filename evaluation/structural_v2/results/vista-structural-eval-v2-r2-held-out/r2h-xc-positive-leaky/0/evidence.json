@@ -1,0 +1,1087 @@
+{
+  "artifact": "build\\vista-structural-v2-r2-held-out\\r2h-xc-positive-leaky.pt2",
+  "artifact_sha256": "c0bd96eaf05ed3afce982c7ae020950924735a5e2e320612ad00672043000b23",
+  "case_id": "r2h-xc-positive-leaky",
+  "certificate": {
+    "certificate_kind": "artifact",
+    "certificate_source_sha256": "f9f2f3ece78290afb4065758ad139588350855f202b951bfc1c3770204962568",
+    "compiler_version": "dft-structural-lean-v2",
+    "failure_witnesses": [],
+    "ir_sha256": "6338d248f0ef8c33027663a58146256f2aa83d1257e15decff35c9c406aa5626",
+    "obligations": [
+      {
+        "fact": "xc_discontinuity_compatible",
+        "id": "6338d248f0ef-xc_discontinuity_compatible",
+        "orchestrator_status": "verified",
+        "proof_sha256": "d831e2ab55053d80535fa6e2419b9176577cd3358acb3681b80909f72502bc1e"
+      },
+      {
+        "fact": "spatial_nonlocality_compatible",
+        "id": "6338d248f0ef-spatial_nonlocality_compatible",
+        "orchestrator_status": "verified",
+        "proof_sha256": "d831e2ab55053d80535fa6e2419b9176577cd3358acb3681b80909f72502bc1e"
+      },
+      {
+        "fact": "self_adjoint",
+        "id": "6338d248f0ef-self_adjoint",
+        "orchestrator_status": "verified",
+        "proof_sha256": "d831e2ab55053d80535fa6e2419b9176577cd3358acb3681b80909f72502bc1e"
+      }
+    ],
+    "policy_version": "dft-structural-v2",
+    "report_schema_version": 2,
+    "report_sha256": "868e08a272ece5fb180011082a542ce3c7bd576353f1d162ba9ff24331356ea6",
+    "source": {
+      "analyzer_version": "dft-structural-analysis-v5",
+      "artifact_sha256": "c0bd96eaf05ed3afce982c7ae020950924735a5e2e320612ad00672043000b23",
+      "extractor_version": "torch-export-inventory-v2",
+      "inventory_sha256": "5cac25af17917499a7c61df54280268f59f16979f7fe13a24c41d0892ec1ec74",
+      "kind": "torch_export",
+      "parameter_structure_sha256": "f8b90169aa1cb11abd077e369dc6bb6ee5a9b584db17f7fe2d9e49339d1d0dd0",
+      "translation_sha256": "722abb70b036951693f615dc89312caf2c3ddc5ca02f869e6d1b8d2907574227"
+    },
+    "source_sha256": "c0bd96eaf05ed3afce982c7ae020950924735a5e2e320612ad00672043000b23",
+    "status": "assembled_pending_certificate_check",
+    "structural_disposition": "structurally_certifiable",
+    "translation_validation": {
+      "checked_claims": [
+        "output_roles",
+        "topology",
+        "message_passing",
+        "xc",
+        "operator",
+        "semantic_derivations"
+      ],
+      "inventory_sha256": "5cac25af17917499a7c61df54280268f59f16979f7fe13a24c41d0892ec1ec74",
+      "status": "translation_validated",
+      "translation_sha256": "722abb70b036951693f615dc89312caf2c3ddc5ca02f869e6d1b8d2907574227"
+    }
+  },
+  "experiment": {
+    "analyzer_version": "dft-structural-analysis-v5",
+    "compiler_version": "dft-structural-lean-v2",
+    "condition_name": "vista-structural-eval-v2-r2",
+    "condition_version": 2,
+    "corpus_freeze_revision": "e7e0cba6762ebf090c2a7a4513261ed073426014",
+    "environment": {
+      "export": "torch.export.save(.pt2)",
+      "platform": "recorded by runner environment",
+      "python": "recorded by runner environment",
+      "pytorch": "recorded by extractor"
+    },
+    "experiment": "VISTA Structural V2 corpus",
+    "extractor_version": "torch-export-inventory-v2",
+    "frozen_revision": "c69e5746289a0ef15e8cf76289802964996d69f9",
+    "integrity": "The corpus freeze revision and execution revision are recorded separately. Do not change semantic rules after observing fresh held-out results; create a new condition instead.",
+    "lean_project": {
+      "identity": "proof-search@0.1.0",
+      "path": "lean",
+      "toolchain": "leanprover/lean4:v4.31.0"
+    },
+    "policy_version": "dft-structural-v2",
+    "semantic_rules": {
+      "message.adjacency_fed_matmul": 2,
+      "operator.add_adjoint_pair": 1,
+      "operator.identity_root": 1,
+      "operator.unconstrained_root": 2,
+      "operator.unrecognized_composition": 1,
+      "operator.zero_root": 1,
+      "topology.adjacency_state": 1,
+      "xc.hinge_activation": 2,
+      "xc.smooth_activation": 2,
+      "xc.unrecognized_composition": 2
+    },
+    "structural_ir_schema_version": 2
+  },
+  "generated_obligations": {
+    "assessment": {
+      "checks": {
+        "self_adjoint": {
+          "construction": "symmetrized",
+          "provenance_nodes": [
+            "add",
+            "numpy_t",
+            "p_base"
+          ],
+          "satisfied": true
+        },
+        "spatial_nonlocality_compatible": {
+          "couplings": [
+            {
+              "covered": true,
+              "path": [
+                0,
+                1,
+                2
+              ],
+              "source": 0,
+              "target": 2
+            }
+          ],
+          "depth": 3,
+          "provenance_nodes": [
+            "matmul_2",
+            "matmul_1",
+            "matmul"
+          ],
+          "satisfied": true
+        },
+        "xc_discontinuity_compatible": {
+          "form": "hinge",
+          "provenance_nodes": [
+            "leaky_relu",
+            "sum_2",
+            "density"
+          ],
+          "satisfied": true
+        }
+      },
+      "ir_sha256": "6338d248f0ef8c33027663a58146256f2aa83d1257e15decff35c9c406aa5626",
+      "source": {
+        "analyzer_version": "dft-structural-analysis-v5",
+        "artifact_sha256": "c0bd96eaf05ed3afce982c7ae020950924735a5e2e320612ad00672043000b23",
+        "extractor_version": "torch-export-inventory-v2",
+        "inventory_sha256": "5cac25af17917499a7c61df54280268f59f16979f7fe13a24c41d0892ec1ec74",
+        "kind": "torch_export",
+        "parameter_structure_sha256": "f8b90169aa1cb11abd077e369dc6bb6ee5a9b584db17f7fe2d9e49339d1d0dd0",
+        "translation_sha256": "722abb70b036951693f615dc89312caf2c3ddc5ca02f869e6d1b8d2907574227"
+      },
+      "status": "structurally_certifiable"
+    },
+    "compiler_version": "dft-structural-lean-v2",
+    "disposition": "structurally_certifiable",
+    "failure_witnesses": [],
+    "ir_sha256": "6338d248f0ef8c33027663a58146256f2aa83d1257e15decff35c9c406aa5626",
+    "obligations": [
+      {
+        "context": "Artifact-derived model description (not an LLM interpretation):\n- Source: torch_export; binding hash: c0bd96eaf05ed3afce982c7ae020950924735a5e2e320612ad00672043000b23.\n- Topology: 6 sites and 6 directed edges.\n- Required couplings: [{'source': 0, 'target': 2}].\n- Message passing: 3 consecutive adjacency-fed stage(s): ['matmul_2', 'matmul_1', 'matmul'].\n- XC output construction: hinge; supporting graph nodes: ['leaky_relu', 'sum_2', 'density'].\n- Self-energy construction: symmetrized; supporting graph nodes: ['add', 'numpy_t', 'p_base'].\n- Declared output roots: {'xc_energy': 'leaky_relu', 'learned_self_energy': 'add', 'message_state': 'matmul_2'}.\n- Adjacency evidence: state 'adjacency'; graph nodes ['b_adjacency', 'to'].\n- Translation validation rechecked these claims against the raw exported inventory.\nScope: structural compatibility only; this does not assess numerical outputs, trained weights, convergence, or experiment.\n\nDFT Structural V2 obligation generated deterministically from the common IR. Prove the exact Boolean structural result. Prefer `by decide`, whose result is reduced by Lean's kernel for this small finite input.",
+        "fact": "xc_discontinuity_compatible",
+        "id": "6338d248f0ef-xc_discontinuity_compatible",
+        "ir_sha256": "6338d248f0ef8c33027663a58146256f2aa83d1257e15decff35c9c406aa5626",
+        "limits": {
+          "cpu_time_s": 480,
+          "memory_mb": 8192,
+          "wall_time_ms": 600000
+        },
+        "module": "Testv2.StructuralV2",
+        "preamble": "namespace DFTCert.StructuralRun_6338d248f0ef\n\ndef sourceSha256 : String := \"c0bd96eaf05ed3afce982c7ae020950924735a5e2e320612ad00672043000b23\"\ndef irSha256 : String := \"6338d248f0ef8c33027663a58146256f2aa83d1257e15decff35c9c406aa5626\"\ndef edges : List (Nat \u00d7 Nat) := [(5, 0), (0, 1), (1, 2), (2, 3), (3, 4), (4, 5)]\ndef messageDepth : Nat := 3\ndef requiredCouplings : List (Nat \u00d7 Nat) := [(0, 2)]\ndef xcForm : Testv2.StructuralV2.XCForm := .hinge\ndef operatorForm : Testv2.StructuralV2.OperatorForm := .add (.parameter \"base\") (.adjoint (.parameter \"base\"))\n\nend DFTCert.StructuralRun_6338d248f0ef\n",
+        "preamble_sha256": "0c73a08ba69bc6b90235c1f13f7cb686c213380ea34344ecdc6a0d7e254c03e9",
+        "project": "testv2",
+        "source_sha256": "c0bd96eaf05ed3afce982c7ae020950924735a5e2e320612ad00672043000b23",
+        "status": "proof_required",
+        "structural_expected": true,
+        "subgoals": [
+          {
+            "context": "Reduce the generic structural checker on the generated finite data.",
+            "depends_on": [],
+            "id": "evaluate-xc_discontinuity_compatible",
+            "theorem": "theorem generated_xc_structure : Testv2.StructuralV2.xcSupportsDiscontinuity DFTCert.StructuralRun_6338d248f0ef.xcForm = true"
+          }
+        ],
+        "theorem": "theorem generated_xc_structure : Testv2.StructuralV2.xcSupportsDiscontinuity DFTCert.StructuralRun_6338d248f0ef.xcForm = true",
+        "verification_mode": "generated_obligation"
+      },
+      {
+        "context": "Artifact-derived model description (not an LLM interpretation):\n- Source: torch_export; binding hash: c0bd96eaf05ed3afce982c7ae020950924735a5e2e320612ad00672043000b23.\n- Topology: 6 sites and 6 directed edges.\n- Required couplings: [{'source': 0, 'target': 2}].\n- Message passing: 3 consecutive adjacency-fed stage(s): ['matmul_2', 'matmul_1', 'matmul'].\n- XC output construction: hinge; supporting graph nodes: ['leaky_relu', 'sum_2', 'density'].\n- Self-energy construction: symmetrized; supporting graph nodes: ['add', 'numpy_t', 'p_base'].\n- Declared output roots: {'xc_energy': 'leaky_relu', 'learned_self_energy': 'add', 'message_state': 'matmul_2'}.\n- Adjacency evidence: state 'adjacency'; graph nodes ['b_adjacency', 'to'].\n- Translation validation rechecked these claims against the raw exported inventory.\nScope: structural compatibility only; this does not assess numerical outputs, trained weights, convergence, or experiment.\n\nDFT Structural V2 obligation generated deterministically from the common IR. Prove the exact Boolean structural result. Prefer `by decide`, whose result is reduced by Lean's kernel for this small finite input.",
+        "fact": "spatial_nonlocality_compatible",
+        "id": "6338d248f0ef-spatial_nonlocality_compatible",
+        "ir_sha256": "6338d248f0ef8c33027663a58146256f2aa83d1257e15decff35c9c406aa5626",
+        "limits": {
+          "cpu_time_s": 480,
+          "memory_mb": 8192,
+          "wall_time_ms": 600000
+        },
+        "module": "Testv2.StructuralV2",
+        "preamble": "namespace DFTCert.StructuralRun_6338d248f0ef\n\ndef sourceSha256 : String := \"c0bd96eaf05ed3afce982c7ae020950924735a5e2e320612ad00672043000b23\"\ndef irSha256 : String := \"6338d248f0ef8c33027663a58146256f2aa83d1257e15decff35c9c406aa5626\"\ndef edges : List (Nat \u00d7 Nat) := [(5, 0), (0, 1), (1, 2), (2, 3), (3, 4), (4, 5)]\ndef messageDepth : Nat := 3\ndef requiredCouplings : List (Nat \u00d7 Nat) := [(0, 2)]\ndef xcForm : Testv2.StructuralV2.XCForm := .hinge\ndef operatorForm : Testv2.StructuralV2.OperatorForm := .add (.parameter \"base\") (.adjoint (.parameter \"base\"))\n\nend DFTCert.StructuralRun_6338d248f0ef\n",
+        "preamble_sha256": "0c73a08ba69bc6b90235c1f13f7cb686c213380ea34344ecdc6a0d7e254c03e9",
+        "project": "testv2",
+        "source_sha256": "c0bd96eaf05ed3afce982c7ae020950924735a5e2e320612ad00672043000b23",
+        "status": "proof_required",
+        "structural_expected": true,
+        "subgoals": [
+          {
+            "context": "Reduce the generic structural checker on the generated finite data.",
+            "depends_on": [],
+            "id": "evaluate-spatial_nonlocality_compatible",
+            "theorem": "theorem generated_spatial_structure : Testv2.StructuralV2.allCovered DFTCert.StructuralRun_6338d248f0ef.edges DFTCert.StructuralRun_6338d248f0ef.messageDepth DFTCert.StructuralRun_6338d248f0ef.requiredCouplings = true"
+          }
+        ],
+        "theorem": "theorem generated_spatial_structure : Testv2.StructuralV2.allCovered DFTCert.StructuralRun_6338d248f0ef.edges DFTCert.StructuralRun_6338d248f0ef.messageDepth DFTCert.StructuralRun_6338d248f0ef.requiredCouplings = true",
+        "verification_mode": "generated_obligation"
+      },
+      {
+        "context": "Artifact-derived model description (not an LLM interpretation):\n- Source: torch_export; binding hash: c0bd96eaf05ed3afce982c7ae020950924735a5e2e320612ad00672043000b23.\n- Topology: 6 sites and 6 directed edges.\n- Required couplings: [{'source': 0, 'target': 2}].\n- Message passing: 3 consecutive adjacency-fed stage(s): ['matmul_2', 'matmul_1', 'matmul'].\n- XC output construction: hinge; supporting graph nodes: ['leaky_relu', 'sum_2', 'density'].\n- Self-energy construction: symmetrized; supporting graph nodes: ['add', 'numpy_t', 'p_base'].\n- Declared output roots: {'xc_energy': 'leaky_relu', 'learned_self_energy': 'add', 'message_state': 'matmul_2'}.\n- Adjacency evidence: state 'adjacency'; graph nodes ['b_adjacency', 'to'].\n- Translation validation rechecked these claims against the raw exported inventory.\nScope: structural compatibility only; this does not assess numerical outputs, trained weights, convergence, or experiment.\n\nDFT Structural V2 obligation generated deterministically from the common IR. Prove the exact Boolean structural result. Prefer `by decide`, whose result is reduced by Lean's kernel for this small finite input.",
+        "fact": "self_adjoint",
+        "id": "6338d248f0ef-self_adjoint",
+        "ir_sha256": "6338d248f0ef8c33027663a58146256f2aa83d1257e15decff35c9c406aa5626",
+        "limits": {
+          "cpu_time_s": 480,
+          "memory_mb": 8192,
+          "wall_time_ms": 600000
+        },
+        "module": "Testv2.StructuralV2",
+        "preamble": "namespace DFTCert.StructuralRun_6338d248f0ef\n\ndef sourceSha256 : String := \"c0bd96eaf05ed3afce982c7ae020950924735a5e2e320612ad00672043000b23\"\ndef irSha256 : String := \"6338d248f0ef8c33027663a58146256f2aa83d1257e15decff35c9c406aa5626\"\ndef edges : List (Nat \u00d7 Nat) := [(5, 0), (0, 1), (1, 2), (2, 3), (3, 4), (4, 5)]\ndef messageDepth : Nat := 3\ndef requiredCouplings : List (Nat \u00d7 Nat) := [(0, 2)]\ndef xcForm : Testv2.StructuralV2.XCForm := .hinge\ndef operatorForm : Testv2.StructuralV2.OperatorForm := .add (.parameter \"base\") (.adjoint (.parameter \"base\"))\n\nend DFTCert.StructuralRun_6338d248f0ef\n",
+        "preamble_sha256": "0c73a08ba69bc6b90235c1f13f7cb686c213380ea34344ecdc6a0d7e254c03e9",
+        "project": "testv2",
+        "source_sha256": "c0bd96eaf05ed3afce982c7ae020950924735a5e2e320612ad00672043000b23",
+        "status": "proof_required",
+        "structural_expected": true,
+        "subgoals": [
+          {
+            "context": "Reduce the generic structural checker on the generated finite data.",
+            "depends_on": [],
+            "id": "evaluate-self_adjoint",
+            "theorem": "theorem generated_operator_structure : Testv2.StructuralV2.guaranteedSelfAdjoint DFTCert.StructuralRun_6338d248f0ef.operatorForm = true"
+          }
+        ],
+        "theorem": "theorem generated_operator_structure : Testv2.StructuralV2.guaranteedSelfAdjoint DFTCert.StructuralRun_6338d248f0ef.operatorForm = true",
+        "verification_mode": "generated_obligation"
+      }
+    ],
+    "policy_version": "dft-structural-v2",
+    "source_sha256": "c0bd96eaf05ed3afce982c7ae020950924735a5e2e320612ad00672043000b23",
+    "status": "obligations_generated"
+  },
+  "input_constraints": {
+    "adjacency_convention": "target_source",
+    "adjacency_state_name": "adjacency",
+    "output_contracts": [
+      {
+        "index": 0,
+        "role": "xc_energy"
+      },
+      {
+        "index": 1,
+        "role": "learned_self_energy"
+      },
+      {
+        "index": 2,
+        "role": "message_state"
+      }
+    ],
+    "required_couplings": [
+      {
+        "source": 0,
+        "target": 2
+      }
+    ]
+  },
+  "lean_verification": {
+    "certificate_source_sha256": "f9f2f3ece78290afb4065758ad139588350855f202b951bfc1c3770204962568",
+    "diagnostics": "warning: mathlib: repository 'D:\\fun stuff\\proof_vibe\\examples\\dft\\lean\\.lake/packages\\mathlib' has local changes\nwarning: batteries: repository 'D:\\fun stuff\\proof_vibe\\examples\\dft\\lean\\.lake/packages\\batteries' has local changes\ngenerated_source_binding : DFTCert.StructuralRun_6338d248f0ef.sourceSha256 =\n  \"c0bd96eaf05ed3afce982c7ae020950924735a5e2e320612ad00672043000b23\"\ngenerated_ir_binding : DFTCert.StructuralRun_6338d248f0ef.irSha256 =\n  \"6338d248f0ef8c33027663a58146256f2aa83d1257e15decff35c9c406aa5626\"\n",
+    "elapsed_ms": 8453,
+    "project_fingerprint": "f495c76d329d53b2846bd9e54d9402a2c7b1ca919f0cf290035b71be43c0dd48",
+    "project_root": "D:\\fun stuff\\proof_vibe\\examples\\dft\\lean",
+    "status": "verified",
+    "version": 2
+  },
+  "policy": {
+    "checks": {
+      "self_adjoint": {
+        "construction": "symmetrized",
+        "provenance_nodes": [
+          "add",
+          "numpy_t",
+          "p_base"
+        ],
+        "satisfied": true
+      },
+      "spatial_nonlocality_compatible": {
+        "couplings": [
+          {
+            "covered": true,
+            "path": [
+              0,
+              1,
+              2
+            ],
+            "source": 0,
+            "target": 2
+          }
+        ],
+        "depth": 3,
+        "provenance_nodes": [
+          "matmul_2",
+          "matmul_1",
+          "matmul"
+        ],
+        "satisfied": true
+      },
+      "xc_discontinuity_compatible": {
+        "form": "hinge",
+        "provenance_nodes": [
+          "leaky_relu",
+          "sum_2",
+          "density"
+        ],
+        "satisfied": true
+      }
+    },
+    "ir_sha256": "6338d248f0ef8c33027663a58146256f2aa83d1257e15decff35c9c406aa5626",
+    "source": {
+      "analyzer_version": "dft-structural-analysis-v5",
+      "artifact_sha256": "c0bd96eaf05ed3afce982c7ae020950924735a5e2e320612ad00672043000b23",
+      "extractor_version": "torch-export-inventory-v2",
+      "inventory_sha256": "5cac25af17917499a7c61df54280268f59f16979f7fe13a24c41d0892ec1ec74",
+      "kind": "torch_export",
+      "parameter_structure_sha256": "f8b90169aa1cb11abd077e369dc6bb6ee5a9b584db17f7fe2d9e49339d1d0dd0",
+      "translation_sha256": "722abb70b036951693f615dc89312caf2c3ddc5ca02f869e6d1b8d2907574227"
+    },
+    "status": "structurally_certifiable"
+  },
+  "raw_extraction": {
+    "artifact_sha256": "c0bd96eaf05ed3afce982c7ae020950924735a5e2e320612ad00672043000b23",
+    "extractor_version": "torch-export-inventory-v2",
+    "facts": {},
+    "inventory": {
+      "nodes": [
+        {
+          "args": [],
+          "kwargs": {},
+          "name": "p_base",
+          "op": "placeholder",
+          "target": "p_base",
+          "tensor": {
+            "dtype": "torch.float32",
+            "shape": [
+              "6",
+              "6"
+            ]
+          }
+        },
+        {
+          "args": [],
+          "kwargs": {},
+          "name": "b_adjacency",
+          "op": "placeholder",
+          "target": "b_adjacency",
+          "tensor": {
+            "dtype": "torch.bool",
+            "shape": [
+              "6",
+              "6"
+            ]
+          }
+        },
+        {
+          "args": [],
+          "kwargs": {},
+          "name": "density",
+          "op": "placeholder",
+          "target": "density",
+          "tensor": {
+            "dtype": "torch.float32",
+            "shape": [
+              "6",
+              "1"
+            ]
+          }
+        },
+        {
+          "args": [
+            {
+              "node": "b_adjacency"
+            },
+            "torch.float32"
+          ],
+          "kwargs": {},
+          "name": "to",
+          "op": "call_function",
+          "target": "aten.to.dtype",
+          "tensor": {
+            "dtype": "torch.float32",
+            "shape": [
+              "6",
+              "6"
+            ]
+          }
+        },
+        {
+          "args": [
+            {
+              "node": "density"
+            }
+          ],
+          "kwargs": {},
+          "name": "sum_1",
+          "op": "call_function",
+          "target": "aten.sum.default",
+          "tensor": {
+            "dtype": "torch.float32",
+            "shape": []
+          }
+        },
+        {
+          "args": [
+            {
+              "node": "sum_1"
+            },
+            0
+          ],
+          "kwargs": {},
+          "name": "mul",
+          "op": "call_function",
+          "target": "aten.mul.Tensor",
+          "tensor": {
+            "dtype": "torch.float32",
+            "shape": []
+          }
+        },
+        {
+          "args": [
+            {
+              "node": "to"
+            },
+            {
+              "node": "density"
+            }
+          ],
+          "kwargs": {},
+          "name": "matmul",
+          "op": "call_function",
+          "target": "aten.matmul.default",
+          "tensor": {
+            "dtype": "torch.float32",
+            "shape": [
+              "6",
+              "1"
+            ]
+          }
+        },
+        {
+          "args": [
+            {
+              "node": "to"
+            },
+            {
+              "node": "matmul"
+            }
+          ],
+          "kwargs": {},
+          "name": "matmul_1",
+          "op": "call_function",
+          "target": "aten.matmul.default",
+          "tensor": {
+            "dtype": "torch.float32",
+            "shape": [
+              "6",
+              "1"
+            ]
+          }
+        },
+        {
+          "args": [
+            {
+              "node": "to"
+            },
+            {
+              "node": "matmul_1"
+            }
+          ],
+          "kwargs": {},
+          "name": "matmul_2",
+          "op": "call_function",
+          "target": "aten.matmul.default",
+          "tensor": {
+            "dtype": "torch.float32",
+            "shape": [
+              "6",
+              "1"
+            ]
+          }
+        },
+        {
+          "args": [
+            {
+              "node": "density"
+            }
+          ],
+          "kwargs": {},
+          "name": "sum_2",
+          "op": "call_function",
+          "target": "aten.sum.default",
+          "tensor": {
+            "dtype": "torch.float32",
+            "shape": []
+          }
+        },
+        {
+          "args": [
+            {
+              "node": "sum_2"
+            }
+          ],
+          "kwargs": {},
+          "name": "leaky_relu",
+          "op": "call_function",
+          "target": "aten.leaky_relu.default",
+          "tensor": {
+            "dtype": "torch.float32",
+            "shape": []
+          }
+        },
+        {
+          "args": [
+            {
+              "node": "p_base"
+            }
+          ],
+          "kwargs": {},
+          "name": "numpy_t",
+          "op": "call_function",
+          "target": "aten.numpy_T.default",
+          "tensor": {
+            "dtype": "torch.float32",
+            "shape": [
+              "6",
+              "6"
+            ]
+          }
+        },
+        {
+          "args": [
+            {
+              "node": "p_base"
+            },
+            {
+              "node": "numpy_t"
+            }
+          ],
+          "kwargs": {},
+          "name": "add",
+          "op": "call_function",
+          "target": "aten.add.Tensor",
+          "tensor": {
+            "dtype": "torch.float32",
+            "shape": [
+              "6",
+              "6"
+            ]
+          }
+        },
+        {
+          "args": [
+            [
+              {
+                "node": "leaky_relu"
+              },
+              {
+                "node": "add"
+              },
+              {
+                "node": "matmul_2"
+              }
+            ]
+          ],
+          "kwargs": {},
+          "name": "output",
+          "op": "output",
+          "target": "output"
+        }
+      ],
+      "state": {
+        "adjacency": {
+          "aliases": [
+            "adjacency"
+          ],
+          "dtype": "torch.bool",
+          "graph_inputs": [
+            "b_adjacency"
+          ],
+          "sha256": "88338b8cce32ce22c6415384573e58118c12de3bc4eea2ec192282bf626eabfe",
+          "shape": [
+            6,
+            6
+          ],
+          "state_kind": "InputKind.BUFFER",
+          "structural_values": [
+            [
+              false,
+              false,
+              false,
+              false,
+              false,
+              true
+            ],
+            [
+              true,
+              false,
+              false,
+              false,
+              false,
+              false
+            ],
+            [
+              false,
+              true,
+              false,
+              false,
+              false,
+              false
+            ],
+            [
+              false,
+              false,
+              true,
+              false,
+              false,
+              false
+            ],
+            [
+              false,
+              false,
+              false,
+              true,
+              false,
+              false
+            ],
+            [
+              false,
+              false,
+              false,
+              false,
+              true,
+              false
+            ]
+          ]
+        },
+        "base": {
+          "aliases": [
+            "base"
+          ],
+          "dtype": "torch.float32",
+          "graph_inputs": [
+            "p_base"
+          ],
+          "sha256": "7023f1ad0ec1e78424aaf26586f4a19aa6efbe6a4789001de3ac0d3a9f59d744",
+          "shape": [
+            6,
+            6
+          ],
+          "state_kind": "InputKind.PARAMETER"
+        },
+        "other": {
+          "aliases": [
+            "other"
+          ],
+          "dtype": "torch.float32",
+          "graph_inputs": [],
+          "sha256": "1b4edf74073733c9d398a06ea6e10977b67f3f005981f245d31e7cd8631c5683",
+          "shape": [
+            6,
+            6
+          ],
+          "state_kind": "unknown"
+        }
+      }
+    },
+    "status": "ok",
+    "torch_version": "2.6.0+cu124"
+  },
+  "repeat": 0,
+  "semantic_derivations": {
+    "message_passing": {
+      "claim": "message_passing.depth",
+      "evidence_nodes": [
+        "matmul_2",
+        "matmul_1",
+        "matmul"
+      ],
+      "metadata": {
+        "recognized": true,
+        "stages": [
+          "matmul_2",
+          "matmul_1",
+          "matmul"
+        ]
+      },
+      "observed_ops": [
+        "aten.matmul.default"
+      ],
+      "root": "matmul_2",
+      "rule": "message.adjacency_fed_matmul",
+      "rule_version": 2,
+      "value": 3
+    },
+    "operator": {
+      "claim": "operator.construction",
+      "evidence_nodes": [
+        "add",
+        "numpy_t",
+        "p_base"
+      ],
+      "observed_ops": [
+        "aten.add.tensor",
+        "aten.numpy_t.default",
+        "p_base"
+      ],
+      "root": "add",
+      "rule": "operator.add_adjoint_pair",
+      "rule_version": 1,
+      "value": "symmetrized"
+    },
+    "topology": {
+      "claim": "topology.adjacency",
+      "evidence_nodes": [
+        "b_adjacency",
+        "to"
+      ],
+      "metadata": {
+        "adjacency_convention": "target_source",
+        "graph_inputs": [
+          "b_adjacency"
+        ],
+        "state_name": "adjacency"
+      },
+      "observed_ops": [
+        "aten.to.dtype",
+        "b_adjacency"
+      ],
+      "root": "adjacency",
+      "rule": "topology.adjacency_state",
+      "rule_version": 1,
+      "value": {
+        "directed_edges": [
+          [
+            5,
+            0
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            1,
+            2
+          ],
+          [
+            2,
+            3
+          ],
+          [
+            3,
+            4
+          ],
+          [
+            4,
+            5
+          ]
+        ],
+        "site_count": 6
+      }
+    },
+    "xc": {
+      "claim": "xc.form",
+      "evidence_nodes": [
+        "leaky_relu",
+        "sum_2",
+        "density"
+      ],
+      "observed_ops": [
+        "aten.leaky_relu.default",
+        "aten.sum.default",
+        "density"
+      ],
+      "root": "leaky_relu",
+      "rule": "xc.hinge_activation",
+      "rule_version": 2,
+      "value": "hinge"
+    }
+  },
+  "structural_ir": {
+    "ir_schema_version": 2,
+    "message_passing": {
+      "depth": 3,
+      "provenance_nodes": [
+        "matmul_2",
+        "matmul_1",
+        "matmul"
+      ],
+      "recognized": true
+    },
+    "operator": {
+      "construction": "symmetrized",
+      "provenance_nodes": [
+        "add",
+        "numpy_t",
+        "p_base"
+      ]
+    },
+    "requirements": {
+      "couplings": [
+        {
+          "source": 0,
+          "target": 2
+        }
+      ]
+    },
+    "source": {
+      "analyzer_version": "dft-structural-analysis-v5",
+      "artifact_sha256": "c0bd96eaf05ed3afce982c7ae020950924735a5e2e320612ad00672043000b23",
+      "extractor_version": "torch-export-inventory-v2",
+      "inventory_sha256": "5cac25af17917499a7c61df54280268f59f16979f7fe13a24c41d0892ec1ec74",
+      "kind": "torch_export",
+      "parameter_structure_sha256": "f8b90169aa1cb11abd077e369dc6bb6ee5a9b584db17f7fe2d9e49339d1d0dd0",
+      "translation_sha256": "722abb70b036951693f615dc89312caf2c3ddc5ca02f869e6d1b8d2907574227"
+    },
+    "topology": {
+      "directed_edges": [
+        [
+          5,
+          0
+        ],
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          4,
+          5
+        ]
+      ],
+      "provenance_nodes": [
+        "b_adjacency"
+      ],
+      "site_count": 6
+    },
+    "translation": {
+      "inventory_sha256": "5cac25af17917499a7c61df54280268f59f16979f7fe13a24c41d0892ec1ec74",
+      "message_passing": {
+        "recognized": true,
+        "root": "matmul_2",
+        "stages": [
+          "matmul_2",
+          "matmul_1",
+          "matmul"
+        ]
+      },
+      "operator": {
+        "construction": "symmetrized",
+        "root": "add"
+      },
+      "roles": {
+        "learned_self_energy": "add",
+        "message_state": "matmul_2",
+        "xc_energy": "leaky_relu"
+      },
+      "schema_version": 2,
+      "semantic_derivations": {
+        "message_passing": {
+          "claim": "message_passing.depth",
+          "evidence_nodes": [
+            "matmul_2",
+            "matmul_1",
+            "matmul"
+          ],
+          "metadata": {
+            "recognized": true,
+            "stages": [
+              "matmul_2",
+              "matmul_1",
+              "matmul"
+            ]
+          },
+          "observed_ops": [
+            "aten.matmul.default"
+          ],
+          "root": "matmul_2",
+          "rule": "message.adjacency_fed_matmul",
+          "rule_version": 2,
+          "value": 3
+        },
+        "operator": {
+          "claim": "operator.construction",
+          "evidence_nodes": [
+            "add",
+            "numpy_t",
+            "p_base"
+          ],
+          "observed_ops": [
+            "aten.add.tensor",
+            "aten.numpy_t.default",
+            "p_base"
+          ],
+          "root": "add",
+          "rule": "operator.add_adjoint_pair",
+          "rule_version": 1,
+          "value": "symmetrized"
+        },
+        "topology": {
+          "claim": "topology.adjacency",
+          "evidence_nodes": [
+            "b_adjacency",
+            "to"
+          ],
+          "metadata": {
+            "adjacency_convention": "target_source",
+            "graph_inputs": [
+              "b_adjacency"
+            ],
+            "state_name": "adjacency"
+          },
+          "observed_ops": [
+            "aten.to.dtype",
+            "b_adjacency"
+          ],
+          "root": "adjacency",
+          "rule": "topology.adjacency_state",
+          "rule_version": 1,
+          "value": {
+            "directed_edges": [
+              [
+                5,
+                0
+              ],
+              [
+                0,
+                1
+              ],
+              [
+                1,
+                2
+              ],
+              [
+                2,
+                3
+              ],
+              [
+                3,
+                4
+              ],
+              [
+                4,
+                5
+              ]
+            ],
+            "site_count": 6
+          }
+        },
+        "xc": {
+          "claim": "xc.form",
+          "evidence_nodes": [
+            "leaky_relu",
+            "sum_2",
+            "density"
+          ],
+          "observed_ops": [
+            "aten.leaky_relu.default",
+            "aten.sum.default",
+            "density"
+          ],
+          "root": "leaky_relu",
+          "rule": "xc.hinge_activation",
+          "rule_version": 2,
+          "value": "hinge"
+        }
+      },
+      "topology": {
+        "adjacency_aliases": [
+          "b_adjacency",
+          "to"
+        ],
+        "adjacency_convention": "target_source",
+        "graph_inputs": [
+          "b_adjacency"
+        ],
+        "state_name": "adjacency"
+      },
+      "xc": {
+        "form": "hinge",
+        "root": "leaky_relu"
+      }
+    },
+    "translation_validation": {
+      "checked_claims": [
+        "output_roles",
+        "topology",
+        "message_passing",
+        "xc",
+        "operator",
+        "semantic_derivations"
+      ],
+      "inventory_sha256": "5cac25af17917499a7c61df54280268f59f16979f7fe13a24c41d0892ec1ec74",
+      "status": "translation_validated",
+      "translation_sha256": "722abb70b036951693f615dc89312caf2c3ddc5ca02f869e6d1b8d2907574227"
+    },
+    "xc": {
+      "form": "hinge",
+      "provenance_nodes": [
+        "leaky_relu",
+        "sum_2",
+        "density"
+      ]
+    }
+  },
+  "tampering": [
+    {
+      "detected": true,
+      "result": "rejected:IR message-passing claim does not match its derivation",
+      "tamper_id": "message_depth"
+    },
+    {
+      "detected": true,
+      "result": "rejected:IR XC claim does not match its derivation",
+      "tamper_id": "xc_form"
+    },
+    {
+      "detected": true,
+      "result": "rejected:IR operator claim does not match its derivation",
+      "tamper_id": "operator_form"
+    },
+    {
+      "detected": true,
+      "result": "rejected:artifact structural IR needs a hash-bound translation derivation",
+      "tamper_id": "evidence_node"
+    },
+    {
+      "detected": true,
+      "result": "rejected:artifact structural IR needs a hash-bound translation derivation",
+      "tamper_id": "root_node"
+    },
+    {
+      "detected": true,
+      "result": "rejected:artifact structural IR needs a hash-bound translation derivation",
+      "tamper_id": "rule_identifier"
+    },
+    {
+      "detected": true,
+      "result": "rejected:artifact structural IR needs a hash-bound translation derivation",
+      "tamper_id": "rule_version"
+    },
+    {
+      "detected": true,
+      "result": "rejected:structural IR source artifact hash does not match the extracted artifact",
+      "tamper_id": "source_hash"
+    },
+    {
+      "detected": true,
+      "result": "rejected:translation topology claim does not match its adjacency evidence",
+      "tamper_id": "ir_field"
+    }
+  ],
+  "translation_validation": {
+    "checked_claims": [
+      "output_roles",
+      "topology",
+      "message_passing",
+      "xc",
+      "operator",
+      "semantic_derivations"
+    ],
+    "inventory_sha256": "5cac25af17917499a7c61df54280268f59f16979f7fe13a24c41d0892ec1ec74",
+    "status": "translation_validated",
+    "translation_sha256": "722abb70b036951693f615dc89312caf2c3ddc5ca02f869e6d1b8d2907574227"
+  }
+}

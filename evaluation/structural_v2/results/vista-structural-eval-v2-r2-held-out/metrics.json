@@ -1,0 +1,12 @@
+{
+  "exact_semantic_classification": "12/12 (100.0%)",
+  "total_cases": 12,
+  "false_certification": "0/9 (0.0%)",
+  "positive_acceptance": "3/3 (100.0%)",
+  "near_miss_certificate_withheld": "3/3 (100.0%)",
+  "unsupported_certificate_withheld": "3/3 (100.0%)",
+  "malformed_input_rejected": "3/3 (100.0%)",
+  "tamper_detection": "81/81 (100.0%)",
+  "reproducible_disposition": "12/12 (100.0%)",
+  "stable_obligation_hash": "9/9 (100.0%)"
+}

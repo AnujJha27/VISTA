@@ -1,12 +1,13 @@
 {
-  "artifact": "D:\\fun stuff\\proof_vibe\\build\\vista-structural-v2-corpus\\spatial-malformed-invalid-convention.pt2",
-  "artifact_sha256": "410af8a2e60363f131e12c6f7abb2e6b034a40fd9651989b0d62b13efd22300b",
+  "artifact": "build\\vista-structural-v2-r2-regression\\spatial-malformed-invalid-convention.pt2",
+  "artifact_sha256": "d90a3c456b9a1fb48c839e87e1b6fd73c9ed78e87697d184a30cf7c6f05c25d4",
   "case_id": "spatial-malformed-invalid-convention",
   "experiment": {
     "analyzer_version": "dft-structural-analysis-v5",
     "compiler_version": "dft-structural-lean-v2",
-    "condition_name": "vista-structural-eval-v2",
+    "condition_name": "vista-structural-eval-v2-r2",
     "condition_version": 2,
+    "corpus_freeze_revision": "e7e0cba6762ebf090c2a7a4513261ed073426014",
     "environment": {
       "export": "torch.export.save(.pt2)",
       "platform": "recorded by runner environment",
@@ -16,7 +17,7 @@
     "experiment": "VISTA Structural V2 corpus",
     "extractor_version": "torch-export-inventory-v2",
     "frozen_revision": "c69e5746289a0ef15e8cf76289802964996d69f9",
-    "integrity": "Changing a semantic rule after inspecting this corpus requires a new condition_version and preserves prior result bundles.",
+    "integrity": "The corpus freeze revision and execution revision are recorded separately. Do not change semantic rules after observing fresh held-out results; create a new condition instead.",
     "lean_project": {
       "identity": "proof-search@0.1.0",
       "path": "lean",
@@ -62,7 +63,7 @@
     ]
   },
   "raw_extraction": {
-    "artifact_sha256": "410af8a2e60363f131e12c6f7abb2e6b034a40fd9651989b0d62b13efd22300b",
+    "artifact_sha256": "d90a3c456b9a1fb48c839e87e1b6fd73c9ed78e87697d184a30cf7c6f05c25d4",
     "extractor_version": "torch-export-inventory-v2",
     "facts": {},
     "inventory": {
