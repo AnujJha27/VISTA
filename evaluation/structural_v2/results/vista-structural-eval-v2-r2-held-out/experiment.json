@@ -10,7 +10,7 @@
     "python": "recorded by runner environment",
     "pytorch": "recorded by extractor"
   },
-  "execution_revision": "457e003b0e7de5e423cfb21245b86e10a6a66e53",
+  "execution_revision": "c9d65a04921932ac124be39808e1831d690c2f96",
   "experiment": "VISTA Structural V2 corpus",
   "extractor_version": "torch-export-inventory-v2",
   "frozen_revision": "c69e5746289a0ef15e8cf76289802964996d69f9",
@@ -22,7 +22,7 @@
   },
   "policy_version": "dft-structural-v2",
   "runtime": {
-    "executed_at": "2026-08-23T16:35:06.370504+00:00",
+    "executed_at": "2026-08-23T17:25:00.390147+00:00",
     "platform": "Windows-11-10.0.26200-SP0",
     "python": "3.12.5 (tags/v3.12.5:ff3bc82, Aug  6 2024, 20:45:27) [MSC v.1940 64 bit (AMD64)]"
   },

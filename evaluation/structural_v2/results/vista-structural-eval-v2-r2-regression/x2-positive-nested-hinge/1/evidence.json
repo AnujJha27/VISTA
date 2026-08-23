@@ -270,7 +270,7 @@
   "lean_verification": {
     "certificate_source_sha256": "2ca2abafb5a6ef6648e6ee07c5a3d4c24ceec27e9db3b3ae2c908ef3db3eb1f0",
     "diagnostics": "warning: mathlib: repository 'D:\\fun stuff\\proof_vibe\\examples\\dft\\lean\\.lake/packages\\mathlib' has local changes\nwarning: batteries: repository 'D:\\fun stuff\\proof_vibe\\examples\\dft\\lean\\.lake/packages\\batteries' has local changes\ngenerated_source_binding : DFTCert.StructuralRun_8f623075347d.sourceSha256 =\n  \"337c104fcd6280fd3dfc14ae078ac46fd62f93c26387fb3685561ad6055ef85d\"\ngenerated_ir_binding : DFTCert.StructuralRun_8f623075347d.irSha256 =\n  \"8f623075347d31313aff1652ad563e54274ebbdd35aef71ae79dfd60d0522aa0\"\n",
-    "elapsed_ms": 8672,
+    "elapsed_ms": 7156,
     "project_fingerprint": "f495c76d329d53b2846bd9e54d9402a2c7b1ca919f0cf290035b71be43c0dd48",
     "project_root": "D:\\fun stuff\\proof_vibe\\examples\\dft\\lean",
     "status": "verified",
