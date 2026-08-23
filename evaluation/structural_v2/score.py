@@ -10,6 +10,8 @@ from collections import defaultdict
 from itertools import groupby
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[2]
+
 STATUS_BY_POLICY = {"structurally_certifiable": "supported-and-compatible",
                     "structural_requirements_not_met": "supported-but-incompatible",
                     "formalization_required": "unsupported"}
@@ -25,6 +27,26 @@ def sha256_file(path: Path) -> str:
         for block in iter(lambda: file.read(1024 * 1024), b""):
             digest.update(block)
         return digest.hexdigest()
+
+
+def verify_condition_fingerprint(options, fingerprint, experiment):
+    """Verify the saved condition identity and every available source byte hash."""
+    issues = []
+    for field in ("condition_name", "corpus_freeze_revision", "execution_revision"):
+        if fingerprint.get(field) != experiment.get(field):
+            issues.append(f"condition fingerprint {field} contradicts saved experiment")
+    if fingerprint.get("manifest_sha256") != sha256_file(options.manifest):
+        issues.append("condition fingerprint manifest_sha256 does not match manifest bytes")
+    sources = fingerprint.get("source_sha256")
+    if not isinstance(sources, dict):
+        return [*issues, "condition fingerprint source_sha256 is missing or invalid"]
+    for name, recorded in sources.items():
+        path = ROOT / Path(name.replace("\\", "/"))
+        if not path.is_file():
+            issues.append(f"condition fingerprint source is unavailable: {name}")
+        elif sha256_file(path) != recorded:
+            issues.append(f"condition fingerprint source_sha256 mismatch: {name}")
+    return issues
 
 
 def verify_bundle(options, manifest_cases, primary, rows):
@@ -97,7 +119,8 @@ def main():
     options.artifacts = options.artifacts or options.results.parents[1].parent / "build" / "vista-structural-v2-corpus"
     fingerprint_path = options.results / "condition_fingerprint.json"
     if fingerprint_path.exists():
-        fingerprint_map = json.loads(fingerprint_path.read_text()).get("artifact_sha256", {})
+        fingerprint = json.loads(fingerprint_path.read_text())
+        fingerprint_map = fingerprint.get("artifact_sha256", {})
     else:
         issues_note = "condition_fingerprint.json missing from result bundle"
         fingerprint_map = {}
@@ -106,6 +129,14 @@ def main():
     primary = [r for r in rows if r["repeat"] == "0"]
 
     issues = verify_bundle(options, manifest_cases, primary, rows)
+    if fingerprint_path.exists():
+        experiment_path = options.results / "experiment.json"
+        if experiment_path.exists():
+            issues.extend(verify_condition_fingerprint(
+                options, fingerprint, json.loads(experiment_path.read_text()),
+            ))
+        else:
+            issues.append("result experiment.json is missing")
 
     by_case = {case["id"]: case for case in manifest_cases}
     correct = [r for r in primary if by_case.get(r["case_id"], {}).get("expected", {}).get("semantic_status") == r["observed_semantic_status"]]
