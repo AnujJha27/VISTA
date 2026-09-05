@@ -1,3 +1,12 @@
+-- NOT MACHINE-VERIFIED IN THIS REPO: this project's `lean-toolchain`
+-- (v4.31.0) is older than the vendored Mathlib checkout requires
+-- (v4.33.0-rc1) -- a pre-existing mismatch, not introduced here. Neither
+-- `lake exe cache get` (no matching prebuilt cache) nor a from-source
+-- build (`Mathlib/Init.lean` itself fails to elaborate under v4.31.0)
+-- currently succeeds. See STRUCTURAL_CAPABILITY_CHECKS.md. The theorems
+-- below are hand-checked against the real Mathlib API (exact lemma/def
+-- names confirmed against the vendored source) but not Lean-checked here
+-- until the toolchain mismatch is fixed.
 import Mathlib.Data.Matrix.Basis
 import Mathlib.LinearAlgebra.Matrix.Symmetric
 

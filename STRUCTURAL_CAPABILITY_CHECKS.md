@@ -79,7 +79,13 @@ existing `reachableWithin`/`OperatorForm` machinery:
 `examples/dft/lean/Testv2/StructuralCapabilityMatrix.lean` (new, imports
 Mathlib) states the actual real-matrix facts that `canRepresentNonLocal`/
 `guaranteedSelfAdjoint` stand in for as computable `Bool` functions over the
-finite `OperatorForm` grammar the analyzer emits:
+finite `OperatorForm` grammar the analyzer emits. It is deliberately **not**
+imported by `Testv2.lean` (the library's aggregator/default build target) --
+doing so would make Mathlib a hard dependency of every other file in this
+library, which the project's pinned toolchain cannot currently build (see
+below). It is standalone, invoked directly (`lake env lean
+Testv2/StructuralCapabilityMatrix.lean`), and nothing in the certificate
+pipeline (`lean_import = "Testv2.StructuralV2"`) references it:
 
 - `symmetrized_is_symm`: for every real matrix `B`, `B + Bᵀ` is symmetric
   (restates Mathlib's own `Matrix.isSymm_add_transpose_self` under this
@@ -87,21 +93,29 @@ finite `OperatorForm` grammar the analyzer emits:
 - `symmetrized_can_be_nonlocal`: for `n ≥ 2`, some real matrix `B` makes
   `B + Bᵀ` non-local, witnessed by `Matrix.single 0 1 1`.
 
-Both are proved (not `sorry`), and both cite exact, source-verified Mathlib
-lemma/def names (`Matrix.isSymm_add_transpose_self`, `Matrix.single`,
-`Matrix.transpose_apply`). `Testv2/StructuralV2.lean` (no Mathlib
-dependency) is confirmed to build under `lake env lean` in this
-environment. `Testv2/StructuralCapabilityMatrix.lean` imports Mathlib,
-whose prebuilt `.olean`s were not present in this checkout; `lake exe cache
-get` reported this project's `lean-toolchain` (`v4.31.0`) does not match
-the vendored Mathlib's own (`v4.33.0-rc1`, a pre-existing mismatch in
-`lake-manifest.json`, unrelated to this change), so the prebuilt cache
-could not be used. Building Mathlib from source to actually compile this
-file was still in progress when this was written -- treat the proof as
-carefully hand-checked against the real Mathlib API but **not yet
-machine-verified in this environment**; run `lake build
-Testv2.StructuralCapabilityMatrix` (after resolving the toolchain mismatch,
-or once a from-source build finishes) to confirm.
+Both cite exact, source-verified Mathlib lemma/def names
+(`Matrix.isSymm_add_transpose_self`, `Matrix.single`,
+`Matrix.transpose_apply`), and neither uses `sorry`. `Testv2/StructuralV2.lean`
+(no Mathlib dependency) is confirmed to build under `lake env lean` in this
+environment.
+
+**`Testv2/StructuralCapabilityMatrix.lean` could NOT be machine-verified in
+this environment, and this is a real, pre-existing repo problem, not a
+transient one**: `lake exe cache get` reports this project's
+`lean-toolchain` (`v4.31.0`) does not match the vendored Mathlib checkout's
+own (`v4.33.0-rc1`), so no prebuilt cache applies; building Mathlib from
+source against the pinned `v4.31.0` toolchain then fails outright --
+`Mathlib/Init.lean` itself does not elaborate under that Lean version
+(`Invalid field notation ... cannot resolve field 'find?'`,
+`failed to synthesize instance for 'for_in%' notation`). The vendored
+Mathlib commit in `lake-manifest.json` is simply too new for this
+project's pinned Lean toolchain. This is a repo-wide inconsistency
+predating this change (every other file here is Mathlib-free specifically
+because of it) and fixing it -- re-pinning the toolchain or the Mathlib
+`rev`, then re-vendoring -- is a separate, riskier maintenance task well
+beyond this plugin. Until that happens, treat
+`symmetrized_is_symm`/`symmetrized_can_be_nonlocal` as **hand-checked
+against the real Mathlib API, not machine-verified anywhere in this repo**.
 
 ## Known limitations
 
