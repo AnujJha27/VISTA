@@ -380,6 +380,76 @@ def _lean_operator(construction: str) -> str:
     }[construction]
 
 
+def _validate_structure_sections(value: dict[str, Any]) -> None:
+    """Shape checks for `topology`/`message_passing`/`xc`/`operator` --
+    never `locality`/`capabilities`, which are each their own plugin's
+    concern. Shared by every plugin built on this module's derivation."""
+    topology = value.get("topology")
+    message = value.get("message_passing")
+    xc = value.get("xc")
+    operator = value.get("operator")
+    if not all(isinstance(item, dict) for item in (topology, message, xc, operator)):
+        raise ManifestError("structural IR sections are missing")
+    count = topology.get("site_count")
+    edges = topology.get("directed_edges")
+    if not isinstance(count, int) or isinstance(count, bool) or count <= 0:
+        raise ManifestError("site_count must be positive")
+    if not isinstance(edges, list) or any(
+        not isinstance(edge, list) or len(edge) != 2
+        or any(not isinstance(node, int) or node < 0 or node >= count for node in edge)
+        for edge in edges
+    ):
+        raise ManifestError("directed_edges are invalid")
+    depth = message.get("depth")
+    if not isinstance(depth, int) or isinstance(depth, bool) or depth < 0:
+        raise ManifestError("message-passing depth must be non-negative")
+    if "recognized" in message and not isinstance(message["recognized"], bool):
+        raise ManifestError("message-passing recognition must be boolean")
+    if xc.get("form") not in {"hinge", "smooth", "unsupported"}:
+        raise ManifestError("unsupported XC form value")
+    if operator.get("construction") not in {
+        "zero", "identity", "symmetrized", "unconstrained_parameter", "unsupported"
+    }:
+        raise ManifestError("unsupported operator construction value")
+
+
+def _revalidate_structure(
+    *, value: dict[str, Any], input_constraints: dict[str, Any],
+    derivation: dict[str, Any], roles: dict[str, str],
+) -> None:
+    """Independently rechecks `topology`/`message_passing`/`xc`/`operator`/
+    `semantic_derivations` against a freshly recomputed `derivation` --
+    never `locality`/`capabilities`. Shared by every plugin built on this
+    module's derivation."""
+    translation = value["translation"]
+    if translation.get("semantic_derivations") != derivation["semantic_derivations"]:
+        raise ManifestError("translation semantic derivations do not match the raw exported graph")
+    topology = translation.get("topology")
+    if topology != {
+        "state_name": derivation["adjacency_state"],
+        "graph_inputs": derivation["graph_inputs"],
+        "adjacency_aliases": derivation["adjacency_aliases"],
+        "adjacency_convention": input_constraints.get("adjacency_convention", "target_source"),
+    } or value["topology"]["site_count"] != derivation["site_count"] or value["topology"]["directed_edges"] != derivation["edges"]:
+        raise ManifestError("translation topology claim does not match its adjacency evidence")
+    if translation.get("message_passing") != {
+        "root": roles["message_state"], "stages": derivation["stage_nodes"], "recognized": derivation["message_recognized"],
+    }:
+        raise ManifestError("translation message-passing derivation is invalid")
+    if value["message_passing"] != {
+        "depth": derivation["depth"], "recognized": derivation["message_recognized"], "provenance_nodes": derivation["stage_nodes"],
+    }:
+        raise ManifestError("IR message-passing claim does not match its derivation")
+    if translation.get("xc") != {"root": roles["xc_energy"], "form": derivation["xc_form"]}:
+        raise ManifestError("translation XC derivation is invalid")
+    if value["xc"] != {"form": derivation["xc_form"], "provenance_nodes": derivation["xc_nodes"]}:
+        raise ManifestError("IR XC claim does not match its derivation")
+    if translation.get("operator") != {"root": roles["learned_self_energy"], "construction": derivation["operator"]}:
+        raise ManifestError("translation operator derivation is invalid")
+    if value["operator"] != {"construction": derivation["operator"], "provenance_nodes": derivation["operator_nodes"]}:
+        raise ManifestError("IR operator claim does not match its derivation")
+
+
 class DFTPlugin(StructuralPlugin):
     name = "dft"
     lean_import = "Testv2.StructuralV2"
@@ -391,13 +461,21 @@ class DFTPlugin(StructuralPlugin):
     def role_requirements(self) -> set[str]:
         return {"xc_energy", "learned_self_energy", "message_state"}
 
-    def derive(
+    def derive_structure(
         self, *, inventory: dict[str, Any], nodes: list[dict[str, Any]],
         roles: dict[str, str], input_constraints: dict[str, Any],
     ) -> dict[str, Any]:
-        """Computes -- once -- everything every other method needs: semantic
-        derivations (for translation/provenance) AND the actual locality
-        observation (real extracted values, not re-derived elsewhere)."""
+        """Everything computable from graph shape and construction
+        classification alone -- topology (a declared bool/int adjacency
+        buffer, never a trainable float), message-passing depth, XC form,
+        operator-construction recipe. Never reads a single extracted
+        parameter's floating-point content (that only happens in
+        `_operator_matrix`/`_locality_from_recipe`, called by `derive()`
+        below, never from here). Shared by `derive()` and by any plugin that
+        must certify architecture without ever depending on trained values."""
+        expected_locality = input_constraints.get("expected_locality")
+        if expected_locality not in {"local", "non_local"}:
+            raise ManifestError("input_constraints.expected_locality must be 'local' or 'non_local'")
         count, edges, graph_inputs, state_name = _topology(inventory, input_constraints)
         aliases = _adjacency_aliases(nodes, graph_inputs)
         stages, message_recognized = _message_chain(nodes, roles["message_state"], graph_inputs)
@@ -450,10 +528,6 @@ class DFTPlugin(StructuralPlugin):
                 },
             ),
         }
-        expected_locality = input_constraints.get("expected_locality")
-        if expected_locality not in {"local", "non_local"}:
-            raise ManifestError("input_constraints.expected_locality must be 'local' or 'non_local'")
-        locality = _locality_from_recipe(operator_recipe, inventory, count, expected_locality)
         adjacency_aliases_list = _adjacency_aliases(nodes, graph_inputs)
         return {
             "semantic_derivations": semantic_derivations,
@@ -462,8 +536,23 @@ class DFTPlugin(StructuralPlugin):
             "depth": len(stages), "stage_nodes": stages, "message_recognized": message_recognized,
             "xc_form": xc_form, "xc_nodes": xc_nodes,
             "operator": operator, "operator_nodes": operator_nodes, "operator_recipe": operator_recipe,
-            "locality": locality,
+            "expected_locality": expected_locality,
         }
+
+    def derive(
+        self, *, inventory: dict[str, Any], nodes: list[dict[str, Any]],
+        roles: dict[str, str], input_constraints: dict[str, Any],
+    ) -> dict[str, Any]:
+        """`derive_structure()` plus the real-weight `locality` observation
+        (the only place this plugin reads an extracted parameter's actual
+        floating-point content)."""
+        derivation = self.derive_structure(
+            inventory=inventory, nodes=nodes, roles=roles, input_constraints=input_constraints,
+        )
+        locality = _locality_from_recipe(
+            derivation["operator_recipe"], inventory, derivation["site_count"], derivation["expected_locality"],
+        )
+        return {**derivation, "locality": locality}
 
     def ir_sections(self, *, derivation: dict[str, Any], input_constraints: dict[str, Any]) -> dict[str, Any]:
         return {
@@ -504,34 +593,11 @@ class DFTPlugin(StructuralPlugin):
         }
 
     def validate_ir_sections(self, value: dict[str, Any]) -> None:
-        topology = value.get("topology")
-        message = value.get("message_passing")
-        xc = value.get("xc")
-        operator = value.get("operator")
+        _validate_structure_sections(value)
         locality = value.get("locality")
-        if not all(isinstance(item, dict) for item in (topology, message, xc, operator, locality)):
-            raise ManifestError("structural IR sections are missing")
-        count = topology.get("site_count")
-        edges = topology.get("directed_edges")
-        if not isinstance(count, int) or isinstance(count, bool) or count <= 0:
-            raise ManifestError("site_count must be positive")
-        if not isinstance(edges, list) or any(
-            not isinstance(edge, list) or len(edge) != 2
-            or any(not isinstance(node, int) or node < 0 or node >= count for node in edge)
-            for edge in edges
-        ):
-            raise ManifestError("directed_edges are invalid")
-        depth = message.get("depth")
-        if not isinstance(depth, int) or isinstance(depth, bool) or depth < 0:
-            raise ManifestError("message-passing depth must be non-negative")
-        if "recognized" in message and not isinstance(message["recognized"], bool):
-            raise ManifestError("message-passing recognition must be boolean")
-        if xc.get("form") not in {"hinge", "smooth", "unsupported"}:
-            raise ManifestError("unsupported XC form value")
-        if operator.get("construction") not in {
-            "zero", "identity", "symmetrized", "unconstrained_parameter", "unsupported"
-        }:
-            raise ManifestError("unsupported operator construction value")
+        if not isinstance(locality, dict):
+            raise ManifestError("structural IR is missing locality")
+        count = value["topology"]["site_count"]
         if locality.get("expected") not in {"local", "non_local"}:
             raise ManifestError("locality.expected must be 'local' or 'non_local'")
         if not isinstance(locality.get("available"), bool):
@@ -564,33 +630,7 @@ class DFTPlugin(StructuralPlugin):
         input_constraints: dict[str, Any], derivation: dict[str, Any],
         roles: dict[str, str],
     ) -> None:
-        translation = value["translation"]
-        if translation.get("semantic_derivations") != derivation["semantic_derivations"]:
-            raise ManifestError("translation semantic derivations do not match the raw exported graph")
-        topology = translation.get("topology")
-        if topology != {
-            "state_name": derivation["adjacency_state"],
-            "graph_inputs": derivation["graph_inputs"],
-            "adjacency_aliases": derivation["adjacency_aliases"],
-            "adjacency_convention": input_constraints.get("adjacency_convention", "target_source"),
-        } or value["topology"]["site_count"] != derivation["site_count"] or value["topology"]["directed_edges"] != derivation["edges"]:
-            raise ManifestError("translation topology claim does not match its adjacency evidence")
-        if translation.get("message_passing") != {
-            "root": roles["message_state"], "stages": derivation["stage_nodes"], "recognized": derivation["message_recognized"],
-        }:
-            raise ManifestError("translation message-passing derivation is invalid")
-        if value["message_passing"] != {
-            "depth": derivation["depth"], "recognized": derivation["message_recognized"], "provenance_nodes": derivation["stage_nodes"],
-        }:
-            raise ManifestError("IR message-passing claim does not match its derivation")
-        if translation.get("xc") != {"root": roles["xc_energy"], "form": derivation["xc_form"]}:
-            raise ManifestError("translation XC derivation is invalid")
-        if value["xc"] != {"form": derivation["xc_form"], "provenance_nodes": derivation["xc_nodes"]}:
-            raise ManifestError("IR XC claim does not match its derivation")
-        if translation.get("operator") != {"root": roles["learned_self_energy"], "construction": derivation["operator"]}:
-            raise ManifestError("translation operator derivation is invalid")
-        if value["operator"] != {"construction": derivation["operator"], "provenance_nodes": derivation["operator_nodes"]}:
-            raise ManifestError("IR operator claim does not match its derivation")
+        _revalidate_structure(value=value, input_constraints=input_constraints, derivation=derivation, roles=roles)
         if value["locality"] != derivation["locality"]:
             raise ManifestError("locality claim/observation does not match the raw exported operator values")
 
@@ -674,6 +714,15 @@ class DFTPlugin(StructuralPlugin):
             f"- Message passing: {value['message_passing']['depth']} consecutive adjacency-fed stage(s): {value['message_passing'].get('provenance_nodes', [])}.",
             f"- XC output construction: {value['xc']['form']}; supporting graph nodes: {value['xc'].get('provenance_nodes', [])}.",
             f"- Self-energy construction: {value['operator']['construction']}; supporting graph nodes: {value['operator'].get('provenance_nodes', [])}.",
+        ]
+
+    def trust_boundary_lines(self) -> list[str]:
+        return [
+            "The PT2 artifact is deserialized only by the extractor boundary; its SHA-256 binds this report to that file.",
+            "The translation validator independently rechecks the IR claims, including the locality observation, against the exported graph inventory and raw parameter values.",
+            "Lean can verify the generated structural theorems, but it does not parse the PT2 binary itself.",
+            "Locality is checked only for recognized, small (<=4096 element) operator constructions; an unrecognized or too-large construction leaves it undetermined rather than guessed.",
+            "This report does not assess training convergence, numerical accuracy of the *magnitude* of couplings, or experiment -- only whether real values are exactly/threshold-nonzero off the diagonal.",
         ]
 
     def lean_preamble_fields(self, value: dict[str, Any], namespace: str) -> str:

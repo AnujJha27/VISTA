@@ -141,6 +141,17 @@ class StructuralPlugin(ABC):
     def model_description_lines(self, value: dict[str, Any]) -> list[str]:
         """Extra lines for `structural_model_description`."""
 
+    def trust_boundary_lines(self) -> list[str]:
+        """`structural_report`'s `trust_boundary` list. Generic default for
+        any plugin that adds nothing beyond the harness's own guarantees;
+        override to disclose what THIS plugin's checks do and do not
+        establish (e.g. whether a real-weight observation exists at all)."""
+        return [
+            "The PT2 artifact is deserialized only by the extractor boundary; its SHA-256 binds this report to that file.",
+            "Lean can verify the generated structural theorems, but it does not parse the PT2 binary itself.",
+            "This report does not assess training convergence or general physical correctness.",
+        ]
+
     @abstractmethod
     def lean_preamble_fields(self, value: dict[str, Any], namespace: str) -> str:
         """Domain-specific `def ... := ...` lines for the Lean preamble,

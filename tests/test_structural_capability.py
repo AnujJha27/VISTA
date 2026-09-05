@@ -2,13 +2,21 @@
 
 Unlike `DFTPlugin`'s `locality` (a fact about real extracted weights, which
 don't exist before training), `DFTCapabilityPlugin`'s `capabilities` are
-facts about topology, message-passing depth, and operator-construction
-recipe alone.
+facts about topology, message-passing depth found within the *operator's
+own ancestry*, and operator-construction recipe alone.
+
+The recipes `DFTPlugin`/`DFTCapabilityPlugin` currently recognize (`zero`,
+`identity`, `symmetrized`, `unconstrained_parameter`) are all built purely
+from parameters/adjoints -- none of them ever consume the adjacency at all.
+So `all_pairs_reachable` is honestly `not applicable` for every inventory
+these tests can build through the public `structural_ir_from_inventory`
+pipeline; `AllPairsReachableUnitTests` below exercises the underlying
+reachability/applicability logic directly instead.
 """
 import unittest
 
 from dftcert.structural.core import generate_structural_obligations, structural_ir_from_inventory
-from dftcert.structural.dft_capability_plugin import DFT_CAPABILITY_PLUGIN
+from dftcert.structural.dft_capability_plugin import DFT_CAPABILITY_PLUGIN, _reachability, _unreachable_pairs
 
 
 def _ref(name):
@@ -43,7 +51,7 @@ def _inventory(*, adjacency, stages, symmetrized=True):
         "name": "output", "op": "output", "target": "output",
         "args": [[_ref("relu"), _ref(operator_root), _ref(current)]], "kwargs": {},
     })
-    # No numeric `structural_values` anywhere -- V4 needs none.
+    # No numeric `structural_values` anywhere -- the capability plugin needs none.
     state = {"adjacency": {
         "structural_values": adjacency, "graph_inputs": ["b_adjacency"],
         "shape": [site_count, site_count], "dtype": "torch.bool", "sha256": "a",
@@ -74,21 +82,64 @@ def _ir(*, expected_locality="non_local", **inventory_kwargs):
     )
 
 
-class AllPairsReachableTests(unittest.TestCase):
-    def test_fully_connected_ring_with_one_stage_covers_all_pairs(self):
-        ir = _ir(adjacency=_RING3, stages=1)
-        self.assertTrue(ir["capabilities"]["all_pairs_reachable"])
-        self.assertEqual(ir["capabilities"]["unreachable_pairs"], [])
+class AllPairsReachableUnitTests(unittest.TestCase):
+    """Exercises `_reachability`/`_unreachable_pairs` directly, since no
+    currently-recognized operator recipe ever depends on message-passing
+    (see module docstring) -- the "applicable" branch can't be reached
+    through the public pipeline yet, but the logic itself must be correct
+    for whenever a message-passing-derived recipe is recognized."""
+
+    def test_fully_connected_ring_with_one_stage_is_applicable_and_covers_all_pairs(self):
+        nodes = [
+            {"name": "b_adjacency", "op": "placeholder", "target": "b_adjacency", "args": [], "kwargs": {}},
+            {"name": "density", "op": "placeholder", "target": "density", "args": [], "kwargs": {}},
+            {"name": "matmul", "op": "call_function", "target": "aten.matmul.default",
+             "args": [_ref("b_adjacency"), _ref("density")], "kwargs": {}},
+        ]
+        edges = [[0, 1], [1, 0], [0, 2], [2, 0], [1, 2], [2, 1]]
+        result = _reachability(
+            nodes=nodes, operator_root="matmul", adjacency_aliases=["b_adjacency"],
+            site_count=3, edges=edges,
+        )
+        self.assertTrue(result["applicable"])
+        self.assertTrue(result["satisfied"])
+        self.assertEqual(result["depth"], 1)
+        self.assertEqual(result["unreachable_pairs"], [])
 
     def test_zero_depth_never_covers_distinct_pairs(self):
-        ir = _ir(adjacency=_RING3, stages=0)
-        self.assertFalse(ir["capabilities"]["all_pairs_reachable"])
-        self.assertEqual(len(ir["capabilities"]["unreachable_pairs"]), 6)
+        edges = [[0, 1], [1, 0], [0, 2], [2, 0], [1, 2], [2, 1]]
+        self.assertEqual(len(_unreachable_pairs(3, edges, depth=0)), 6)
 
     def test_one_directional_chain_never_covers_backward_pairs(self):
-        ir = _ir(adjacency=_CHAIN3, stages=2)
-        self.assertFalse(ir["capabilities"]["all_pairs_reachable"])
-        self.assertIn({"source": 2, "target": 0}, ir["capabilities"]["unreachable_pairs"])
+        unreachable = _unreachable_pairs(3, [[0, 1], [1, 2]], depth=2)
+        self.assertIn({"source": 2, "target": 0}, unreachable)
+
+    def test_operator_not_depending_on_adjacency_is_not_applicable(self):
+        nodes = [
+            {"name": "b_adjacency", "op": "placeholder", "target": "b_adjacency", "args": [], "kwargs": {}},
+            {"name": "p_base", "op": "placeholder", "target": "p_base", "args": [], "kwargs": {}},
+        ]
+        result = _reachability(
+            nodes=nodes, operator_root="p_base", adjacency_aliases=["b_adjacency"],
+            site_count=3, edges=[],
+        )
+        self.assertFalse(result["applicable"])
+        self.assertTrue(result["satisfied"])  # vacuous, never "rescued" by an unrelated branch
+        self.assertIsNone(result["depth"])
+        self.assertIsNone(result["unreachable_pairs"])
+
+
+class AllPairsReachablePipelineTests(unittest.TestCase):
+    def test_every_currently_recognized_operator_recipe_is_not_applicable(self):
+        # zero/identity/symmetrized/unconstrained_parameter are all built
+        # from placeholders + add/transpose only -- never matmul -- so this
+        # must hold for every inventory the public pipeline can produce today.
+        for symmetrized in (True, False):
+            ir = _ir(adjacency=_RING3, stages=2, symmetrized=symmetrized)
+            self.assertFalse(ir["capabilities"]["all_pairs_reachable_applicable"])
+            self.assertTrue(ir["capabilities"]["all_pairs_reachable"])
+            self.assertIsNone(ir["capabilities"]["operator_message_depth"])
+            self.assertIsNone(ir["capabilities"]["unreachable_pairs"])
 
 
 class NonLocalCapacityTests(unittest.TestCase):
@@ -105,6 +156,13 @@ class NonLocalCapacityTests(unittest.TestCase):
         checks = generate_structural_obligations(ir, plugin=DFT_CAPABILITY_PLUGIN)["assessment"]["checks"]
         self.assertTrue(checks["non_local_capacity"]["satisfied"])
         self.assertFalse(checks["self_adjoint"]["satisfied"])
+
+    def test_single_site_never_has_non_local_capacity_even_for_a_free_parameter(self):
+        # A 1x1 matrix has no off-diagonal entry to assign, for any recipe.
+        ir = _ir(adjacency=[[False]], stages=0, symmetrized=True, expected_locality="non_local")
+        self.assertFalse(ir["capabilities"]["non_local_capacity"])
+        checks = generate_structural_obligations(ir, plugin=DFT_CAPABILITY_PLUGIN)["assessment"]["checks"]
+        self.assertFalse(checks["non_local_capacity"]["satisfied"])
 
     def test_certifiable_without_any_extracted_floats(self):
         inventory = _inventory(adjacency=_RING3, stages=1, symmetrized=True)

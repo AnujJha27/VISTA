@@ -185,13 +185,7 @@ def structural_report(value: dict[str, Any], *, plugin: StructuralPlugin = DFT_P
             for name, check in checks.items()
         ],
         "failure_witnesses": structural_failure_witnesses(value, plugin=plugin),
-        "trust_boundary": [
-            "The PT2 artifact is deserialized only by the extractor boundary; its SHA-256 binds this report to that file.",
-            "The translation validator independently rechecks the IR claims, including the locality observation, against the exported graph inventory and raw parameter values.",
-            "Lean can verify the generated structural theorems, but it does not parse the PT2 binary itself.",
-            "Locality is checked only for recognized, small (<=4096 element) operator constructions; an unrecognized or too-large construction leaves it undetermined rather than guessed.",
-            "This report does not assess training convergence, numerical accuracy of the *magnitude* of couplings, or experiment -- only whether real values are exactly/threshold-nonzero off the diagonal.",
-        ],
+        "trust_boundary": plugin.trust_boundary_lines(),
     }
 
 

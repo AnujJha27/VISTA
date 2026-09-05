@@ -5,3 +5,4 @@ import Testv2.XC
 import Testv2.Spatial
 import Testv2.Verifier
 import Testv2.StructuralV2
+import Testv2.StructuralCapabilityMatrix
