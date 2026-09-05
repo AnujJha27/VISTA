@@ -58,4 +58,27 @@ def allCovered (edges : List (Nat × Nat)) (depth : Nat)
 def localityMatches (expectedLocal : Bool) (observedNonzeroOffDiagonal : List (Nat × Nat)) : Bool :=
   expectedLocal == observedNonzeroOffDiagonal.isEmpty
 
+/-- V4: every ordered pair of distinct sites is reachable from every other
+    within the declared message-passing depth -- a fact about topology and
+    depth alone (`edges`, `depth`, `siteCount`), never about extracted
+    weights and never a hand-picked pair. -/
+def allPairsReachable (edges : List (Nat × Nat)) (depth : Nat) (siteCount : Nat) : Bool :=
+  (List.range siteCount).all fun source =>
+    (List.range siteCount).all fun target =>
+      source == target || reachableWithin edges depth source target
+
+/-- V4: does this operator construction admit *some* parameter assignment
+    with a nonzero off-diagonal entry? `.zero`/`.identity` never can, for any
+    assignment; an unconstrained `.parameter` and a symmetrized
+    `.add p (.adjoint p)` (or its mirror) always can. A fact about the
+    construction alone -- never about the values currently stored in it (see
+    `localityMatches` for that). -/
+def canRepresentNonLocal : OperatorForm → Bool
+  | .zero => false
+  | .identity => false
+  | .parameter _ => true
+  | .add _ (.adjoint _) => true
+  | .add (.adjoint _) _ => true
+  | _ => false
+
 end Testv2.StructuralV2
