@@ -99,3 +99,34 @@ export PROOF_SEARCH_DB="$PWD/build/certified-ring.db"
 ./noether tui --run-dir build/runs/certified-ring
 ./noether review --run-dir build/runs/certified-ring
 ```
+
+## Structural V3: locality claim verified against the candidate's own values
+
+See `STRUCTURAL_V3.md` for the design. There is no coupling list and no
+reference-operator file anymore: `structural-v3-input-constraints.json`
+declares a single `expected_locality` claim (`"local"` or `"non_local"`),
+and VISTA checks it against the candidate's own extracted operator values.
+
+```bash
+PYTHONPATH=. python examples/dft/models/analyze_structural_gnns.py \
+  build/structural-v3-models \
+  --constraints examples/dft/structural-v3-input-constraints.json \
+  --output-dir build/structural-v3-analysis
+```
+
+Compare against `examples/dft/structural-v3-evaluation.json` (real, observed
+results from a fixed-seed export -- not guessed). Unlike V2's depth-dependent
+coupling check, `certified-ring` and `too-shallow-ring` are now identical:
+locality depends only on the operator's own extracted values, never on
+message-passing depth. `identity-operator-ring` and `zero-operator-ring`
+correctly do NOT match the shared `non_local` claim, because their real
+extracted operator genuinely is diagonal -- a real, computed mismatch, not a
+labeling error.
+
+The full frozen V3 evaluation condition (locality-verification corpus + fresh
+held-out adversarial cases) lives in `evaluation/structural_v3/`, run the
+same way as `evaluation/structural_v2/`:
+
+```bash
+python evaluation/structural_v3/run.py --generate
+```

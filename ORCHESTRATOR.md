@@ -38,8 +38,8 @@ graph and current frontier.
 
 `orchestrator/roles.json` is now a structured agent registry. Legacy
 `{"direct": "instructions"}` files still load, but structured entries can
-define agent kind, model route, tools, temperature, candidate budget, and
-handoff targets:
+define agent kind, model route, tools, candidate budget, and handoff
+targets:
 
 ```json
 {
@@ -47,7 +47,6 @@ handoff targets:
     "kind": "proposer",
     "model": "default",
     "tools": ["lean_diagnostics", "frontier_read", "candidate_submit"],
-    "temperature": 0.2,
     "max_candidates": 2,
     "handoff_targets": ["automation", "structural"],
     "instructions": "Prefer short definitional and simplification proofs."
@@ -259,7 +258,6 @@ Useful CLI controls:
 --frontier-width 6
 --provider-timeout-s 120
 --agents-file orchestrator/roles.json
---roles-file orchestrator/roles.json
 ```
 
 The result includes every candidate, Lean status and diagnostics, critic events, cache flags, model-call count, and the winning patch. `sorry` and `admit` candidates are rejected before verification.
@@ -289,25 +287,6 @@ only repeated metadata and verbose history are removed:
 Use the normal mode as an evaluation baseline; do not assume one prompt style
 is best without measuring verified proofs on the same task set.
 
-Agent `model` fields can route to different provider adapters. The default
-provider still comes from `--provider`, while `--provider-routes` supplies
-overrides by model name:
-
-```json
-{
-  "fast-local": {
-    "provider": "command",
-    "command": ["/path/to/adapter", "--model", "fast-local"],
-    "timeout_s": 60
-  },
-  "critic-hosted": {
-    "provider": "http",
-    "url": "http://127.0.0.1:8080/generate",
-    "token_env": "LLM_API_TOKEN",
-    "timeout_s": 120
-  }
-}
-```
-
-Then set an agent to `"model": "fast-local"` or `"model": "critic-hosted"`.
-Replay artifacts record the selected model route for every call.
+Every agent calls the single provider adapter configured by `--provider`;
+`model` is a label carried through model-call records and prompts, not a
+per-agent provider selector.

@@ -1,0 +1,25 @@
+{
+  "artifact_sha256": {
+    "v3h-malformed-duplicate-xc-role": "aca8c28a3d394a7cf0789d5b64e9c77857c959c8a52661953cd062b3ca3657c3",
+    "v3h-malformed-missing-locality-field": "9a4a17dd31c22dc1f293813eafc924571f065a2217c7c8de1c1728e3af43d76a",
+    "v3h-nearmiss-free-parameter-not-self-adjoint": "1195fe7486069c8ea5a1d07b35f46231868e5ba4061a09868b8783abcd9f682b",
+    "v3h-positive-adjoint-first": "63dbb701e042ce2dd810ae1e41eb89d7c202eef0ebb145501476f872a4cc3fbe",
+    "v3h-unsupported-diagonal-operator": "d29e5b3d7c124c01f4d1ea75db00db3a3f5b4ed1c32255daa625561292a7034e",
+    "v3h-unsupported-transformed-scaled-operator": "7e4a71c575f2d667232a71a544cb6d90675894d1252cef89ed9d69eb4fa18040"
+  },
+  "condition_name": "vista-structural-eval-v3-r1",
+  "corpus_freeze_revision": "PENDING: re-pin to the commit that lands this V3 corpus",
+  "execution_revision": "6f40ca628502770bb1135286749898652b2e61b0",
+  "manifest_sha256": "40621d09fd5c2849111393d99f258c968610181f32c34abe3e5bfe3490e19d11",
+  "source_sha256": {
+    "dftcert/structural/cli.py": "4f409814f49ca283d9503b13513a4536dfa153fc2232abe9dfa0d24bff6108f0",
+    "dftcert/structural/core.py": "7cd4b69a7cb5df2232fe971a0f932fa65bba20457c286e5bd4b801a685a3a198",
+    "evaluation/structural_v2/corpus_models.py": "b72d21e8e5fc3a071263cc011c6cc294988aa5679c3e4158676944817feb3a0d",
+    "evaluation/structural_v3/experiment.json": "9fc294589a7d3c6ae277fc407f7ff176d59ef60c5905e5c83bee1c6f774a9526",
+    "evaluation/structural_v3/fresh_held_out_manifest.json": "40621d09fd5c2849111393d99f258c968610181f32c34abe3e5bfe3490e19d11",
+    "evaluation/structural_v3/generate.py": "8ba4aeff151c7e1457b8b7d129a8da4d80412928048b0feb21125f2077e80f5f",
+    "evaluation/structural_v3/run.py": "f6c06afb5b69f4c3a83e036e4486a38c54e7a2033ff51b504f6e545159a86179",
+    "evaluation/structural_v3/score.py": "e69ea66ef9dd9b02cd38c43e09414fecf9400ae4457a6be783f3c2fdc388d76f",
+    "extractors/torch_export_worker.py": "f58101a4882a7d960b486fb4071c94b8a256de29d1eca6ca842423a8e5fe6f85"
+  }
+}

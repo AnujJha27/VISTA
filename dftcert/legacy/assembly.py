@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from ..manifest import ArchitectureManifest, canonical_json
+from ..manifest import ArchitectureManifest, canonical_json, proof_result_map
 from .obligations import generate_obligations
 from .policy import Policy, PolicyError
 
@@ -24,27 +24,13 @@ def _lean_string(value: str) -> str:
     return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
-def _result_map(value: Any) -> dict[str, dict[str, Any]]:
-    entries = value.get("results") if isinstance(value, dict) and "results" in value else value
-    if not isinstance(entries, list):
-        raise AssemblyError("proof results must be an array or an object with results")
-    result: dict[str, dict[str, Any]] = {}
-    for entry in entries:
-        if not isinstance(entry, dict) or not isinstance(entry.get("id"), str):
-            raise AssemblyError("each proof result needs a string id")
-        if entry["id"] in result:
-            raise AssemblyError(f"duplicate proof result {entry['id']!r}")
-        result[entry["id"]] = entry
-    return result
-
-
 def assemble_certificate(*, manifest: ArchitectureManifest, policy: Policy,
                          proof_results: Any) -> tuple[str, dict[str, Any]]:
     generated = generate_obligations(manifest, policy)
     if generated["status"] != "obligations_generated":
         raise AssemblyError(generated.get("reason", "obligations were not generated"))
     profile = policy.generation_profile(generated["profile"])
-    results = _result_map(proof_results)
+    results = proof_result_map(proof_results, error=AssemblyError)
     proof_lines: list[str] = []
     evidence: list[dict[str, Any]] = []
     for task in generated["obligations"]:

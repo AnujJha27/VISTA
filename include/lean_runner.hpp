@@ -26,7 +26,6 @@ class LeanRunner {
   explicit LeanRunner(std::filesystem::path project_dir);
   VerificationResult verify(const VerifyRequest& request,
                             const std::atomic_bool* cancelled = nullptr) const;
-  const std::filesystem::path& project_dir() const { return project_dir_; }
 
  private:
   std::filesystem::path project_dir_;

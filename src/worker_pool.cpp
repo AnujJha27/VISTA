@@ -4,11 +4,12 @@
 
 namespace proof_search {
 
+unsigned default_worker_count() {
+  const unsigned hardware = std::thread::hardware_concurrency();
+  return hardware > 1 ? hardware - 1 : 1;
+}
+
 WorkerPool::WorkerPool(unsigned worker_count) {
-  if (worker_count == 0) {
-    const unsigned hardware = std::thread::hardware_concurrency();
-    worker_count = hardware > 1 ? hardware - 1 : 1;
-  }
   for (unsigned i = 0; i < worker_count; ++i) {
     workers_.emplace_back([this] {
       for (;;) {

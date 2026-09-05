@@ -28,11 +28,10 @@ from .supervisor import AgentAssignment, SupervisorPolicy, agent_scorecard
 from .verifier import VerifierClient, VerifierError
 
 
-DEFAULT_ROLES_FILE = Path(__file__).with_name("roles.json")
-DEFAULT_AGENTS_FILE = DEFAULT_ROLES_FILE
+DEFAULT_AGENTS_FILE = Path(__file__).with_name("roles.json")
 
 
-def load_roles(path: str | Path = DEFAULT_ROLES_FILE) -> dict[str, str]:
+def load_roles(path: str | Path = DEFAULT_AGENTS_FILE) -> dict[str, str]:
     registry = load_agent_registry(path)
     proposers = registry.proposer_specs()
     if not proposers:
@@ -142,11 +141,6 @@ class Orchestrator:
         self.permissions = permissions or PermissionPolicy()
         self.router = provider_router or ProviderRouter(provider)
         self.frontier_policy = FrontierPolicy(self.config.frontier_width)
-        self.supervisor_agent = AgentSpec(
-            name="supervisor",
-            kind="supervisor",
-            instructions="Schedule proof-search work without asserting proof success.",
-        )
         self.supervisor = SupervisorPolicy(
             list(self.proposer_specs),
             handoff_targets={

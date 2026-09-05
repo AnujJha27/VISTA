@@ -92,8 +92,15 @@ unsigned configured_workers() {
     try { const unsigned parsed = static_cast<unsigned>(std::stoul(value)); if (parsed > 0) return parsed; }
     catch (...) {}
   }
-  const unsigned hardware = std::thread::hardware_concurrency();
-  return hardware > 1 ? hardware - 1 : 1;
+  return default_worker_count();
+}
+
+// generated_obligation is opt-in via PROOF_SEARCH_ALLOW_GENERATED_OBLIGATIONS;
+// shared by the verify and search_batch dispatch arms below.
+std::optional<json> generated_obligation_gate(const std::string& id, const std::string& verification_mode) {
+  if (verification_mode == "generated_obligation" && !generated_obligations_enabled())
+    return invalid_response(id, "generated obligations are disabled");
+  return std::nullopt;
 }
 
 }  // namespace
@@ -125,16 +132,12 @@ int main() {
         } else if (request["type"] == "verify") {
           VerifyRequest parsed;
           if (auto error = parse_verify(request, parsed)) response = invalid_response(id, error->message);
-          else if (parsed.verification_mode == "generated_obligation" &&
-                   !generated_obligations_enabled())
-            response = invalid_response(id, "generated obligations are disabled");
+          else if (auto gate = generated_obligation_gate(id, parsed.verification_mode)) response = *gate;
           else response = result_json(parsed.id, check_one(parsed, runner, cache));
         } else if (request["type"] == "search_batch") {
           BatchRequest parsed;
           if (auto error = parse_batch(request, parsed)) response = invalid_response(id, error->message);
-          else if (parsed.verification_mode == "generated_obligation" &&
-                   !generated_obligations_enabled())
-            response = invalid_response(id, "generated obligations are disabled");
+          else if (auto gate = generated_obligation_gate(id, parsed.verification_mode)) response = *gate;
           else response = process_batch(parsed, runner, cache, workers);
         } else response = invalid_response(id, "unsupported request type");
       } catch (const json::exception& error) {

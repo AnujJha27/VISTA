@@ -25,7 +25,7 @@ from .core import (
 
 CLAIMS_SCHEMA = {
     "type": "object",
-    "required": ["topology", "message_passing", "xc", "operator", "requirements"],
+    "required": ["topology", "message_passing", "xc", "operator", "locality"],
     "properties": {
         "topology": {
             "type": "object",
@@ -34,7 +34,7 @@ CLAIMS_SCHEMA = {
         "message_passing": {"type": "object", "required": ["depth"]},
         "xc": {"type": "object", "required": ["form"]},
         "operator": {"type": "object", "required": ["construction"]},
-        "requirements": {"type": "object", "required": ["couplings"]},
+        "locality": {"type": "object", "required": ["expected"]},
     },
 }
 
@@ -65,7 +65,7 @@ def _atomic_claims(claims: dict[str, Any], *, description: str, reviewed: bool) 
         "message_passing": ("message", "layer", "stage", "depth", "propagation"),
         "xc": ("xc", "exchange", "correlation", "hinge", "relu", "smooth", "sigmoid", "tanh"),
         "operator": ("operator", "self-energy", "self energy", "adjoint", "transpose", "symmetr"),
-        "requirements": ("require", "coupling", "reach", "nonlocal"),
+        "locality": ("local", "nonlocal", "non-local", "diagonal", "coupling"),
     }
 
     def source_for(property_name: str) -> tuple[str | None, list[int] | None]:
@@ -84,24 +84,25 @@ def _atomic_claims(claims: dict[str, Any], *, description: str, reviewed: bool) 
             end -= 1
         return description[start:end], [start, end]
 
-    return [
-        {
+    results = []
+    for property_name, value in claims.items():
+        text, span = source_for(property_name)
+        results.append({
             "property": property_name,
             "proposed_value": value,
-            "source_text": source_for(property_name)[0],
-            "source_span": source_for(property_name)[1],
+            "source_text": text,
+            "source_span": span,
             "draft_interpretation": value,
             "reviewer_decision": "confirmed" if reviewed else "pending",
             "final_value": value if reviewed else None,
             "provenance": "human_confirmation" if reviewed else "llm_draft",
-        }
-        for property_name, value in claims.items()
-    ]
+        })
+    return results
 
 
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(
-        prog="vista structural", description="Artifact-grounded VISTA Structural V2 workflow"
+        prog="vista structural", description="Artifact-grounded VISTA Structural V3 workflow"
     )
     commands = root.add_subparsers(dest="command", required=True)
 
@@ -202,8 +203,9 @@ def main(argv: list[str] | None = None) -> int:
                 prompt=(
                     "Extract a finite directed topology, message-passing depth, XC form "
                     "(hinge, smooth, unsupported), operator construction (zero, identity, "
-                    "symmetrized, unconstrained_parameter, unsupported), and required couplings. "
-                    "Do not infer trained numerical behavior.\n\nDescription:\n" + description
+                    "symmetrized, unconstrained_parameter, unsupported), and the claimed "
+                    "self-energy locality (local or non_local) explicitly stated in the "
+                    "description. Do not infer trained numerical behavior.\n\nDescription:\n" + description
                 ),
                 schema=CLAIMS_SCHEMA,
             )

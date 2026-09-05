@@ -1,0 +1,474 @@
+{
+  "artifact": "build/vista-structural-v3-held-out/v3h-malformed-duplicate-xc-role.pt2",
+  "artifact_sha256": "aca8c28a3d394a7cf0789d5b64e9c77857c959c8a52661953cd062b3ca3657c3",
+  "case_id": "v3h-malformed-duplicate-xc-role",
+  "experiment": {
+    "analyzer_version": "dft-structural-analysis-v6",
+    "compiler_version": "dft-structural-lean-v3",
+    "condition_name": "vista-structural-eval-v3-r1",
+    "condition_version": 1,
+    "corpus_freeze_revision": "PENDING: re-pin to the commit that lands this V3 corpus",
+    "environment": {
+      "export": "torch.export.save(.pt2)",
+      "platform": "recorded by runner environment",
+      "python": "recorded by runner environment",
+      "pytorch": "recorded by extractor"
+    },
+    "experiment": "VISTA Structural V3 locality-verification corpus",
+    "extractor_version": "torch-export-inventory-v3",
+    "integrity": "V3 checks a global locality claim against the candidate's own extracted operator values -- no coupling pairs, no external reference file. This condition supersedes an earlier V3 design (reference-operator-derived coupling pairs) abandoned before release; see STRUCTURAL_V3.md. Do not change semantic rules after observing fresh held-out results; create a new condition instead.",
+    "lean_project": {
+      "identity": "proof-search@0.1.0",
+      "path": "lean",
+      "toolchain": "leanprover/lean4:v4.31.0"
+    },
+    "policy_version": "dft-structural-v3",
+    "semantic_rules": {
+      "message.adjacency_fed_matmul": 2,
+      "operator.add_adjoint_pair": 1,
+      "operator.identity_root": 1,
+      "operator.unconstrained_root": 2,
+      "operator.unrecognized_composition": 1,
+      "operator.zero_root": 1,
+      "operator_offdiag_abs_threshold": 1,
+      "topology.adjacency_state": 1,
+      "xc.hinge_activation": 2,
+      "xc.smooth_activation": 2,
+      "xc.unrecognized_composition": 2
+    },
+    "structural_ir_schema_version": 3
+  },
+  "input_constraints": {
+    "adjacency_convention": "target_source",
+    "adjacency_state_name": "adjacency",
+    "expected_locality": "non_local",
+    "output_contracts": [
+      {
+        "index": 0,
+        "role": "xc_energy"
+      },
+      {
+        "index": 1,
+        "role": "learned_self_energy"
+      },
+      {
+        "index": 2,
+        "role": "message_state"
+      },
+      {
+        "index": 0,
+        "role": "xc_energy"
+      }
+    ]
+  },
+  "raw_extraction": {
+    "artifact_sha256": "aca8c28a3d394a7cf0789d5b64e9c77857c959c8a52661953cd062b3ca3657c3",
+    "extractor_version": "torch-export-inventory-v3",
+    "facts": {},
+    "inventory": {
+      "nodes": [
+        {
+          "args": [],
+          "kwargs": {},
+          "name": "p_base",
+          "op": "placeholder",
+          "target": "p_base",
+          "tensor": {
+            "dtype": "torch.float32",
+            "shape": [
+              "5",
+              "5"
+            ]
+          }
+        },
+        {
+          "args": [],
+          "kwargs": {},
+          "name": "b_adjacency",
+          "op": "placeholder",
+          "target": "b_adjacency",
+          "tensor": {
+            "dtype": "torch.bool",
+            "shape": [
+              "5",
+              "5"
+            ]
+          }
+        },
+        {
+          "args": [],
+          "kwargs": {},
+          "name": "density",
+          "op": "placeholder",
+          "target": "density",
+          "tensor": {
+            "dtype": "torch.float32",
+            "shape": [
+              "5",
+              "1"
+            ]
+          }
+        },
+        {
+          "args": [
+            {
+              "node": "b_adjacency"
+            },
+            "torch.float32"
+          ],
+          "kwargs": {},
+          "name": "to",
+          "op": "call_function",
+          "target": "aten.to.dtype",
+          "tensor": {
+            "dtype": "torch.float32",
+            "shape": [
+              "5",
+              "5"
+            ]
+          }
+        },
+        {
+          "args": [
+            {
+              "node": "density"
+            }
+          ],
+          "kwargs": {},
+          "name": "sum_1",
+          "op": "call_function",
+          "target": "aten.sum.default",
+          "tensor": {
+            "dtype": "torch.float32",
+            "shape": []
+          }
+        },
+        {
+          "args": [
+            {
+              "node": "sum_1"
+            },
+            0
+          ],
+          "kwargs": {},
+          "name": "mul",
+          "op": "call_function",
+          "target": "aten.mul.Tensor",
+          "tensor": {
+            "dtype": "torch.float32",
+            "shape": []
+          }
+        },
+        {
+          "args": [
+            {
+              "node": "to"
+            },
+            {
+              "node": "density"
+            }
+          ],
+          "kwargs": {},
+          "name": "matmul",
+          "op": "call_function",
+          "target": "aten.matmul.default",
+          "tensor": {
+            "dtype": "torch.float32",
+            "shape": [
+              "5",
+              "1"
+            ]
+          }
+        },
+        {
+          "args": [
+            {
+              "node": "to"
+            },
+            {
+              "node": "matmul"
+            }
+          ],
+          "kwargs": {},
+          "name": "matmul_1",
+          "op": "call_function",
+          "target": "aten.matmul.default",
+          "tensor": {
+            "dtype": "torch.float32",
+            "shape": [
+              "5",
+              "1"
+            ]
+          }
+        },
+        {
+          "args": [
+            {
+              "node": "density"
+            }
+          ],
+          "kwargs": {},
+          "name": "sum_2",
+          "op": "call_function",
+          "target": "aten.sum.default",
+          "tensor": {
+            "dtype": "torch.float32",
+            "shape": []
+          }
+        },
+        {
+          "args": [
+            {
+              "node": "sum_2"
+            },
+            {
+              "node": "mul"
+            }
+          ],
+          "kwargs": {},
+          "name": "add",
+          "op": "call_function",
+          "target": "aten.add.Tensor",
+          "tensor": {
+            "dtype": "torch.float32",
+            "shape": []
+          }
+        },
+        {
+          "args": [
+            {
+              "node": "add"
+            }
+          ],
+          "kwargs": {},
+          "name": "relu",
+          "op": "call_function",
+          "target": "aten.relu.default",
+          "tensor": {
+            "dtype": "torch.float32",
+            "shape": []
+          }
+        },
+        {
+          "args": [
+            {
+              "node": "p_base"
+            }
+          ],
+          "kwargs": {},
+          "name": "numpy_t",
+          "op": "call_function",
+          "target": "aten.numpy_T.default",
+          "tensor": {
+            "dtype": "torch.float32",
+            "shape": [
+              "5",
+              "5"
+            ]
+          }
+        },
+        {
+          "args": [
+            {
+              "node": "p_base"
+            },
+            {
+              "node": "numpy_t"
+            }
+          ],
+          "kwargs": {},
+          "name": "add_1",
+          "op": "call_function",
+          "target": "aten.add.Tensor",
+          "tensor": {
+            "dtype": "torch.float32",
+            "shape": [
+              "5",
+              "5"
+            ]
+          }
+        },
+        {
+          "args": [
+            [
+              {
+                "node": "relu"
+              },
+              {
+                "node": "add_1"
+              },
+              {
+                "node": "matmul_1"
+              }
+            ]
+          ],
+          "kwargs": {},
+          "name": "output",
+          "op": "output",
+          "target": "output"
+        }
+      ],
+      "state": {
+        "adjacency": {
+          "aliases": [
+            "adjacency"
+          ],
+          "dtype": "torch.bool",
+          "graph_inputs": [
+            "b_adjacency"
+          ],
+          "sha256": "b935d15e61f4259a155dc29c0c4e4bc5c3613ee9cf9a920d639bc58dd9f8adf9",
+          "shape": [
+            5,
+            5
+          ],
+          "state_kind": "InputKind.BUFFER",
+          "structural_values": [
+            [
+              false,
+              false,
+              false,
+              false,
+              true
+            ],
+            [
+              true,
+              false,
+              false,
+              false,
+              false
+            ],
+            [
+              false,
+              false,
+              false,
+              true,
+              false
+            ],
+            [
+              false,
+              true,
+              false,
+              false,
+              false
+            ],
+            [
+              false,
+              false,
+              true,
+              false,
+              false
+            ]
+          ]
+        },
+        "base": {
+          "aliases": [
+            "base"
+          ],
+          "dtype": "torch.float32",
+          "graph_inputs": [
+            "p_base"
+          ],
+          "sha256": "4bb7f890c580e302c68c77e34d638d4c2b511fc944480c7467de68dc3f927386",
+          "shape": [
+            5,
+            5
+          ],
+          "state_kind": "InputKind.PARAMETER",
+          "structural_value_kind": "numeric",
+          "structural_values": [
+            [
+              1.7507025003433228,
+              -0.4637308716773987,
+              2.3737614154815674,
+              -0.48401814699172974,
+              0.5136961936950684
+            ],
+            [
+              -0.6760387420654297,
+              1.0634995698928833,
+              -1.3201552629470825,
+              -3.0559959411621094,
+              -1.3201253414154053
+            ],
+            [
+              -0.3148205876350403,
+              -0.8129187226295471,
+              -0.04434327408671379,
+              0.6176014542579651,
+              -2.663886547088623
+            ],
+            [
+              -0.09989523887634277,
+              1.252607822418213,
+              0.6060830354690552,
+              1.4003552198410034,
+              0.23328717052936554
+            ],
+            [
+              -0.9960798621177673,
+              2.1584417819976807,
+              0.7363535761833191,
+              0.9187784194946289,
+              -0.5709909796714783
+            ]
+          ]
+        },
+        "other": {
+          "aliases": [
+            "other"
+          ],
+          "dtype": "torch.float32",
+          "graph_inputs": [],
+          "sha256": "44625c662ac91b69ad24b6bd7b4640bc937a45b584e74b25f71b60c32e112493",
+          "shape": [
+            5,
+            5
+          ],
+          "state_kind": "unknown",
+          "structural_value_kind": "numeric",
+          "structural_values": [
+            [
+              -1.585208535194397,
+              0.18520602583885193,
+              -2.3575713634490967,
+              1.0656874179840088,
+              1.7002507448196411
+            ],
+            [
+              1.8058116436004639,
+              -1.0864731073379517,
+              0.7929787039756775,
+              1.209228277206421,
+              -0.9931235909461975
+            ],
+            [
+              1.9090609550476074,
+              0.18369030952453613,
+              0.5043251514434814,
+              0.9014609456062317,
+              -0.5965671539306641
+            ],
+            [
+              1.0729526281356812,
+              -1.161200761795044,
+              -0.048048749566078186,
+              -0.4089110493659973,
+              -0.03554476052522659
+            ],
+            [
+              0.20577581226825714,
+              0.7245758175849915,
+              -0.12311772257089615,
+              -0.1326853334903717,
+              -0.8745192885398865
+            ]
+          ]
+        }
+      }
+    },
+    "status": "ok",
+    "torch_version": "2.6.0+cu124"
+  },
+  "repeat": 0
+}

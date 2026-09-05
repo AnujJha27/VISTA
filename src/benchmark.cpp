@@ -1,5 +1,6 @@
 #include "cache.hpp"
 #include "lean_runner.hpp"
+#include "worker_pool.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -77,8 +78,7 @@ int main(int argc, char** argv) {
               {"cold_cache", {{"attempts", requests.size()}, {"elapsed_ms", pass_elapsed_ms[0]}}},
               {"warm_cache", {{"attempts", requests.size()}, {"elapsed_ms", pass_elapsed_ms[1]}}},
               {"failure_counts", failures},
-              {"worker_count", std::thread::hardware_concurrency() > 1
-                                   ? std::thread::hardware_concurrency() - 1 : 1},
+              {"worker_count", default_worker_count()},
               {"configured_limits", configured_limits}};
   std::ofstream file("benchmark-results.json");
   file << output.dump(2) << '\n';

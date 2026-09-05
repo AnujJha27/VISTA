@@ -1,0 +1,32 @@
+{
+  "artifact_sha256": {
+    "v3-malformed-invalid-adjacency": "0b18aaa742da0df97012ca11b81a0921c05a5f0bad610996f1cf2b2010605c51",
+    "v3-malformed-invalid-locality-value": "ffd2bfb81f1d96be92ce5a93690cdb59ce3b997e7944d77e9f993518f6f53b11",
+    "v3-malformed-missing-message-role": "c6aef3dd67fc9df36c9210b5b30d8b6e200971e541c93b394c8b720b6a1c0573",
+    "v3-mismatch-identity-claimed-nonlocal": "3b9a83c4380256b48adbe16c6e64ee29ba264adf2541e622e9e23844220fe917",
+    "v3-mismatch-symmetrized-claimed-local": "df1fe5b2238fe3bb06e4b5139de7d3914edbaa100c43517890103efa4f377455",
+    "v3-nearmiss-cross-not-self-adjoint": "716bafef7ff4b4f0b070519968139c2f92b49b2f38867ad9a26fa29f831366b8",
+    "v3-nearmiss-smooth-xc-independent-of-locality": "2f87a60980a6e9af7c218a6eec94ba05d6db03319193c837cd27093813c16b2e",
+    "v3-positive-identity-local": "a134938812f2c427201db499a45a7e0c0d63c3564b5e751cc04b629124a8b2b4",
+    "v3-positive-symmetrized-nonlocal": "74a752c9627ea371de051df9b17cc50a318831c4a7fc2f443345b168fcc84bf9",
+    "v3-positive-symmetrized-nonlocal-chain": "695aadf6435b1f276f16ffe6f398f9369c5d2f62505fabf6f61abfb06038523c",
+    "v3-positive-zero-local": "3e9055750cff5dfb67dcba06fccc9b6d8d8dd2cf9dea77bcd0db3f3358623758",
+    "v3-unsupported-indirect-operator": "2e92604d9b54dbbccbf66152dbc924e74370b8b561a8023dc9ce265612e73994",
+    "v3-unsupported-nested-operator": "740b4fee3ec3b6ddc10c759d411bee3ce3b8b720ad9e3f9bf63cd86f6fa844fa"
+  },
+  "condition_name": "vista-structural-eval-v3-r1",
+  "corpus_freeze_revision": "PENDING: re-pin to the commit that lands this V3 corpus",
+  "execution_revision": "6f40ca628502770bb1135286749898652b2e61b0",
+  "manifest_sha256": "eea0669d5234c4cede541d0ef97edb16caf47d382297a120a06e7035f80009f7",
+  "source_sha256": {
+    "dftcert/structural/cli.py": "4f409814f49ca283d9503b13513a4536dfa153fc2232abe9dfa0d24bff6108f0",
+    "dftcert/structural/core.py": "7cd4b69a7cb5df2232fe971a0f932fa65bba20457c286e5bd4b801a685a3a198",
+    "evaluation/structural_v2/corpus_models.py": "b72d21e8e5fc3a071263cc011c6cc294988aa5679c3e4158676944817feb3a0d",
+    "evaluation/structural_v3/corpus_manifest.json": "eea0669d5234c4cede541d0ef97edb16caf47d382297a120a06e7035f80009f7",
+    "evaluation/structural_v3/experiment.json": "9fc294589a7d3c6ae277fc407f7ff176d59ef60c5905e5c83bee1c6f774a9526",
+    "evaluation/structural_v3/generate.py": "8ba4aeff151c7e1457b8b7d129a8da4d80412928048b0feb21125f2077e80f5f",
+    "evaluation/structural_v3/run.py": "f6c06afb5b69f4c3a83e036e4486a38c54e7a2033ff51b504f6e545159a86179",
+    "evaluation/structural_v3/score.py": "e69ea66ef9dd9b02cd38c43e09414fecf9400ae4457a6be783f3c2fdc388d76f",
+    "extractors/torch_export_worker.py": "f58101a4882a7d960b486fb4071c94b8a256de29d1eca6ca842423a8e5fe6f85"
+  }
+}

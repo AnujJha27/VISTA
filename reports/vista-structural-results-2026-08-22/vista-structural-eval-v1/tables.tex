@@ -1,0 +1,53 @@
+% metrics
+\begin{tabular}{lr}
+\toprule
+metric & value \
+\midrule
+total cases & 36 \
+false certification & 1/27 (3.7%) \
+positive acceptance & 9/9 (100.0%) \
+near miss rejection & 9/9 (100.0%) \
+unsupported withheld & 9/10 (90.0%) \
+malformed rejection & 7/9 (77.8%) \
+tamper detection & 216/243 (88.9%) \
+reproducible disposition & 36/36 (100.0%) \
+stable obligation hash & 29/29 (100.0%) \
+\bottomrule
+\end{tabular}
+
+% domain x class
+\begin{tabular}{llrrrrr}
+\toprule
+domain & class & cases & correct & unsupported & malformed & false certs \
+\midrule
+operator & malformed & 3 & 2 & 1 & 2 & 0 \
+operator & near miss & 3 & 2 & 2 & 0 & 0 \
+operator & positive & 3 & 3 & 0 & 0 & 0 \
+operator & unsupported & 3 & 3 & 3 & 0 & 0 \
+spatial & malformed & 3 & 3 & 0 & 3 & 0 \
+spatial & near miss & 3 & 3 & 0 & 0 & 0 \
+spatial & positive & 3 & 3 & 0 & 0 & 0 \
+spatial & unsupported & 3 & 2 & 2 & 0 & 0 \
+xc & malformed & 3 & 2 & 1 & 2 & 0 \
+xc & near miss & 3 & 3 & 0 & 0 & 0 \
+xc & positive & 3 & 3 & 0 & 0 & 0 \
+xc & unsupported & 3 & 2 & 2 & 0 & 1 \
+\bottomrule
+\end{tabular}
+
+% tampering
+\begin{tabular}{lrl}
+\toprule
+mutation & detected & rejected by \
+\midrule
+evidence\_node & 27/27 & translation validation \
+ir\_field & 27/27 & translation validation \
+message\_depth & 27/27 & translation validation \
+operator\_form & 27/27 & translation validation \
+root\_node & 27/27 & translation validation \
+rule\_identifier & 27/27 & translation validation \
+rule\_version & 27/27 & translation validation \
+source\_hash & 0/27 & not detected (documented gap) \
+xc\_form & 27/27 & translation validation \
+\bottomrule
+\end{tabular}

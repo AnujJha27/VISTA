@@ -32,24 +32,6 @@ from .sandbox import BubblewrapExtractor
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_POLICY = ROOT / "policies/dft-architecture-v1.json"
-CLUSTER_LLM_PRESETS = {
-    "maestro": {
-        "base_url": "http://127.0.0.1:11434/v1/chat/completions",
-        "model": "qwen3.6-64k:latest",
-    },
-    "piano": {
-        "base_url": "http://pianoteg:11437/v1/chat/completions",
-        "model": "qwen3.6:27b-q4_K_M",
-    },
-    "sitar": {
-        "base_url": "http://sitarteg:11437/v1/chat/completions",
-        "model": "qwen2.5-coder:14b-instruct-q4_K_M",
-    },
-    "violin": {
-        "base_url": "http://violinteg:11437/v1/chat/completions",
-        "model": "qwen3.6-64k:latest",
-    },
-}
 
 DFT_DEMO_SCENARIOS = {
     "certified": {
@@ -206,10 +188,6 @@ def parser() -> argparse.ArgumentParser:
             "deterministic",
             "openrouter-free",
             "openai-compatible",
-            "maestro",
-            "piano",
-            "sitar",
-            "violin",
         ),
         default="deterministic",
         help="model backend for the demo",
@@ -227,7 +205,7 @@ def parser() -> argparse.ArgumentParser:
     assess.add_argument("--model-id", default="described-model")
     assess.add_argument(
         "--llm",
-        choices=("deterministic", "openai-compatible", "maestro", "piano", "sitar", "violin"),
+        choices=("deterministic", "openai-compatible"),
         default="deterministic",
         help="assumption extractor backend",
     )
@@ -399,13 +377,7 @@ def _run_demo(options: argparse.Namespace, policy: Policy) -> int:
             raise ValueError("OPENROUTER_API_KEY is required for --llm openrouter-free")
         llm_command = f"{shlex.quote(sys.executable)} {shlex.quote(str(openrouter_adapter))}"
         env["OPENROUTER_MODEL"] = options.model or "openrouter/free"
-    elif options.llm in {"openai-compatible", *CLUSTER_LLM_PRESETS}:
-        preset = CLUSTER_LLM_PRESETS.get(options.llm)
-        if preset:
-            env["NOETHER_OPENAI_BASE_URL"] = preset["base_url"]
-            env["NOETHER_OPENAI_MODEL"] = options.model or preset["model"]
-            env.setdefault("NOETHER_OPENAI_MAX_TOKENS", "8192")
-            env.setdefault("NOETHER_OPENAI_TIMEOUT_S", str(options.provider_timeout_s))
+    elif options.llm == "openai-compatible":
         if not env.get("NOETHER_OPENAI_BASE_URL"):
             raise ValueError("NOETHER_OPENAI_BASE_URL is required for --llm openai-compatible")
         if not env.get("NOETHER_OPENAI_MODEL") and not options.model:
@@ -467,7 +439,7 @@ def _run_demo(options: argparse.Namespace, policy: Policy) -> int:
         "llm": options.llm,
         "model": (
             (options.model or env.get("OPENROUTER_MODEL") or env.get("NOETHER_OPENAI_MODEL"))
-            if options.llm in {"openrouter-free", "openai-compatible", *CLUSTER_LLM_PRESETS}
+            if options.llm in {"openrouter-free", "openai-compatible"}
             else "deterministic"
         ),
         "run_dir": run_dir,
@@ -492,9 +464,8 @@ def _run_assess(options: argparse.Namespace, policy: Policy) -> int:
             policy=policy,
         )
     else:
-        preset = CLUSTER_LLM_PRESETS.get(options.llm)
-        base_url = preset["base_url"] if preset else os.environ.get("NOETHER_OPENAI_BASE_URL")
-        model = options.model or (preset["model"] if preset else os.environ.get("NOETHER_OPENAI_MODEL"))
+        base_url = os.environ.get("NOETHER_OPENAI_BASE_URL")
+        model = options.model or os.environ.get("NOETHER_OPENAI_MODEL")
         if not base_url:
             raise ValueError("NOETHER_OPENAI_BASE_URL is required for LLM assumption extraction")
         if not model:

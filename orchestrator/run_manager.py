@@ -126,7 +126,7 @@ class RunStore:
             if item.get("task_id") == task_id:
                 item.update(task_entry)
                 break
-        if status in {"verified", "approved"}:
+        if status == "verified":
             state.completed.append(task_entry)
         else:
             state.blocked.append(task_entry)

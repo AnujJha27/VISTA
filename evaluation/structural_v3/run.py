@@ -1,0 +1,190 @@
+"""Run the VISTA V3 locality-verification corpus: a global local/non_local
+claim checked against the candidate's own extracted operator values -- no
+coupling pairs, no external reference file.
+"""
+from __future__ import annotations
+import argparse, copy, csv, hashlib, json, platform, subprocess, sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT))
+from dftcert.manifest import ManifestError, sha256_value
+from dftcert.structural import (assemble_structural_certificate, assess_structural_ir,
+    generate_structural_obligations, structural_ir_from_inventory, validate_translation,
+    verify_structural_certificate)
+
+
+def dump(path, value):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def constraints(case):
+    value = {
+        "adjacency_state_name": "adjacency", "adjacency_convention": "target_source",
+        "output_contracts": [
+            {"index": 0, "role": "xc_energy"}, {"index": 1, "role": "learned_self_energy"},
+            {"index": 2, "role": "message_state"},
+        ],
+    }
+    locality = case.get("expected_locality")
+    if locality is not None:  # a case may deliberately omit this to test the missing-field failure mode
+        value["expected_locality"] = locality
+    role = case.get("malformed_role")
+    if role == "missing_message": value["output_contracts"] = value["output_contracts"][:2]
+    if role == "duplicate_xc": value["output_contracts"].append({"index": 0, "role": "xc_energy"})
+    return value
+
+
+def _extractor_python():
+    """The extractor needs a torch-capable interpreter; `lake` (invoked later)
+    must run from a native process for this OS or its build-config cache gets
+    cross-contaminated between a Windows- and a WSL-invoked `lake` sharing the
+    same .lake directory."""
+    import os
+    return os.environ.get("VISTA_TORCH_PYTHON", sys.executable)
+
+
+def extract(artifact):
+    artifact_arg = Path(artifact).resolve().relative_to(ROOT).as_posix()
+    process = subprocess.run(
+        [_extractor_python(), "extractors/torch_export_worker.py", artifact_arg],
+        cwd=ROOT, text=True, capture_output=True,
+    )
+    if process.returncode != 0 or not process.stdout.strip():
+        return {"status": "error", "diagnostics": f"extractor produced no output; stderr: {process.stderr[:500]}"}
+    return json.loads(process.stdout)
+
+
+def normalized(ir):
+    status = assess_structural_ir(ir)["status"]
+    return {"structurally_certifiable": "supported-and-compatible", "structural_requirements_not_met": "supported-but-incompatible", "formalization_required": "unsupported"}[status]
+
+
+def tamper(ir, inventory, input_constraints, artifact_sha256):
+    mutations = {
+        "message_depth": lambda x: x.__setitem__("message_passing", {**x["message_passing"], "depth": x["message_passing"]["depth"] + 1}),
+        "xc_form": lambda x: x["xc"].__setitem__("form", "smooth" if x["xc"]["form"] != "smooth" else "hinge"),
+        "operator_form": lambda x: x["operator"].__setitem__("construction", "zero" if x["operator"]["construction"] != "zero" else "identity"),
+        "evidence_node": lambda x: x["translation"]["semantic_derivations"]["xc"]["evidence_nodes"].append("forged"),
+        "root_node": lambda x: x["translation"]["semantic_derivations"]["operator"].__setitem__("root", "forged"),
+        "rule_identifier": lambda x: x["translation"]["semantic_derivations"]["operator"].__setitem__("rule", "operator.forged"),
+        "rule_version": lambda x: x["translation"]["semantic_derivations"]["operator"].__setitem__("rule_version", 99),
+        "source_hash": lambda x: x["source"].__setitem__("artifact_sha256", "0" * 64),
+        "ir_field": lambda x: x["topology"].__setitem__("site_count", x["topology"]["site_count"] + 1),
+        "observed_local": lambda x: x["locality"].__setitem__("observed_local", not x["locality"]["observed_local"]),
+        "off_diagonal_nonzero": lambda x: x["locality"].__setitem__(
+            "off_diagonal_nonzero", [*x["locality"]["off_diagonal_nonzero"], {"source": 0, "target": max(0, x["topology"]["site_count"] - 1)}],
+        ),
+    }
+    # Mutations of the locality observation are meaningless (nothing to
+    # tamper) when locality itself is undetermined -- skip them there rather
+    # than reporting a vacuous "accepted" no-op as a missed detection.
+    if not ir["locality"]["available"]:
+        mutations = {k: v for k, v in mutations.items() if k not in {"observed_local", "off_diagonal_nonzero"}}
+    output = []
+    for name, change in mutations.items():
+        altered = copy.deepcopy(ir)
+        change(altered)
+        try:
+            validate_translation(inventory=inventory, value=altered, input_constraints=input_constraints, artifact_sha256=artifact_sha256)
+            result = "accepted"
+        except ManifestError as error:
+            result = "rejected:" + str(error)
+        output.append({"tamper_id": name, "result": result, "detected": result.startswith("rejected:")})
+    return output
+
+
+def run_case(case, artifact, output, repeat):
+    input_constraints = constraints(case)
+    evidence = {"case_id": case["id"], "repeat": repeat, "artifact": str(artifact), "artifact_sha256": hashlib.sha256(artifact.read_bytes()).hexdigest(), "input_constraints": input_constraints, "experiment": json.loads((HERE / "experiment.json").read_text())}
+    try:
+        raw = extract(artifact)
+        evidence["raw_extraction"] = raw
+        if raw.get("status") != "ok":
+            raise ManifestError(raw.get("diagnostics", "extractor failed"))
+        if case.get("malformed_adjacency"):
+            raw["inventory"]["state"]["adjacency"]["structural_values"][0][1] = "corrupted"
+        ir = structural_ir_from_inventory(inventory=raw["inventory"], artifact_sha256=raw["artifact_sha256"], extractor_version=raw["extractor_version"], input_constraints=input_constraints)
+        assessment, obligations = assess_structural_ir(ir), generate_structural_obligations(ir)
+        evidence.update({"structural_ir": ir, "semantic_derivations": ir["translation"]["semantic_derivations"], "translation_validation": ir["translation_validation"], "policy": assessment, "generated_obligations": obligations})
+        status, reason = normalized(ir), ""
+        certificate_status, lean_status = "ineligible", "not_run"
+        if status == "supported-and-compatible":
+            proofs = [{"id": x["id"], "status": "verified", "winner": {"patch": "by decide"}} for x in obligations["obligations"]]
+            source, certificate = assemble_structural_certificate(ir, proofs)
+            output.mkdir(parents=True, exist_ok=True)
+            source_path = output / "Certificate.lean"
+            source_path.write_text(source, encoding="utf-8")
+            verification = verify_structural_certificate(project_root=ROOT / "examples" / "dft" / "lean", certificate_source=source_path, trusted_local=True, timeout_s=400)
+            evidence.update({"certificate": certificate, "lean_verification": verification})
+            lean_status = verification["status"]
+            certificate_status = "verified" if lean_status == "verified" else "not_verified"
+        if repeat == 0 and case["class"] != "malformed":
+            evidence["tampering"] = tamper(ir, raw["inventory"], input_constraints, evidence["artifact_sha256"])
+    except Exception as error:
+        status, reason, lean_status, certificate_status = "malformed", f"{type(error).__name__}: {error}", "not_run", "ineligible"
+    expected = case["expected"]["semantic_status"]
+    row = {"case_id": case["id"], "class": case["class"], "repeat": repeat, "artifact_hash": evidence.get("artifact_sha256", ""), "expected_status": expected, "observed_semantic_status": status, "observed_ir_value": "" if "structural_ir" not in evidence else json.dumps({"xc": evidence["structural_ir"]["xc"]["form"], "operator": evidence["structural_ir"]["operator"]["construction"], "locality": evidence["structural_ir"]["locality"]}, sort_keys=True), "translation_valid": evidence.get("translation_validation", {}).get("status") == "translation_validated", "policy_status": evidence.get("policy", {}).get("status", "not_run"), "lean_status": lean_status, "certificate_status": certificate_status, "correct": status == expected, "failure_reason": reason}
+    dump(output / "evidence.json", evidence)
+    return row
+
+
+def revision():
+    return subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True, capture_output=True, check=True).stdout.strip()
+
+
+def condition_fingerprint(manifest_path, experiment_path):
+    sources = [manifest_path, HERE / "generate.py", HERE / "run.py", HERE / "score.py",
+               HERE.parent / "structural_v2" / "corpus_models.py", experiment_path,
+               ROOT / "dftcert" / "structural" / "core.py", ROOT / "dftcert" / "structural" / "cli.py",
+               ROOT / "extractors" / "torch_export_worker.py"]
+    experiment = json.loads(experiment_path.read_text())
+    return {"condition_name": experiment["condition_name"],
+            "corpus_freeze_revision": experiment["corpus_freeze_revision"],
+            "execution_revision": revision(),
+            "manifest_sha256": hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+            "source_sha256": {p.resolve().relative_to(ROOT).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest() for p in sources}}
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--repeats", type=int, default=3)
+    parser.add_argument("--artifacts", type=Path, default=ROOT / "build" / "vista-structural-v3-corpus")
+    parser.add_argument("--results", type=Path, default=HERE / "results" / "latest")
+    parser.add_argument("--manifest", type=Path, default=HERE / "corpus_manifest.json")
+    parser.add_argument("--experiment", type=Path, default=HERE / "experiment.json")
+    parser.add_argument("--generate", action="store_true")
+    options = parser.parse_args()
+    if options.generate:
+        subprocess.run([sys.executable, str(HERE / "generate.py"), "--manifest", str(options.manifest), "--output-dir", str(options.artifacts)], check=True)
+    manifest = json.loads(options.manifest.read_text())
+    options.results.mkdir(parents=True, exist_ok=True)
+    experiment = json.loads(options.experiment.read_text())
+    experiment["execution_revision"] = revision()
+    experiment["runtime"] = {"python": sys.version, "platform": platform.platform(), "executed_at": datetime.now(timezone.utc).isoformat()}
+    dump(options.results / "experiment.json", experiment)
+    fingerprint = condition_fingerprint(options.manifest, options.experiment)
+    fingerprint["artifact_sha256"] = {case["id"]: hashlib.sha256((options.artifacts / f'{case["id"]}.pt2').read_bytes()).hexdigest() if (options.artifacts / f'{case["id"]}.pt2').exists() else None for case in manifest["cases"]}
+    dump(options.results / "condition_fingerprint.json", fingerprint)
+    rows = []
+    for index, case in enumerate(manifest["cases"]):
+        print(f"[{index + 1}/{len(manifest['cases'])}] {case['id']}", file=sys.stderr, flush=True)
+        artifact = options.artifacts / f'{case["id"]}.pt2'
+        if not artifact.exists():
+            rows.append({"case_id": case["id"], "class": case["class"], "repeat": 0, "artifact_hash": "", "expected_status": case["expected"]["semantic_status"], "observed_semantic_status": "malformed", "observed_ir_value": "", "translation_valid": False, "policy_status": "not_run", "lean_status": "not_run", "certificate_status": "ineligible", "correct": False, "failure_reason": "artifact missing; run with --generate in a PyTorch environment"})
+            continue
+        for repeat in range(options.repeats):
+            rows.append(run_case(case, artifact, options.results / case["id"] / str(repeat), repeat))
+    with (options.results / "cases.csv").open("w", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=rows[0])
+        writer.writeheader()
+        writer.writerows(rows)
+    dump(options.results / "cases.json", rows)
+    subprocess.run([sys.executable, str(HERE / "score.py"), str(options.results), "--manifest", str(options.manifest), "--artifacts", str(options.artifacts)], check=False)
+
+
+if __name__ == "__main__":
+    main()

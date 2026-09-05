@@ -67,6 +67,23 @@ def sha256_file(path: str | Path) -> str:
     return digest.hexdigest()
 
 
+def proof_result_map(
+    value: Any, *, error: type[Exception] = ManifestError,
+) -> dict[str, dict[str, Any]]:
+    """Normalize a proof-results JSON array or ``{"results": [...]}`` blob into id -> entry."""
+    entries = value.get("results") if isinstance(value, dict) and "results" in value else value
+    if not isinstance(entries, list):
+        raise error("proof results must be an array or an object with results")
+    result: dict[str, dict[str, Any]] = {}
+    for entry in entries:
+        if not isinstance(entry, dict) or not isinstance(entry.get("id"), str):
+            raise error("each proof result needs a string id")
+        if entry["id"] in result:
+            raise error(f"duplicate proof result {entry['id']!r}")
+        result[entry["id"]] = entry
+    return result
+
+
 @dataclass(slots=True)
 class ArchitectureManifest:
     value: dict[str, Any]

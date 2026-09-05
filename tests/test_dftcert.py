@@ -764,13 +764,22 @@ class StructuralV2Tests(unittest.TestCase):
                 {"name": "add", "op": "call_function", "target": "aten.add.Tensor", "args": [ref("p_base"), ref("numpy_t")], "kwargs": {}},
                 {"name": "output", "op": "output", "target": "output", "args": [[ref("relu"), ref("add"), ref("matmul_2")]], "kwargs": {}},
             ],
-            "state": {"adjacency": {
-                "structural_values": [[False, True, False, False], [False, False, True, False], [False, False, False, True], [False, False, False, False]],
-                "graph_inputs": ["b_adjacency"], "shape": [4, 4], "dtype": "torch.bool", "sha256": "a",
-            }},
+            "state": {
+                "adjacency": {
+                    "structural_values": [[False, True, False, False], [False, False, True, False], [False, False, False, True], [False, False, False, False]],
+                    "graph_inputs": ["b_adjacency"], "shape": [4, 4], "dtype": "torch.bool", "sha256": "a",
+                },
+                # base[0][3] = 1 -> base + base^T has real off-diagonal entries at
+                # (row=0,col=3) and (row=3,col=0), i.e. a genuine non-local operator.
+                "base": {
+                    "structural_values": [[0, 0, 0, 1], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
+                    "structural_value_kind": "numeric",
+                    "graph_inputs": ["p_base"], "shape": [4, 4], "dtype": "torch.float32", "sha256": "b",
+                },
+            },
         }
 
-    def constraints(self):
+    def constraints(self, *, expected_locality="non_local"):
         return {
             "adjacency_state_name": "adjacency", "adjacency_convention": "source_target",
             "output_contracts": [
@@ -778,7 +787,7 @@ class StructuralV2Tests(unittest.TestCase):
                 {"index": 1, "role": "learned_self_energy"},
                 {"index": 2, "role": "message_state"},
             ],
-            "required_couplings": [{"source": 0, "target": 3}],
+            "expected_locality": expected_locality,
         }
 
     def test_translation_validation_rejects_ir_claim_tampering(self):
@@ -974,7 +983,7 @@ class StructuralV2Tests(unittest.TestCase):
         self.assertEqual(xc["rule_version"], 2)
         self.assertEqual(xc["metadata"]["reason"], "mixed hinge and smooth activation composition")
 
-    def ir(self, *, depth=3, xc="hinge", operator="symmetrized"):
+    def ir(self, *, depth=3, xc="hinge", operator="symmetrized", expected_locality="non_local"):
         return confirmed_description_ir(
             description="Reviewed six-site structural model",
             topology={
@@ -988,27 +997,42 @@ class StructuralV2Tests(unittest.TestCase):
             message_passing={"depth": depth, "provenance_nodes": []},
             xc={"form": xc, "provenance_nodes": []},
             operator={"construction": operator, "provenance_nodes": []},
-            requirements={"couplings": [{"source": 0, "target": 3}]},
+            locality={"expected": expected_locality},
         )
 
     def test_structural_assessment_and_failure_witnesses(self):
         self.assertEqual(assess_structural_ir(self.ir())["status"], "structurally_certifiable")
-        shallow = self.ir(depth=2)
-        self.assertEqual(
-            assess_structural_ir(shallow)["status"], "structural_requirements_not_met"
+        # A confirmed-description spec is human-attested on both sides (expected
+        # and observed), so it can never itself produce a locality mismatch --
+        # that requires the independently-computed torch_export path instead.
+        inventory = self.inventory()
+        mismatched = structural_ir_from_inventory(
+            inventory=inventory, artifact_sha256="artifact", extractor_version="test",
+            # base[0][3] = 1 makes the real operator non-local; claiming "local" mismatches it.
+            input_constraints=self.constraints(expected_locality="local"),
         )
-        witness = structural_failure_witnesses(shallow)
-        self.assertEqual(witness[0]["kind"], "uncovered_coupling")
-        self.assertEqual((witness[0]["source"], witness[0]["target"]), (0, 3))
+        self.assertEqual(
+            assess_structural_ir(mismatched)["status"], "structural_requirements_not_met"
+        )
+        witness = structural_failure_witnesses(mismatched)
+        locality_witness = next(w for w in witness if w["fact"] == "operator_locality_verified")
+        self.assertEqual(locality_witness["kind"], "locality_mismatch")
+        self.assertEqual(locality_witness["expected"], "local")
+        self.assertEqual(locality_witness["observed_local"], False)
+        self.assertEqual(
+            sorted((item["source"], item["target"]) for item in locality_witness["off_diagonal_nonzero"]),
+            [(0, 3), (3, 0)],
+        )
 
     def test_generated_tasks_are_ir_bound_and_not_fixed_templates(self):
         generated = generate_structural_obligations(self.ir())
         self.assertEqual(len(generated["obligations"]), 3)
         self.assertIn(generated["ir_sha256"], generated["obligations"][0]["preamble"])
-        self.assertIn("allCovered", generated["obligations"][1]["theorem"])
-        self.assertNotIn("Fin 6", generated["obligations"][1]["theorem"])
+        locality_task = next(t for t in generated["obligations"] if t["fact"] == "operator_locality_verified")
+        self.assertIn("localityMatches", locality_task["theorem"])
+        self.assertNotIn("Fin 6", locality_task["theorem"])
         self.assertIn("Topology: 6 sites", generated["obligations"][0]["context"])
-        self.assertIn("Scope: structural compatibility only", generated["obligations"][0]["context"])
+        self.assertIn("Scope: structural/value compatibility only", generated["obligations"][0]["context"])
 
     def test_certificate_distinguishes_confirmed_specification(self):
         ir = self.ir()
@@ -1027,7 +1051,7 @@ class StructuralV2Tests(unittest.TestCase):
             description="three message-passing stages",
             topology=self.ir()["topology"], message_passing=self.ir()["message_passing"],
             xc=self.ir()["xc"], operator=self.ir()["operator"],
-            requirements=self.ir()["requirements"],
+            locality={"expected": self.ir()["locality"]["expected"]},
             confirmed_claims=[{
                 "property": "message_passing",
                 "proposed_value": {"depth": 3},

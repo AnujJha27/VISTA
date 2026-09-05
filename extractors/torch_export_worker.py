@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 
-EXTRACTOR_VERSION = "torch-export-inventory-v2"
+EXTRACTOR_VERSION = "torch-export-inventory-v3"
 
 
 def sha256_file(path: Path) -> str:
@@ -61,6 +61,9 @@ def inventory_node(node: Any) -> dict[str, Any]:
 
 
 def state_inventory(program: Any) -> dict[str, Any]:
+    # Imported here, not at module level, to keep torch confined to the sandbox worker.
+    import torch
+
     graph_inputs: dict[str, list[str]] = {}
     state_kinds: dict[str, str] = {}
     signature = getattr(program, "graph_signature", None)
@@ -87,13 +90,19 @@ def state_inventory(program: Any) -> dict[str, Any]:
             "aliases": sorted(aliases[tensor.untyped_storage().data_ptr()]),
         }
         if detached.dtype in {
-            __import__("torch").bool,
-            __import__("torch").int8,
-            __import__("torch").int16,
-            __import__("torch").int32,
-            __import__("torch").int64,
+            torch.bool, torch.int8, torch.int16, torch.int32, torch.int64,
         } and detached.numel() <= 4096:
             entry["structural_values"] = detached.tolist()
+        elif detached.dtype in {
+            torch.float16, torch.float32, torch.float64,
+        } and detached.numel() <= 4096:
+            # Exact integer/boolean state above is architecture-shape evidence.
+            # Float state is the model's actual trained values -- captured
+            # only so the analyzer can check real numeric facts (e.g. is a
+            # learned operator's off-diagonal actually nonzero) against an
+            # explicit, disclosed threshold rule. Never treated as exact.
+            entry["structural_values"] = detached.tolist()
+            entry["structural_value_kind"] = "numeric"
         result[str(name)] = entry
     return result
 

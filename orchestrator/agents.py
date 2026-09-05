@@ -19,7 +19,6 @@ class AgentSpec:
     tools: tuple[str, ...] = field(default_factory=tuple)
     max_candidates: int | None = None
     handoff_targets: tuple[str, ...] = field(default_factory=tuple)
-    temperature: float | None = None
     explicit_tools: bool = False
 
     @classmethod
@@ -34,7 +33,6 @@ class AgentSpec:
         tools = value.get("tools", [])
         handoff_targets = value.get("handoff_targets", [])
         max_candidates = value.get("max_candidates")
-        temperature = value.get("temperature")
         explicit_tools = value.get("explicit_tools", True)
         if kind not in {"proposer", "critic", "decomposer", "supervisor", "reporter"}:
             raise AgentRegistryError(f"agent {name!r} has unsupported kind {kind!r}")
@@ -54,10 +52,6 @@ class AgentSpec:
             or max_candidates <= 0
         ):
             raise AgentRegistryError(f"agent {name!r} max_candidates must be positive")
-        if temperature is not None and (
-            not isinstance(temperature, (int, float)) or isinstance(temperature, bool)
-        ):
-            raise AgentRegistryError(f"agent {name!r} temperature must be numeric")
         if not isinstance(explicit_tools, bool):
             raise AgentRegistryError(f"agent {name!r} explicit_tools must be boolean")
         return cls(
@@ -68,7 +62,6 @@ class AgentSpec:
             tools=tuple(tools),
             max_candidates=max_candidates,
             handoff_targets=tuple(handoff_targets),
-            temperature=float(temperature) if temperature is not None else None,
             explicit_tools=explicit_tools,
         )
 
@@ -81,7 +74,6 @@ class AgentSpec:
             "tools": list(self.tools),
             "max_candidates": self.max_candidates,
             "handoff_targets": list(self.handoff_targets),
-            "temperature": self.temperature,
             "explicit_tools": self.explicit_tools,
         }
 

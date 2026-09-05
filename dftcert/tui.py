@@ -608,6 +608,42 @@ def coverage_lines(data: dict[str, Any], width: int) -> list[tuple[str, str]]:
     return lines
 
 
+def attr(name: str) -> int:
+    pairs = {"muted": 1, "title": 2, "good": 3, "warn": 4, "bad": 5, "gap": 6}
+    return curses.color_pair(pairs.get(name, 1)) if curses.has_colors() else 0
+
+
+def init_colors() -> None:
+    if not curses.has_colors():
+        return
+    curses.start_color()
+    curses.use_default_colors()
+    palette = {
+        "muted": curses.COLOR_WHITE,
+        "title": curses.COLOR_RED,
+        "good": curses.COLOR_GREEN,
+        "warn": curses.COLOR_YELLOW,
+        "bad": curses.COLOR_RED,
+        "gap": curses.COLOR_MAGENTA,
+    }
+    for pair_index, name in enumerate(palette, start=1):
+        curses.init_pair(pair_index, palette[name], -1)
+
+
+def draw_box(screen: Any, y: int, x: int, h: int, w: int, title: str = "") -> None:
+    if h < 2 or w < 2:
+        return
+    screen.attron(attr("title"))
+    screen.addstr(y, x, "┌" + "─" * (w - 2) + "┐")
+    for row in range(y + 1, y + h - 1):
+        screen.addstr(row, x, "│")
+        screen.addstr(row, x + w - 1, "│")
+    screen.addstr(y + h - 1, x, "└" + "─" * (w - 2) + "┘")
+    if title:
+        screen.addstr(y, x + 2, f" {title} "[:max(0, w - 4)])
+    screen.attroff(attr("title"))
+
+
 def confirm_assumptions_tui(manifest: ArchitectureManifest, policy: Policy) -> None:
     assumptions = [
         item for item in manifest.value.get("assumptions", [])
@@ -619,38 +655,6 @@ def confirm_assumptions_tui(manifest: ArchitectureManifest, policy: Policy) -> N
 
     index = 0
     message = "y accept · n reject · u unknown · ↑/↓ move · Enter finish · q cancel"
-
-    def attr(name: str) -> int:
-        pairs = {"muted": 1, "title": 2, "good": 3, "warn": 4, "bad": 5, "gap": 6}
-        return curses.color_pair(pairs.get(name, 1)) if curses.has_colors() else 0
-
-    def init_colors() -> None:
-        if not curses.has_colors():
-            return
-        curses.start_color()
-        curses.use_default_colors()
-        palette = {
-            "muted": curses.COLOR_WHITE,
-            "title": curses.COLOR_RED,
-            "good": curses.COLOR_GREEN,
-            "warn": curses.COLOR_YELLOW,
-            "bad": curses.COLOR_RED,
-            "gap": curses.COLOR_MAGENTA,
-        }
-        for pair_index, name in enumerate(palette, start=1):
-            curses.init_pair(pair_index, palette[name], -1)
-
-    def draw_box(screen: Any, y: int, x: int, h: int, w: int, title: str) -> None:
-        if h < 2 or w < 2:
-            return
-        screen.attron(attr("title"))
-        screen.addstr(y, x, "┌" + "─" * (w - 2) + "┐")
-        for row in range(y + 1, y + h - 1):
-            screen.addstr(row, x, "│")
-            screen.addstr(row, x + w - 1, "│")
-        screen.addstr(y + h - 1, x, "└" + "─" * (w - 2) + "┘")
-        screen.addstr(y, x + 2, f" {title} "[:max(0, w - 4)])
-        screen.attroff(attr("title"))
 
     def row_status(item: dict[str, Any]) -> str:
         return str(item.get("status", "needs_user_confirmation"))
@@ -996,24 +1000,10 @@ class TuiApp:
         return "left" if x <= left_w else "right"
 
     def _colors(self) -> None:
-        if not curses.has_colors():
-            return
-        curses.start_color()
-        curses.use_default_colors()
-        palette = {
-            "muted": curses.COLOR_WHITE,
-            "title": curses.COLOR_RED,
-            "good": curses.COLOR_GREEN,
-            "warn": curses.COLOR_YELLOW,
-            "bad": curses.COLOR_RED,
-            "gap": curses.COLOR_MAGENTA,
-        }
-        for index, name in enumerate(palette, start=1):
-            curses.init_pair(index, palette[name], -1)
+        init_colors()
 
     def _attr(self, name: str) -> int:
-        pairs = {"muted": 1, "title": 2, "good": 3, "warn": 4, "bad": 5, "gap": 6}
-        return curses.color_pair(pairs.get(name, 1)) if curses.has_colors() else 0
+        return attr(name)
 
     def _run_report(self) -> None:
         try:
@@ -1037,17 +1027,7 @@ class TuiApp:
 
     def _box(self, screen: Any, y: int, x: int, h: int, w: int,
              title: str = "") -> None:
-        if h < 2 or w < 2:
-            return
-        screen.attron(self._attr("title"))
-        screen.addstr(y, x, "┌" + "─" * (w - 2) + "┐")
-        for row in range(y + 1, y + h - 1):
-            screen.addstr(row, x, "│")
-            screen.addstr(row, x + w - 1, "│")
-        screen.addstr(y + h - 1, x, "└" + "─" * (w - 2) + "┘")
-        if title:
-            screen.addstr(y, x + 2, f" {title} "[:max(0, w - 4)])
-        screen.attroff(self._attr("title"))
+        draw_box(screen, y, x, h, w, title)
 
     def _draw_wrapped(self, screen: Any, y: int, x: int, width: int,
                       height: int, text: str, attr: int = 0,

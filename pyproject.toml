@@ -25,8 +25,6 @@ noether-dftcert = "dftcert.legacy.cli:main"
 noether-orchestrator = "orchestrator.cli:main"
 noether-replay = "orchestrator.replay:main"
 noether-tui = "dftcert.tui:main"
-vista = "dftcert.local_cli:main"
-vista-structural = "dftcert.structural.cli:main"
 
 [tool.setuptools]
 packages = ["dftcert", "dftcert.legacy", "dftcert.structural", "orchestrator", "extractors"]

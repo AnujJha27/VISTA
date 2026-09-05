@@ -12,7 +12,7 @@ from .engine import DEFAULT_AGENTS_FILE, Orchestrator, SearchConfig
 from .models import SearchTask
 from .provider_router import ProviderRouter
 from .providers import CommandProvider, HttpProvider, MockProvider, token_from_environment
-from .run_manager import RunStore
+from .run_manager import RunStore, _atomic_json
 from .verifier import VerifierClient
 
 
@@ -22,10 +22,6 @@ def arguments(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--llm-command", help="quoted adapter command for --provider command")
     parser.add_argument("--llm-url", help="gateway endpoint for --provider http")
     parser.add_argument("--provider-timeout-s", type=int, default=120)
-    parser.add_argument(
-        "--provider-routes",
-        help="JSON object mapping agent model names to provider specs",
-    )
     parser.add_argument("--verifier", default="./build/proof-search")
     parser.add_argument("--max-rounds", type=int, default=3)
     parser.add_argument(
@@ -53,7 +49,6 @@ def arguments(argv: list[str] | None = None) -> argparse.Namespace:
         help="run decomposer, every proposer, critic, verifier, and reporter even for decidable tasks",
     )
     parser.add_argument("--agents-file", help="structured agent registry JSON")
-    parser.add_argument("--roles-file", help="legacy alias for --agents-file")
     parser.add_argument("--journal-dir")
     parser.add_argument("--run-dir", help="durable multi-task run state directory")
     parser.add_argument("--resume-journal", action="store_true")
@@ -73,51 +68,6 @@ def provider_from_args(options: argparse.Namespace, *, timeout_s: int | None = N
     return HttpProvider(options.llm_url, token_from_environment(), timeout_s)
 
 
-def provider_from_route_spec(spec: dict[str, Any], *, default_timeout_s: int):
-    provider = spec.get("provider")
-    timeout_s = spec.get("timeout_s", default_timeout_s)
-    if not isinstance(timeout_s, int) or isinstance(timeout_s, bool) or timeout_s <= 0:
-        raise ValueError("provider route timeout_s must be a positive integer")
-    if provider == "mock":
-        return MockProvider()
-    if provider == "command":
-        command = spec.get("command")
-        if isinstance(command, str):
-            command_value = shlex.split(command)
-        elif isinstance(command, list) and all(isinstance(item, str) for item in command):
-            command_value = command
-        else:
-            raise ValueError("command provider routes require command string or string array")
-        return CommandProvider(command_value, timeout_s)
-    if provider == "http":
-        url = spec.get("url")
-        if not isinstance(url, str) or not url:
-            raise ValueError("http provider routes require url")
-        token_env = spec.get("token_env", "LLM_API_TOKEN")
-        if token_env is not None and (not isinstance(token_env, str) or not token_env):
-            raise ValueError("token_env must be a non-empty string or null")
-        token = token_from_environment() if token_env == "LLM_API_TOKEN" else None
-        if token_env not in {None, "LLM_API_TOKEN"}:
-            import os
-            token = os.environ.get(token_env)
-        return HttpProvider(url, token, timeout_s)
-    raise ValueError("provider route provider must be one of: command, http, mock")
-
-
-def provider_routes_from_file(path: str | Path, *, default_timeout_s: int) -> dict[str, Any]:
-    value = json.loads(Path(path).read_text(encoding="utf-8"))
-    if not isinstance(value, dict):
-        raise ValueError("provider routes file must contain a JSON object")
-    routes: dict[str, Any] = {}
-    for model, spec in value.items():
-        if not isinstance(model, str) or not model:
-            raise ValueError("provider route model names must be non-empty strings")
-        if not isinstance(spec, dict):
-            raise ValueError(f"provider route {model!r} must be a JSON object")
-        routes[model] = provider_from_route_spec(spec, default_timeout_s=default_timeout_s)
-    return routes
-
-
 def main(argv: list[str] | None = None) -> int:
     try:
         options = arguments(argv)
@@ -125,14 +75,7 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("epoch budgets must be positive")
         queue_safe_timeout = options.provider_timeout_s * max(1, options.agent_parallelism)
         provider = provider_from_args(options, timeout_s=queue_safe_timeout)
-        route_providers = (
-            provider_routes_from_file(
-                options.provider_routes,
-                default_timeout_s=queue_safe_timeout,
-            )
-            if options.provider_routes else None
-        )
-        agents_file = options.agents_file or options.roles_file or str(DEFAULT_AGENTS_FILE)
+        agents_file = options.agents_file or str(DEFAULT_AGENTS_FILE)
         registry = load_agent_registry(agents_file)
         config = SearchConfig(
             max_rounds=options.max_rounds,
@@ -174,7 +117,7 @@ def main(argv: list[str] | None = None) -> int:
             provider,
             verifier,
             config,
-            provider_router=ProviderRouter(provider, route_providers),
+            provider_router=ProviderRouter(provider),
             progress_sink=run_store.append_event if run_store else None,
         )
         for task in parsed_tasks:
@@ -201,15 +144,8 @@ def main(argv: list[str] | None = None) -> int:
                         "node_count": node_count,
                     })
                 if options.journal_dir:
-                    journal = Path(options.journal_dir)
-                    journal.mkdir(parents=True, exist_ok=True)
-                    destination = journal / f"{task.id}.json"
-                    temporary = destination.with_suffix(".json.tmp")
-                    temporary.write_text(
-                        json.dumps(response, indent=2, sort_keys=True) + "\n",
-                        encoding="utf-8",
-                    )
-                    temporary.replace(destination)
+                    destination = Path(options.journal_dir) / f"{task.id}.json"
+                    _atomic_json(destination, response)
                 if response["status"] in {"verified", "paused_stagnant", "project_not_built"}:
                     break
                 prior_node_count = node_count

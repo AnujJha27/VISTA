@@ -1,0 +1,61 @@
+{
+  "note": "Checks against a single shared expected_locality: non_local (examples/dft/structural-v3-input-constraints.json). identity-operator-ring and zero-operator-ring have a genuinely local extracted operator, so this shared claim correctly does NOT match them -- that is real, computed behavior, not a labeling mistake. certified-ring and too-shallow-ring are now IDENTICAL under V3: unlike V2, locality does not depend on message-passing depth, only on the operator's own extracted values.",
+  "cases": [
+    {
+      "case": "certified-ring",
+      "expected_checks": {
+        "xc_discontinuity_compatible": true,
+        "operator_locality_verified": true,
+        "self_adjoint": true
+      }
+    },
+    {
+      "case": "too-shallow-ring",
+      "expected_checks": {
+        "xc_discontinuity_compatible": true,
+        "operator_locality_verified": true,
+        "self_adjoint": true
+      }
+    },
+    {
+      "case": "unconstrained-operator",
+      "expected_checks": {
+        "xc_discontinuity_compatible": true,
+        "operator_locality_verified": true,
+        "self_adjoint": false
+      }
+    },
+    {
+      "case": "smooth-xc",
+      "expected_checks": {
+        "xc_discontinuity_compatible": false,
+        "operator_locality_verified": true,
+        "self_adjoint": true
+      }
+    },
+    {
+      "case": "identity-operator-ring",
+      "expected_checks": {
+        "xc_discontinuity_compatible": true,
+        "operator_locality_verified": false,
+        "self_adjoint": true
+      }
+    },
+    {
+      "case": "zero-operator-ring",
+      "expected_checks": {
+        "xc_discontinuity_compatible": true,
+        "operator_locality_verified": false,
+        "self_adjoint": true
+      }
+    },
+    {
+      "case": "all-failures-ring",
+      "expected_checks": {
+        "xc_discontinuity_compatible": false,
+        "operator_locality_verified": true,
+        "self_adjoint": false
+      }
+    }
+  ]
+}

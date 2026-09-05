@@ -11,9 +11,13 @@
 
 namespace proof_search {
 
+// Default worker count when the caller has no explicit preference: leaves one
+// core free on multi-core hardware, falls back to 1 on single-core.
+unsigned default_worker_count();
+
 class WorkerPool {
  public:
-  explicit WorkerPool(unsigned worker_count = 0);
+  explicit WorkerPool(unsigned worker_count);
   ~WorkerPool();
   WorkerPool(const WorkerPool&) = delete;
   WorkerPool& operator=(const WorkerPool&) = delete;
@@ -32,8 +36,6 @@ class WorkerPool {
     ready_.notify_one();
     return future;
   }
-
-  unsigned size() const { return static_cast<unsigned>(workers_.size()); }
 
  private:
   std::vector<std::thread> workers_;

@@ -1,0 +1,55 @@
+{
+  "corpus": "VISTA Structural V3 fresh held-out (authored before any execution)",
+  "note": "Labels were fixed before running. Do not edit expected values after observing results.",
+  "cases": [
+    {
+      "id": "v3h-positive-adjoint-first",
+      "class": "positive",
+      "model": {"topology": "chain", "sites": 4, "depth": 2, "operator": "adjoint_first", "xc": "relu"},
+      "expected_locality": "non_local",
+      "expected": {"semantic_status": "supported-and-compatible", "certificate_eligible": true},
+      "rationale": "base^T + base is recognized as symmetrized regardless of operand order; real random weights are non-local."
+    },
+    {
+      "id": "v3h-nearmiss-free-parameter-not-self-adjoint",
+      "class": "near_miss",
+      "model": {"topology": "chain", "sites": 4, "depth": 2, "operator": "free", "xc": "relu"},
+      "expected_locality": "non_local",
+      "expected": {"semantic_status": "supported-but-incompatible", "certificate_eligible": false},
+      "rationale": "A bare parameter (no add/transpose at all) is the 'param' recipe path -- real random weights are genuinely non-local (locality passes) but the construction gives no self-adjoint guarantee (fails independently)."
+    },
+    {
+      "id": "v3h-malformed-missing-locality-field",
+      "class": "malformed",
+      "model": {"topology": "chain", "sites": 4, "depth": 2, "operator": "symmetrized", "xc": "relu"},
+      "expected_locality": null,
+      "expected": {"semantic_status": "malformed", "certificate_eligible": false},
+      "rationale": "expected_locality is a required input_constraints field; omitting it must fail closed, never default to a guess."
+    },
+    {
+      "id": "v3h-unsupported-diagonal-operator",
+      "class": "unsupported",
+      "model": {"topology": "chain", "sites": 4, "depth": 2, "operator": "diagonal", "xc": "relu"},
+      "expected_locality": "local",
+      "expected": {"semantic_status": "unsupported", "certificate_eligible": false},
+      "rationale": "torch.diag(base) is not a recognized construction; even though it IS actually local, VISTA must not guess -- it stays undetermined."
+    },
+    {
+      "id": "v3h-unsupported-transformed-scaled-operator",
+      "class": "unsupported",
+      "model": {"topology": "irregular", "sites": 5, "depth": 2, "operator": "transformed", "xc": "relu"},
+      "expected_locality": "non_local",
+      "expected": {"semantic_status": "unsupported", "certificate_eligible": false},
+      "rationale": "base + 2*base^T is a scaled adjoint, not the direct paired-add the analyzer recognizes; correctly left undetermined."
+    },
+    {
+      "id": "v3h-malformed-duplicate-xc-role",
+      "class": "malformed",
+      "model": {"topology": "irregular", "sites": 5, "depth": 2, "operator": "symmetrized", "xc": "relu"},
+      "malformed_role": "duplicate_xc",
+      "expected_locality": "non_local",
+      "expected": {"semantic_status": "malformed", "certificate_eligible": false},
+      "rationale": "output_contracts roles must be unique; a duplicated xc_energy role fails closed regardless of locality."
+    }
+  ]
+}

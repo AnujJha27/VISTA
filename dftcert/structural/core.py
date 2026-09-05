@@ -1,368 +1,47 @@
+"""The domain-agnostic VISTA structural-verification harness.
+
+Extraction plumbing, hashing, translation-validation re-derivation,
+certificate assembly/binding, and Lean invocation live here and know nothing
+about any one verification domain. Everything domain-specific is behind the
+`StructuralPlugin` interface (`dftcert.structural.plugin`); every public
+function below takes a `plugin` argument defaulting to `DFT_PLUGIN`
+(`dftcert.structural.dft_plugin`), VISTA's first plugin, so existing callers
+keep working unchanged. See `VISTA_GENERALIZATION.md`.
+"""
 from __future__ import annotations
 
 import hashlib
+import os
 import re
+import signal
 import subprocess
 import tempfile
 import time
 from pathlib import Path
-from collections import deque
 from collections.abc import Sequence
 from typing import Any
 
 from ..certificate import project_fingerprint
-from ..manifest import ManifestError, sha256_value
+from ..manifest import ManifestError, proof_result_map, sha256_value
+from .dft_plugin import DFT_PLUGIN
+from .plugin import StructuralPlugin
 
-
-IR_SCHEMA_VERSION = 2
-ANALYZER_VERSION = "dft-structural-analysis-v5"
-COMPILER_VERSION = "dft-structural-lean-v2"
-POLICY_VERSION = "dft-structural-v2"
 _FORBIDDEN = re.compile(r"\b(sorry|admit|axiom|unsafe)\b")
-_ZERO_TARGETS = {
-    "aten.zeros.default", "aten.zeros_like.default", "aten.zero.default",
-}
-_IDENTITY_TARGETS = {"aten.eye.default"}
-_ADD_TARGETS = {"aten.add.tensor"}
-_ADJOINT_TARGETS = {
-    "aten.transpose.int", "aten.permute.default", "aten.t.default",
-    "aten.numpy_t.default",
-}
-_HINGE_TARGETS = {
-    "aten.relu.default", "aten.leaky_relu.default", "aten.clamp_min.default",
-    "aten.maximum.default", "aten.abs.default", "aten.hardtanh.default",
-}
-_SMOOTH_TARGETS = {
-    "aten.sigmoid.default", "aten.softplus.default", "aten.tanh.default",
-    "aten.silu.default", "aten.gelu.default",
-}
-_ADJACENCY_ALIAS_TARGETS = {
-    "aten.to.dtype", "aten._to_copy.default", "prims.convert_element_type.default",
-    "aten.alias.default", "aten.clone.default", "aten.contiguous.default",
-    "aten.detach.default",
-}
-_MESSAGE_TARGETS = {
-    "aten.matmul.default", "aten.mm.default", "aten.bmm.default", "aten.mv.default",
-}
 
 
-def _observed_ops(nodes: list[dict[str, Any]]) -> list[str]:
-    return sorted({_target(node) for node in nodes if _target(node)})
-
-
-def _derivation(
-    *, claim: str, value: Any, root: str | None, evidence_nodes: list[str],
-    rule: str, observed_nodes: list[dict[str, Any]], metadata: dict[str, Any] | None = None,
-    rule_version: int = 1,
-) -> dict[str, Any]:
-    """Compact, hash-bound explanation for one semantic lowering result."""
-    result = {
-        "claim": claim,
-        "value": value,
-        "root": root,
-        "evidence_nodes": evidence_nodes,
-        "rule": rule,
-        "rule_version": rule_version,
-        "observed_ops": _observed_ops(observed_nodes),
-    }
-    if metadata:
-        result["metadata"] = metadata
-    return result
-
-
-def _semantic_derivations(
-    *, inventory: dict[str, Any], nodes: list[dict[str, Any]], roles: dict[str, str],
-    input_constraints: dict[str, Any],
-) -> tuple[dict[str, Any], int, list[list[int]], list[str], str]:
-    """Lower raw inventory facts into versioned, provenance-preserving claims."""
-    count, edges, graph_inputs, state_name = _topology(inventory, input_constraints)
-    aliases = _adjacency_aliases(nodes, graph_inputs)
-    stages, message_recognized = _message_chain(nodes, roles["message_state"], graph_inputs)
-    xc_form, xc_nodes = _xc_form(nodes, roles["xc_energy"])
-    operator, operator_nodes = _operator_construction(nodes, roles["learned_self_energy"])
-    by_name = {node.get("name"): node for node in nodes if isinstance(node.get("name"), str)}
-    stage_graph = [by_name[name] for name in stages]
-    xc_graph = _ancestors(nodes, roles["xc_energy"])
-    operator_graph = _ancestors(nodes, roles["learned_self_energy"])
-    topology_graph = [by_name[name] for name in aliases if name in by_name]
-    derivations = {
-        "topology": _derivation(
-            claim="topology.adjacency", value={"site_count": count, "directed_edges": edges},
-            root=state_name, evidence_nodes=aliases, rule="topology.adjacency_state",
-            observed_nodes=topology_graph,
-            metadata={"state_name": state_name, "graph_inputs": graph_inputs,
-                      "adjacency_convention": input_constraints.get("adjacency_convention", "target_source")},
-        ),
-        "message_passing": _derivation(
-            claim="message_passing.depth", value=len(stages), root=roles["message_state"],
-            evidence_nodes=stages, rule="message.adjacency_fed_matmul",
-            observed_nodes=stage_graph, rule_version=2,
-            metadata={"stages": stages, "recognized": message_recognized},
-        ),
-        "xc": _derivation(
-            claim="xc.form", value=xc_form, root=roles["xc_energy"],
-            evidence_nodes=xc_nodes,
-            rule={"hinge": "xc.hinge_activation", "smooth": "xc.smooth_activation"}.get(xc_form, "xc.unrecognized_composition"),
-            rule_version=2,
-            observed_nodes=xc_graph,
-            metadata=(
-                {"reason": "mixed hinge and smooth activation composition"}
-                if (xc_form == "unsupported" and _has_target(xc_graph, _HINGE_TARGETS) and _has_target(xc_graph, _SMOOTH_TARGETS))
-                else {"reason": "no supported hinge or smooth activation"} if xc_form == "unsupported" else None
-            ),
-        ),
-        "operator": _derivation(
-            claim="operator.construction", value=operator, root=roles["learned_self_energy"],
-            evidence_nodes=operator_nodes,
-            rule={
-                "zero": "operator.zero_root", "identity": "operator.identity_root",
-                "symmetrized": "operator.add_adjoint_pair",
-                "unconstrained_parameter": "operator.unconstrained_root",
-            }.get(operator, "operator.unrecognized_composition"),
-            rule_version=2 if operator == "unconstrained_parameter" else 1,
-            observed_nodes=operator_graph,
-            metadata=({"reason": "unrecognized operator composition"} if operator == "unsupported" else None),
-        ),
-    }
-    return derivations, count, edges, graph_inputs, state_name
-
-
-def _refs(value: Any) -> list[str]:
-    if isinstance(value, dict):
-        if set(value) == {"node"} and isinstance(value["node"], str):
-            return [value["node"]]
-        return [item for child in value.values() for item in _refs(child)]
-    if isinstance(value, list):
-        return [item for child in value for item in _refs(child)]
-    return []
-
-
-def _ancestors(nodes: list[dict[str, Any]], root: str) -> list[dict[str, Any]]:
-    by_name = {
-        node.get("name"): node for node in nodes
-        if isinstance(node, dict) and isinstance(node.get("name"), str)
-    }
-    seen: set[str] = set()
-    pending = [root]
-    ordered: list[dict[str, Any]] = []
-    while pending:
-        name = pending.pop()
-        if name in seen or name not in by_name:
-            continue
-        seen.add(name)
-        node = by_name[name]
-        ordered.append(node)
-        pending.extend(_refs(node.get("args")))
-        pending.extend(_refs(node.get("kwargs")))
-    return ordered
-
-
-def _output_roots(nodes: list[dict[str, Any]]) -> list[str]:
-    outputs = [node for node in nodes if node.get("op") == "output"]
-    if len(outputs) != 1:
-        raise ManifestError("structural inventory requires exactly one output node")
-    return _refs(outputs[0].get("args"))
-
-
-def _target(node: dict[str, Any]) -> str:
-    return str(node.get("target", "")).lower()
-
-
-def _has_target(nodes: list[dict[str, Any]], targets: set[str]) -> bool:
-    return any(_target(node) in targets for node in nodes)
-
-
-def _direct_ref(value: Any) -> str | None:
-    refs = _refs(value)
-    return refs[0] if len(refs) == 1 else None
-
-
-def _operator_construction(
-    nodes: list[dict[str, Any]], root: str,
-) -> tuple[str, list[str]]:
-    by_name = {node["name"]: node for node in nodes if isinstance(node.get("name"), str)}
-    provenance = [node["name"] for node in _ancestors(nodes, root)]
-    root_node = by_name.get(root, {})
-    if _has_target([root_node], _ZERO_TARGETS):
-        return "zero", provenance
-    if _has_target([root_node], _IDENTITY_TARGETS):
-        return "identity", provenance
-    if _has_target([root_node], _ADD_TARGETS):
-        arguments = _refs(root_node.get("args"))
-        if len(arguments) >= 2:
-            left, right = arguments[:2]
-            for base, transformed in ((left, right), (right, left)):
-                transformed_node = by_name.get(transformed, {})
-                if _has_target([transformed_node], _ADJOINT_TARGETS):
-                    transformed_base = _direct_ref(transformed_node.get("args"))
-                    if transformed_base == base:
-                        return "symmetrized", provenance
-                    if (
-                        transformed_base in by_name
-                        and by_name.get(base, {}).get("op") in {"placeholder", "get_attr"}
-                        and by_name[transformed_base].get("op") in {"placeholder", "get_attr"}
-                    ):
-                        return "unconstrained_parameter", provenance
-    if root_node.get("op") in {"placeholder", "get_attr"}:
-        return "unconstrained_parameter", provenance
-    return "unsupported", provenance
-
-
-def _xc_form(nodes: list[dict[str, Any]], root: str) -> tuple[str, list[str]]:
-    ancestors = _ancestors(nodes, root)
-    provenance = [node["name"] for node in ancestors]
-    hinge = _has_target(ancestors, _HINGE_TARGETS)
-    smooth = _has_target(ancestors, _SMOOTH_TARGETS)
-    if hinge and smooth:
-        return "unsupported", provenance
-    if hinge:
-        return "hinge", provenance
-    if smooth:
-        return "smooth", provenance
-    return "unsupported", provenance
-
-
-def _adjacency_aliases(nodes: list[dict[str, Any]], adjacency_inputs: list[str]) -> list[str]:
-    aliases = set(adjacency_inputs)
-    while True:
-        additions = {
-            node["name"] for node in nodes
-            if isinstance(node.get("name"), str)
-            and _has_target([node], _ADJACENCY_ALIAS_TARGETS)
-            and len(_refs(node.get("args"))) == 1
-            and _refs(node.get("args"))[0] in aliases
-        }
-        if additions <= aliases:
-            return [node["name"] for node in nodes if node.get("name") in aliases]
-        aliases.update(additions)
-
-
-def _message_chain(
-    nodes: list[dict[str, Any]], root: str, adjacency_inputs: list[str],
-) -> tuple[list[str], bool]:
-    """Follow only consecutive adjacency-fed matmuls from the declared output."""
-    by_name = {node["name"]: node for node in nodes if isinstance(node.get("name"), str)}
-    adjacency_aliases = set(_adjacency_aliases(nodes, adjacency_inputs))
-    current, stages = root, []
-    while True:
-        node = by_name.get(current, {})
-        refs = _refs(node.get("args"))
-        if not _has_target([node], _MESSAGE_TARGETS):
-            return stages, node.get("op") == "placeholder"
-        adjacency = [ref for ref in refs if ref in adjacency_aliases]
-        state = [ref for ref in refs if ref not in adjacency_aliases]
-        if len(adjacency) != 1 or len(state) != 1:
-            return stages, False
-        stages.append(current)
-        current = state[0]
-
-
-def _state_entry(inventory: dict[str, Any], requested: str | None) -> dict[str, Any] | None:
-    state = inventory.get("state", {})
-    if not isinstance(state, dict):
-        return None
-    if requested and isinstance(state.get(requested), dict):
-        return state[requested]
-    for name, value in state.items():
-        if "adjacency" in name.lower() and isinstance(value, dict):
-            return value
-    return None
-
-
-def _state_name(inventory: dict[str, Any], requested: str | None) -> str | None:
-    state = inventory.get("state", {})
-    if not isinstance(state, dict):
-        return None
-    if requested and isinstance(state.get(requested), dict):
-        return requested
-    return next(
-        (name for name, value in state.items()
-         if isinstance(name, str) and "adjacency" in name.lower() and isinstance(value, dict)),
-        None,
-    )
-
-
-def _topology(
-    inventory: dict[str, Any], input_constraints: dict[str, Any],
-) -> tuple[int, list[list[int]], list[str], str]:
-    state_name = _state_name(inventory, input_constraints.get("adjacency_state_name"))
-    entry = _state_entry(inventory, state_name)
-    if not entry:
-        raise ManifestError("artifact has no extractable structural adjacency buffer")
-    values = entry.get("structural_values")
-    if (
-        not isinstance(values, list) or not values
-        or any(not isinstance(row, list) for row in values)
-        or any(not isinstance(cell, (bool, int)) for row in values for cell in row)
-    ):
-        raise ManifestError("adjacency buffer must be a small exported boolean/integer matrix")
-    size = len(values)
-    if any(len(row) != size for row in values):
-        raise ManifestError("adjacency buffer must be square")
-    convention = input_constraints.get("adjacency_convention", "target_source")
-    if convention not in {"target_source", "source_target"}:
-        raise ManifestError("adjacency_convention must be target_source or source_target")
-    edges = []
-    for row, values_row in enumerate(values):
-        for column, connected in enumerate(values_row):
-            if bool(connected):
-                edges.append(
-                    [column, row] if convention == "target_source" else [row, column]
-                )
-    provenance = entry.get("graph_inputs", [])
-    return size, edges, [str(item) for item in provenance if isinstance(item, str)], state_name
-
-
-def _role_roots(
-    nodes: list[dict[str, Any]], input_constraints: dict[str, Any],
-) -> dict[str, str]:
-    roots = _output_roots(nodes)
-    contracts = input_constraints.get("output_contracts")
-    if not isinstance(contracts, list):
-        raise ManifestError("output_contracts must identify structural output roles")
-    result: dict[str, str] = {}
-    for contract in contracts:
-        if not isinstance(contract, dict):
-            raise ManifestError("output contracts must be objects")
-        index, role = contract.get("index"), contract.get("role")
-        if not isinstance(index, int) or not isinstance(role, str) or index < 0 or index >= len(roots):
-            raise ManifestError("output contract index or role is invalid")
-        if role in result:
-            raise ManifestError(f"duplicate output contract role {role!r}")
-        result[role] = roots[index]
-    if len(set(result.values())) != len(result):
-        raise ManifestError("output contract roles must resolve to distinct outputs")
-    required = {"xc_energy", "learned_self_energy", "message_state"}
-    if set(result) != required:
-        raise ManifestError("output_contracts must map xc_energy, learned_self_energy, and message_state")
-    return result
+def _lean_string(value: str) -> str:
+    return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
 def structural_ir_from_inventory(
     *, inventory: dict[str, Any], artifact_sha256: str, extractor_version: str,
-    input_constraints: dict[str, Any],
+    input_constraints: dict[str, Any], plugin: StructuralPlugin = DFT_PLUGIN,
 ) -> dict[str, Any]:
     nodes = inventory.get("nodes")
     if not isinstance(nodes, list) or any(not isinstance(node, dict) for node in nodes):
         raise ManifestError("artifact graph inventory is malformed")
-    roles = _role_roots(nodes, input_constraints)
-    derivations, site_count, edges, topology_nodes, adjacency_state = _semantic_derivations(
-        inventory=inventory, nodes=nodes, roles=roles, input_constraints=input_constraints,
-    )
-    message_derivation = derivations["message_passing"]
-    stage_nodes = message_derivation["evidence_nodes"]
-    depth = message_derivation["value"]
-    message_recognized = message_derivation["metadata"]["recognized"]
-    xc_form, xc_nodes = derivations["xc"]["value"], derivations["xc"]["evidence_nodes"]
-    operator, operator_nodes = derivations["operator"]["value"], derivations["operator"]["evidence_nodes"]
-    requirements = input_constraints.get("required_couplings", [])
-    if not isinstance(requirements, list) or any(
-        not isinstance(item, dict)
-        or not isinstance(item.get("source"), int)
-        or not isinstance(item.get("target"), int)
-        for item in requirements
-    ):
-        raise ManifestError("required_couplings must contain integer source/target pairs")
+    roles = plugin.role_roots(nodes, input_constraints)
+    derivation = plugin.derive(inventory=inventory, nodes=nodes, roles=roles, input_constraints=input_constraints)
     inventory_sha256 = sha256_value(inventory)
     state = inventory.get("state", {})
     parameter_structure = {
@@ -377,64 +56,34 @@ def structural_ir_from_inventory(
         if isinstance(name, str) and isinstance(value, dict)
     } if isinstance(state, dict) else {}
     translation = {
-        "schema_version": 2,
         "inventory_sha256": inventory_sha256,
-        "roles": roles,
-        "topology": {
-            "state_name": adjacency_state,
-            "graph_inputs": topology_nodes,
-            "adjacency_aliases": _adjacency_aliases(nodes, topology_nodes),
-            "adjacency_convention": input_constraints.get("adjacency_convention", "target_source"),
-        },
-        "message_passing": {
-            "root": roles["message_state"], "stages": stage_nodes,
-            "recognized": message_recognized,
-        },
-        "xc": {"root": roles["xc_energy"], "form": xc_form},
-        "operator": {"root": roles["learned_self_energy"], "construction": operator},
-        "semantic_derivations": derivations,
+        **plugin.translation_sections(derivation=derivation, roles=roles, input_constraints=input_constraints),
     }
     value = {
-        "ir_schema_version": IR_SCHEMA_VERSION,
+        "ir_schema_version": plugin.ir_schema_version,
         "source": {
             "kind": "torch_export",
             "artifact_sha256": artifact_sha256,
             "inventory_sha256": inventory_sha256,
             "extractor_version": extractor_version,
-            "analyzer_version": ANALYZER_VERSION,
+            "analyzer_version": plugin.analyzer_version,
             "parameter_structure_sha256": sha256_value(parameter_structure),
             "translation_sha256": sha256_value(translation),
         },
-        "topology": {
-            "site_count": site_count,
-            "directed_edges": edges,
-            "provenance_nodes": topology_nodes,
-        },
-        "message_passing": {
-            "depth": depth, "recognized": message_recognized,
-            "provenance_nodes": stage_nodes,
-        },
-        "xc": {"form": xc_form, "provenance_nodes": xc_nodes},
-        "operator": {"construction": operator, "provenance_nodes": operator_nodes},
-        "requirements": {
-            "couplings": [
-                {"source": item["source"], "target": item["target"]}
-                for item in requirements
-            ]
-        },
+        **plugin.ir_sections(derivation=derivation, input_constraints=input_constraints),
         "translation": translation,
     }
-    validate_structural_ir(value)
+    validate_structural_ir(value, plugin=plugin)
     value["translation_validation"] = validate_translation(
         inventory=inventory, value=value, input_constraints=input_constraints,
-        artifact_sha256=artifact_sha256,
+        artifact_sha256=artifact_sha256, plugin=plugin,
     )
     return value
 
 
-def validate_structural_ir(value: dict[str, Any]) -> None:
-    if not isinstance(value, dict) or value.get("ir_schema_version") != IR_SCHEMA_VERSION:
-        raise ManifestError("structural IR must use schema version 2")
+def validate_structural_ir(value: dict[str, Any], *, plugin: StructuralPlugin = DFT_PLUGIN) -> None:
+    if not isinstance(value, dict) or value.get("ir_schema_version") != plugin.ir_schema_version:
+        raise ManifestError(f"structural IR must use schema version {plugin.ir_schema_version}")
     source = value.get("source")
     if not isinstance(source, dict) or source.get("kind") not in {
         "torch_export", "confirmed_description"
@@ -444,170 +93,45 @@ def validate_structural_ir(value: dict[str, Any]) -> None:
     if source.get("kind") == "torch_export":
         if not isinstance(translation, dict) or source.get("translation_sha256") != sha256_value(translation):
             raise ManifestError("artifact structural IR needs a hash-bound translation derivation")
-    topology = value.get("topology")
-    message = value.get("message_passing")
-    xc = value.get("xc")
-    operator = value.get("operator")
-    requirements = value.get("requirements")
-    if not all(isinstance(item, dict) for item in (topology, message, xc, operator, requirements)):
-        raise ManifestError("structural IR sections are missing")
-    count = topology.get("site_count")
-    edges = topology.get("directed_edges")
-    if not isinstance(count, int) or isinstance(count, bool) or count <= 0:
-        raise ManifestError("site_count must be positive")
-    if not isinstance(edges, list) or any(
-        not isinstance(edge, list) or len(edge) != 2
-        or any(not isinstance(node, int) or node < 0 or node >= count for node in edge)
-        for edge in edges
-    ):
-        raise ManifestError("directed_edges are invalid")
-    depth = message.get("depth")
-    if not isinstance(depth, int) or isinstance(depth, bool) or depth < 0:
-        raise ManifestError("message-passing depth must be non-negative")
-    if "recognized" in message and not isinstance(message["recognized"], bool):
-        raise ManifestError("message-passing recognition must be boolean")
-    if xc.get("form") not in {"hinge", "smooth", "unsupported"}:
-        raise ManifestError("unsupported XC form value")
-    if operator.get("construction") not in {
-        "zero", "identity", "symmetrized", "unconstrained_parameter", "unsupported"
-    }:
-        raise ManifestError("unsupported operator construction value")
-    couplings = requirements.get("couplings")
-    if not isinstance(couplings, list) or any(
-        not isinstance(item, dict)
-        or not isinstance(item.get("source"), int)
-        or not isinstance(item.get("target"), int)
-        or item["source"] < 0 or item["source"] >= count
-        or item["target"] < 0 or item["target"] >= count
-        for item in couplings
-    ):
-        raise ManifestError("required couplings are invalid")
+    plugin.validate_ir_sections(value)
 
 
 def validate_translation(
     *, inventory: dict[str, Any], value: dict[str, Any], input_constraints: dict[str, Any],
-    artifact_sha256: str | None = None,
+    artifact_sha256: str | None = None, plugin: StructuralPlugin = DFT_PLUGIN,
 ) -> dict[str, Any]:
     """Independently recheck an artifact IR's derivation against raw graph inventory."""
-    validate_structural_ir(value)
+    validate_structural_ir(value, plugin=plugin)
     if value["source"]["kind"] != "torch_export":
         raise ManifestError("only exported artifacts have a translation derivation")
     if artifact_sha256 is not None and value["source"].get("artifact_sha256") != artifact_sha256:
         raise ManifestError("structural IR source artifact hash does not match the extracted artifact")
     translation = value["translation"]
-    if translation.get("schema_version") != 2:
-        raise ManifestError("unsupported translation derivation schema")
     if translation.get("inventory_sha256") != sha256_value(inventory):
         raise ManifestError("translation derivation is bound to a different inventory")
     nodes = inventory.get("nodes")
     if not isinstance(nodes, list) or any(not isinstance(node, dict) for node in nodes):
         raise ManifestError("translation validation needs a graph-node inventory")
-    roles = _role_roots(nodes, input_constraints)
+    roles = plugin.role_roots(nodes, input_constraints)
     if translation.get("roles") != roles:
         raise ManifestError("translation output roles do not match the raw exported graph")
-    derivations, count, edges, graph_inputs, state_name = _semantic_derivations(
-        inventory=inventory, nodes=nodes, roles=roles, input_constraints=input_constraints,
+    derivation = plugin.derive(inventory=inventory, nodes=nodes, roles=roles, input_constraints=input_constraints)
+    plugin.revalidate(
+        inventory=inventory, value=value, input_constraints=input_constraints,
+        derivation=derivation, roles=roles,
     )
-    if translation.get("semantic_derivations") != derivations:
-        raise ManifestError("translation semantic derivations do not match the raw exported graph")
-    topology = translation.get("topology")
-    if topology != {
-        "state_name": state_name,
-        "graph_inputs": graph_inputs,
-        "adjacency_aliases": _adjacency_aliases(nodes, graph_inputs),
-        "adjacency_convention": input_constraints.get("adjacency_convention", "target_source"),
-    } or value["topology"]["site_count"] != count or value["topology"]["directed_edges"] != edges:
-        raise ManifestError("translation topology claim does not match its adjacency evidence")
-    message_derivation = derivations["message_passing"]
-    stages = message_derivation["evidence_nodes"]
-    message_recognized = message_derivation["metadata"]["recognized"]
-    if translation.get("message_passing") != {
-        "root": roles["message_state"], "stages": stages, "recognized": message_recognized,
-    }:
-        raise ManifestError("translation message-passing derivation is invalid")
-    if value["message_passing"] != {
-        "depth": len(stages), "recognized": message_recognized, "provenance_nodes": stages,
-    }:
-        raise ManifestError("IR message-passing claim does not match its derivation")
-    xc_form, xc_nodes = derivations["xc"]["value"], derivations["xc"]["evidence_nodes"]
-    if translation.get("xc") != {"root": roles["xc_energy"], "form": xc_form}:
-        raise ManifestError("translation XC derivation is invalid")
-    if value["xc"] != {"form": xc_form, "provenance_nodes": xc_nodes}:
-        raise ManifestError("IR XC claim does not match its derivation")
-    operator, operator_nodes = derivations["operator"]["value"], derivations["operator"]["evidence_nodes"]
-    if translation.get("operator") != {
-        "root": roles["learned_self_energy"], "construction": operator,
-    }:
-        raise ManifestError("translation operator derivation is invalid")
-    if value["operator"] != {"construction": operator, "provenance_nodes": operator_nodes}:
-        raise ManifestError("IR operator claim does not match its derivation")
     return {
         "status": "translation_validated",
         "translation_sha256": sha256_value(translation),
         "inventory_sha256": sha256_value(inventory),
-        "checked_claims": ["output_roles", "topology", "message_passing", "xc", "operator", "semantic_derivations"],
+        "checked_claims": ["output_roles", *plugin.checked_claim_names()],
     }
 
 
-def shortest_path(
-    edges: list[list[int]], source: int, target: int, max_depth: int,
-) -> list[int] | None:
-    adjacency: dict[int, list[int]] = {}
-    for left, right in edges:
-        adjacency.setdefault(left, []).append(right)
-    pending: deque[list[int]] = deque([[source]])
-    seen = {(source, 0)}
-    while pending:
-        path = pending.popleft()
-        if path[-1] == target:
-            return path
-        if len(path) - 1 >= max_depth:
-            continue
-        for neighbor in adjacency.get(path[-1], []):
-            state = (neighbor, len(path))
-            if state not in seen:
-                seen.add(state)
-                pending.append([*path, neighbor])
-    return None
-
-
-def assess_structural_ir(value: dict[str, Any]) -> dict[str, Any]:
-    validate_structural_ir(value)
-    topology = value["topology"]
-    depth = value["message_passing"]["depth"]
-    coupling_results = []
-    for coupling in value["requirements"]["couplings"]:
-        path = shortest_path(
-            topology["directed_edges"], coupling["source"], coupling["target"], depth
-        )
-        coupling_results.append({**coupling, "covered": path is not None, "path": path})
-    spatial = all(item["covered"] for item in coupling_results)
-    xc = value["xc"]["form"] == "hinge"
-    self_adjoint = value["operator"]["construction"] in {"zero", "identity", "symmetrized"}
-    supported = (
-        value["message_passing"].get("recognized", True)
-        and
-        value["xc"]["form"] != "unsupported"
-        and value["operator"]["construction"] != "unsupported"
-    )
-    checks = {
-        "xc_discontinuity_compatible": {
-            "satisfied": xc,
-            "form": value["xc"]["form"],
-            "provenance_nodes": value["xc"].get("provenance_nodes", []),
-        },
-        "spatial_nonlocality_compatible": {
-            "satisfied": spatial,
-            "depth": depth,
-            "couplings": coupling_results,
-            "provenance_nodes": value["message_passing"].get("provenance_nodes", []),
-        },
-        "self_adjoint": {
-            "satisfied": self_adjoint,
-            "construction": value["operator"]["construction"],
-            "provenance_nodes": value["operator"].get("provenance_nodes", []),
-        },
-    }
+def assess_structural_ir(value: dict[str, Any], *, plugin: StructuralPlugin = DFT_PLUGIN) -> dict[str, Any]:
+    validate_structural_ir(value, plugin=plugin)
+    checks = plugin.checks(value)
+    supported = plugin.supported(value)
     disposition = (
         "formalization_required" if not supported
         else "structurally_certifiable" if all(item["satisfied"] for item in checks.values())
@@ -621,48 +145,25 @@ def assess_structural_ir(value: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def structural_failure_witnesses(value: dict[str, Any]) -> list[dict[str, Any]]:
-    assessment = assess_structural_ir(value)
-    witnesses: list[dict[str, Any]] = []
-    xc = assessment["checks"]["xc_discontinuity_compatible"]
-    if not xc["satisfied"]:
-        witnesses.append({
-            "fact": "xc_discontinuity_compatible",
-            "kind": "construction_form",
-            "observed": xc["form"],
-            "required": "hinge",
-            "provenance_nodes": xc["provenance_nodes"],
-        })
-    spatial = assessment["checks"]["spatial_nonlocality_compatible"]
-    for coupling in spatial["couplings"]:
-        if not coupling["covered"]:
-            witnesses.append({
-                "fact": "spatial_nonlocality_compatible",
-                "kind": "uncovered_coupling",
-                "source": coupling["source"],
-                "target": coupling["target"],
-                "message_passing_depth": spatial["depth"],
-                "provenance_nodes": spatial["provenance_nodes"],
-            })
-    operator = assessment["checks"]["self_adjoint"]
-    if not operator["satisfied"]:
-        witnesses.append({
-            "fact": "self_adjoint",
-            "kind": "operator_construction",
-            "observed": operator["construction"],
-            "required": ["zero", "identity", "symmetrized"],
-            "provenance_nodes": operator["provenance_nodes"],
-        })
-    return witnesses
+def structural_failure_witnesses(
+    value: dict[str, Any], *, plugin: StructuralPlugin = DFT_PLUGIN,
+) -> list[dict[str, Any]]:
+    assessment = assess_structural_ir(value, plugin=plugin)
+    return [
+        plugin.failure_witness(name, check)
+        for name, check in assessment["checks"].items()
+        if not check["satisfied"]
+    ]
 
 
-def structural_report(value: dict[str, Any]) -> dict[str, Any]:
+def structural_report(value: dict[str, Any], *, plugin: StructuralPlugin = DFT_PLUGIN) -> dict[str, Any]:
     """Human-facing evidence report; it does not upgrade any trust boundary."""
-    assessment = assess_structural_ir(value)
+    assessment = assess_structural_ir(value, plugin=plugin)
     source = value["source"]
     checks = assessment["checks"]
+    what_was_checked = plugin.what_was_checked()
     return {
-        "report_schema_version": 2,
+        "report_schema_version": plugin.ir_schema_version,
         "status": assessment["status"],
         "certificate_kind": "artifact" if source["kind"] == "torch_export" else "confirmed_specification",
         "plain_summary": (
@@ -678,82 +179,50 @@ def structural_report(value: dict[str, Any]) -> dict[str, Any]:
             {
                 "name": name,
                 "satisfied": check["satisfied"],
-                "what_was_checked": {
-                    "xc_discontinuity_compatible": "The declared XC output path contains a supported hinge construction.",
-                    "spatial_nonlocality_compatible": "Every required source-to-target coupling has a directed path within the extracted adjacency-fed layer count.",
-                    "self_adjoint": "The declared operator output is structurally zero, identity, or a parameter plus its transpose.",
-                }[name],
+                "what_was_checked": what_was_checked[name],
                 "evidence": check,
             }
             for name, check in checks.items()
         ],
-        "failure_witnesses": structural_failure_witnesses(value),
+        "failure_witnesses": structural_failure_witnesses(value, plugin=plugin),
         "trust_boundary": [
             "The PT2 artifact is deserialized only by the extractor boundary; its SHA-256 binds this report to that file.",
-            "The translation validator independently rechecks the IR claims against the exported graph inventory.",
+            "The translation validator independently rechecks the IR claims, including the locality observation, against the exported graph inventory and raw parameter values.",
             "Lean can verify the generated structural theorems, but it does not parse the PT2 binary itself.",
-            "This report does not assess trained-weight quality, numerical accuracy, convergence, or experiment.",
+            "Locality is checked only for recognized, small (<=4096 element) operator constructions; an unrecognized or too-large construction leaves it undetermined rather than guessed.",
+            "This report does not assess training convergence, numerical accuracy of the *magnitude* of couplings, or experiment -- only whether real values are exactly/threshold-nonzero off the diagonal.",
         ],
     }
 
 
-def structural_model_description(value: dict[str, Any]) -> str:
+def structural_model_description(
+    value: dict[str, Any], *, plugin: StructuralPlugin = DFT_PLUGIN,
+) -> str:
     """Readable, deterministic context for local proof agents and reports."""
-    validate_structural_ir(value)
-    topology = value["topology"]
+    validate_structural_ir(value, plugin=plugin)
     source = value["source"]
     translation = value.get("translation", {})
     lines = [
         "Artifact-derived model description (not an LLM interpretation):",
         f"- Source: {source['kind']}; binding hash: {source.get('artifact_sha256', source.get('description_sha256', 'unknown'))}.",
-        f"- Topology: {topology['site_count']} sites and {len(topology['directed_edges'])} directed edges.",
-        f"- Required couplings: {value['requirements']['couplings']}.",
-        f"- Message passing: {value['message_passing']['depth']} consecutive adjacency-fed stage(s): {value['message_passing'].get('provenance_nodes', [])}.",
-        f"- XC output construction: {value['xc']['form']}; supporting graph nodes: {value['xc'].get('provenance_nodes', [])}.",
-        f"- Self-energy construction: {value['operator']['construction']}; supporting graph nodes: {value['operator'].get('provenance_nodes', [])}.",
+        *plugin.model_description_lines(value),
     ]
     if source["kind"] == "torch_export":
         lines.extend([
             f"- Declared output roots: {translation.get('roles', {})}.",
             f"- Adjacency evidence: state {translation.get('topology', {}).get('state_name')!r}; graph nodes {translation.get('topology', {}).get('adjacency_aliases', [])}.",
-            "- Translation validation rechecked these claims against the raw exported inventory.",
+            "- Translation validation rechecked these claims, including locality, against the raw exported inventory.",
         ])
     lines.append(
-        "Scope: structural compatibility only; this does not assess numerical outputs, trained weights, convergence, or experiment."
+        "Scope: structural/value compatibility only; this does not assess training convergence, numerical accuracy, or experiment."
     )
     return "\n".join(lines)
 
 
-def _lean_string(value: str) -> str:
-    return value.replace("\\", "\\\\").replace('"', '\\"')
-
-
-def _lean_edges(edges: list[list[int]]) -> str:
-    return "[" + ", ".join(f"({left}, {right})" for left, right in edges) + "]"
-
-
-def _lean_couplings(couplings: list[dict[str, int]]) -> str:
-    return "[" + ", ".join(
-        f"({item['source']}, {item['target']})" for item in couplings
-    ) + "]"
-
-
-def _lean_xc(form: str) -> str:
-    return {"hinge": ".hinge", "smooth": ".smooth", "unsupported": ".unsupported"}[form]
-
-
-def _lean_operator(construction: str) -> str:
-    return {
-        "zero": ".zero",
-        "identity": ".identity",
-        "symmetrized": '.add (.parameter "base") (.adjoint (.parameter "base"))',
-        "unconstrained_parameter": '.parameter "unconstrained"',
-        "unsupported": ".unsupported",
-    }[construction]
-
-
-def generate_structural_obligations(value: dict[str, Any]) -> dict[str, Any]:
-    assessment = assess_structural_ir(value)
+def generate_structural_obligations(
+    value: dict[str, Any], *, plugin: StructuralPlugin = DFT_PLUGIN,
+) -> dict[str, Any]:
+    assessment = assess_structural_ir(value, plugin=plugin)
     source = value["source"]
     source_hash = (
         source.get("artifact_sha256") or source.get("description_sha256")
@@ -762,38 +231,15 @@ def generate_structural_obligations(value: dict[str, Any]) -> dict[str, Any]:
         raise ManifestError("structural IR source hash is missing")
     ir_hash = assessment["ir_sha256"]
     namespace = f"DFTCert.StructuralRun_{ir_hash[:12]}"
-    preamble = f"""namespace {namespace}
-
-def sourceSha256 : String := \"{_lean_string(source_hash)}\"
-def irSha256 : String := \"{ir_hash}\"
-def edges : List (Nat × Nat) := {_lean_edges(value['topology']['directed_edges'])}
-def messageDepth : Nat := {value['message_passing']['depth']}
-def requiredCouplings : List (Nat × Nat) := {_lean_couplings(value['requirements']['couplings'])}
-def xcForm : Testv2.StructuralV2.XCForm := {_lean_xc(value['xc']['form'])}
-def operatorForm : Testv2.StructuralV2.OperatorForm := {_lean_operator(value['operator']['construction'])}
-
-end {namespace}
-"""
-    expected = {
-        "xc_discontinuity_compatible": assessment["checks"]["xc_discontinuity_compatible"]["satisfied"],
-        "spatial_nonlocality_compatible": assessment["checks"]["spatial_nonlocality_compatible"]["satisfied"],
-        "self_adjoint": assessment["checks"]["self_adjoint"]["satisfied"],
-    }
-    statements = {
-        "xc_discontinuity_compatible": (
-            f"theorem generated_xc_structure : Testv2.StructuralV2.xcSupportsDiscontinuity "
-            f"{namespace}.xcForm = {str(expected['xc_discontinuity_compatible']).lower()}"
-        ),
-        "spatial_nonlocality_compatible": (
-            f"theorem generated_spatial_structure : Testv2.StructuralV2.allCovered "
-            f"{namespace}.edges {namespace}.messageDepth {namespace}.requiredCouplings = "
-            f"{str(expected['spatial_nonlocality_compatible']).lower()}"
-        ),
-        "self_adjoint": (
-            f"theorem generated_operator_structure : Testv2.StructuralV2.guaranteedSelfAdjoint "
-            f"{namespace}.operatorForm = {str(expected['self_adjoint']).lower()}"
-        ),
-    }
+    preamble = (
+        f"namespace {namespace}\n\n"
+        f'def sourceSha256 : String := "{_lean_string(source_hash)}"\n'
+        f'def irSha256 : String := "{ir_hash}"\n'
+        f"{plugin.lean_preamble_fields(value, namespace)}\n\n"
+        f"end {namespace}\n"
+    )
+    statements = plugin.lean_statements(value, namespace, assessment["checks"])
+    expected = {fact: assessment["checks"][fact]["satisfied"] for fact in statements}
     tasks = []
     for fact, theorem in statements.items():
         tasks.append({
@@ -801,7 +247,7 @@ end {namespace}
             "fact": fact,
             "status": "proof_required",
             "project": "testv2",
-            "module": "Testv2.StructuralV2",
+            "module": plugin.lean_import,
             "verification_mode": "generated_obligation",
             "theorem": theorem,
             "preamble": preamble,
@@ -810,10 +256,10 @@ end {namespace}
             "ir_sha256": ir_hash,
             "source_sha256": source_hash,
             "context": (
-                structural_model_description(value) + "\n\n"
-                + "DFT Structural V2 obligation generated deterministically from the common IR. "
-                "Prove the exact Boolean structural result. Prefer `by decide`, whose result "
-                "is reduced by Lean's kernel for this small finite input."
+                structural_model_description(value, plugin=plugin) + "\n\n"
+                + f"VISTA obligation generated deterministically from the common IR by the "
+                f"{plugin.name!r} plugin. Prove the exact Boolean structural result. Prefer "
+                "`by decide`, whose result is reduced by Lean's kernel for this small finite input."
             ),
             "subgoals": [{
                 "id": f"evaluate-{fact}",
@@ -825,35 +271,21 @@ end {namespace}
         })
     return {
         "status": "obligations_generated",
-        "compiler_version": COMPILER_VERSION,
+        "compiler_version": plugin.compiler_version,
         "ir_sha256": ir_hash,
         "source_sha256": source_hash,
-        "policy_version": POLICY_VERSION,
+        "policy_version": plugin.policy_version,
         "disposition": assessment["status"],
         "assessment": assessment,
-        "failure_witnesses": structural_failure_witnesses(value),
+        "failure_witnesses": structural_failure_witnesses(value, plugin=plugin),
         "obligations": tasks,
     }
 
 
-def _proof_results(value: Any) -> dict[str, dict[str, Any]]:
-    entries = value.get("results") if isinstance(value, dict) and "results" in value else value
-    if not isinstance(entries, list):
-        raise ManifestError("proof results must be an array or an object with results")
-    result: dict[str, dict[str, Any]] = {}
-    for entry in entries:
-        if not isinstance(entry, dict) or not isinstance(entry.get("id"), str):
-            raise ManifestError("each proof result needs a string id")
-        if entry["id"] in result:
-            raise ManifestError(f"duplicate proof result {entry['id']!r}")
-        result[entry["id"]] = entry
-    return result
-
-
 def assemble_structural_certificate(
-    value: dict[str, Any], proof_results: Any,
+    value: dict[str, Any], proof_results: Any, *, plugin: StructuralPlugin = DFT_PLUGIN,
 ) -> tuple[str, dict[str, Any]]:
-    generated = generate_structural_obligations(value)
+    generated = generate_structural_obligations(value, plugin=plugin)
     translation_validation = value.get("translation_validation")
     if value["source"]["kind"] == "torch_export" and (
         not isinstance(translation_validation, dict)
@@ -862,7 +294,7 @@ def assemble_structural_certificate(
         != value["source"].get("translation_sha256")
     ):
         raise ManifestError("artifact certificate assembly requires a validated translation derivation")
-    results = _proof_results(proof_results)
+    results = proof_result_map(proof_results)
     declarations: list[str] = []
     evidence: list[dict[str, Any]] = []
     for task in generated["obligations"]:
@@ -882,7 +314,7 @@ def assemble_structural_certificate(
         })
     namespace = f"DFTCert.StructuralRun_{generated['ir_sha256'][:12]}"
     source = (
-        "import Testv2.StructuralV2\n\n"
+        f"import {plugin.lean_import}\n\n"
         + generated["obligations"][0]["preamble"] + "\n"
         + "\n".join(declarations) + "\n"
         + f"theorem generated_source_binding : {namespace}.sourceSha256 = "
@@ -896,16 +328,17 @@ def assemble_structural_certificate(
     )
     source_kind = value["source"]["kind"]
     report = {
-        "report_schema_version": 2,
+        "report_schema_version": plugin.ir_schema_version,
         "status": "assembled_pending_certificate_check",
         "certificate_kind": (
             "artifact" if source_kind == "torch_export" else "confirmed_specification"
         ),
-        "policy_version": POLICY_VERSION,
-        "compiler_version": COMPILER_VERSION,
+        "policy_version": plugin.policy_version,
+        "compiler_version": plugin.compiler_version,
         "source": value["source"],
         "source_sha256": generated["source_sha256"],
         "ir_sha256": generated["ir_sha256"],
+        "locality": value.get("locality"),
         "certificate_source_sha256": hashlib.sha256(source.encode()).hexdigest(),
         "structural_disposition": generated["disposition"],
         "failure_witnesses": generated["failure_witnesses"],
@@ -934,18 +367,36 @@ def verify_structural_certificate(
     with tempfile.TemporaryDirectory(prefix="dftcert-v2-") as directory:
         check = Path(directory) / "StructuralCertificateCheck.lean"
         check.write_text(source, encoding="utf-8")
+        # `lake env lean` forks a `lean` child rather than exec-ing into it,
+        # so killing only the direct child on timeout leaks a runaway `lean`
+        # process that then contends with later invocations. Run it in its
+        # own process group (POSIX only) so a timeout can take the whole
+        # group down via Popen directly (subprocess.run's timeout only kills
+        # the immediate child).
+        popen_kwargs: dict[str, Any] = {}
+        if hasattr(os, "setsid"):
+            popen_kwargs["start_new_session"] = True
+        handle = subprocess.Popen(
+            [*lean_command, str(check)], cwd=root,
+            encoding="utf-8", errors="replace",
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            **popen_kwargs,
+        )
         try:
-            process = subprocess.run(
-                [*lean_command, str(check)], cwd=root,
-                encoding="utf-8", errors="replace",
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                timeout=timeout_s, check=False,
-            )
-            status = "verified" if process.returncode == 0 else "lean_error"
-            diagnostics = process.stdout
-        except subprocess.TimeoutExpired as error:
+            stdout, _ = handle.communicate(timeout=timeout_s)
+            status = "verified" if handle.returncode == 0 else "lean_error"
+            diagnostics = stdout
+        except subprocess.TimeoutExpired:
             status = "timeout"
-            diagnostics = str(error)
+            if "start_new_session" in popen_kwargs:
+                try:
+                    os.killpg(os.getpgid(handle.pid), signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+            else:
+                handle.kill()
+            diagnostics = f"timed out after {timeout_s}s (process group terminated)"
+            handle.wait(timeout=10)
     return {
         "version": 2,
         "status": status,
@@ -959,12 +410,31 @@ def verify_structural_certificate(
 
 def confirmed_description_ir(
     *, description: str, topology: dict[str, Any], message_passing: dict[str, Any],
-    xc: dict[str, Any], operator: dict[str, Any], requirements: dict[str, Any],
+    xc: dict[str, Any], operator: dict[str, Any], locality: dict[str, Any],
     confirmed_claims: list[dict[str, Any]] | None = None,
+    plugin: StructuralPlugin = DFT_PLUGIN,
 ) -> dict[str, Any]:
+    """Human-confirmed (no artifact) specification path. Not yet routed
+    through the plugin interface -- still DFT-shaped regardless of `plugin`.
+    See VISTA_GENERALIZATION.md open questions."""
     description_hash = hashlib.sha256(description.encode()).hexdigest()
+    if locality.get("expected") not in {"local", "non_local"}:
+        raise ManifestError("locality.expected must be 'local' or 'non_local'")
+    # A pure English-description specification has no real weights to
+    # extract: a human confirms both what is expected AND what holds, exactly
+    # as they already do for topology/xc/operator in this path. That is a
+    # different (weaker) trust level than the torch_export path's
+    # independently-computed observation, and the certificate_kind
+    # ("confirmed_specification") already communicates that distinction.
+    locality = {
+        "expected": locality["expected"],
+        "available": True,
+        "observed_local": locality["expected"] == "local",
+        "off_diagonal_nonzero": [],
+        "rule": {"name": "human_attested", "version": 1},
+    }
     value = {
-        "ir_schema_version": IR_SCHEMA_VERSION,
+        "ir_schema_version": plugin.ir_schema_version,
         "source": {
             "kind": "confirmed_description",
             "description_sha256": description_hash,
@@ -973,7 +443,7 @@ def confirmed_description_ir(
                 "message_passing": message_passing,
                 "xc": xc,
                 "operator": operator,
-                "requirements": requirements,
+                "locality": locality,
                 "confirmed_claims": confirmed_claims or [],
             }),
             "confirmed_claims": confirmed_claims or [],
@@ -982,7 +452,7 @@ def confirmed_description_ir(
         "message_passing": message_passing,
         "xc": xc,
         "operator": operator,
-        "requirements": requirements,
+        "locality": locality,
     }
-    validate_structural_ir(value)
+    validate_structural_ir(value, plugin=plugin)
     return value

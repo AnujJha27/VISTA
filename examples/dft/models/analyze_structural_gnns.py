@@ -13,13 +13,13 @@ from extractors.torch_export_worker import extract
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Analyze exported VISTA V2 demo models")
+    parser = argparse.ArgumentParser(description="Analyze exported VISTA V3 demo models")
     parser.add_argument("model_dir")
     parser.add_argument(
         "--constraints",
-        default="examples/dft/structural-v2-input-constraints.json",
+        default="examples/dft/structural-v3-input-constraints.json",
     )
-    parser.add_argument("--output-dir", default="build/structural-v2-analysis")
+    parser.add_argument("--output-dir", default="build/structural-v3-analysis")
     options = parser.parse_args()
     constraints = json.loads(Path(options.constraints).read_text(encoding="utf-8"))
     output = Path(options.output_dir)

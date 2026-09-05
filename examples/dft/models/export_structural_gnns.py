@@ -33,6 +33,7 @@ def main() -> int:
     options = parser.parse_args()
     output = Path(options.output_dir)
     output.mkdir(parents=True, exist_ok=True)
+    torch.manual_seed(20260905)  # reproducible base_operator values for the locality demo
     example = (torch.randn(6, 1),)
     for name, factory in MODELS.items():
         model = factory().eval()
