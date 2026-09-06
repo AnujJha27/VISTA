@@ -8,6 +8,17 @@ semantics of its own.
 `render_target_tree`/`node_detail_lines` are plain functions returning text,
 independent of `curses`, so they're testable without a real screen -- the
 same split `dftcert.tui` already uses (`render_plain` vs `curses.wrapper`).
+
+Known scope gap: section 15's `[b] choose artifact binding` action for an
+`ambiguous_binding` node is not wired here yet. Resolving an ambiguity is
+a `binding_choices` entry in the *package*, not session-local state, so
+doing it live would mean this TUI writing to the package file and
+re-invoking `start_session` (which re-runs Lean) rather than just calling
+a `VerificationSession` method. Today that path works end to end through
+`VerificationPackageBuilder(binding_choices=...)` + `vista verify start`
+(see `tests/test_verification_session.py`); it is just not yet reachable
+from inside `interact` without leaving it. A weaker-but-sound gap, not a
+guess -- nothing here silently picks among ambiguous candidates.
 """
 from __future__ import annotations
 
