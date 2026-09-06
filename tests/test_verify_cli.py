@@ -9,32 +9,40 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from dftcert.structural.dft_capability_plugin import DFT_CAPABILITY_PLUGIN
 from dftcert.verification.cli import main
 from dftcert.verification.package import VerificationPackageBuilder
 
 from tests.test_lean_introspection import _HAS_LEAN, _SKIP_REASON
-from tests.test_structural_capability import _CHAIN3, _ir
+from tests.test_structural_capability import _CHAIN3, _constraints, _inventory
 
 PROJECT = Path(__file__).resolve().parent.parent / "examples" / "dft" / "lean"
 ENTRYPOINT = "Testv2.Requirements.ValidPretrainingArchitecture"
+
+
+def _write_extraction_result(path: Path, *, symmetrized: bool = True) -> None:
+    path.write_text(json.dumps({
+        "inventory": _inventory(adjacency=_CHAIN3, stages=0, symmetrized=symmetrized),
+        "artifact_sha256": "deadbeef", "extractor_version": "t",
+    }), encoding="utf-8")
 
 
 @unittest.skipUnless(_HAS_LEAN, _SKIP_REASON)
 class VerifyCliEndToEndTests(unittest.TestCase):
     def test_start_resume_certify_round_trip(self):
         with TemporaryDirectory() as tmp:
-            ir_path = Path(tmp) / "ir.json"
-            ir_path.write_text(json.dumps(_ir(adjacency=_CHAIN3, stages=0, symmetrized=True)), encoding="utf-8")
+            extraction_path = Path(tmp) / "extraction.json"
+            _write_extraction_result(extraction_path)
             package_path = Path(tmp) / "package.json"
             VerificationPackageBuilder(
-                lean_project=PROJECT, entrypoints=[ENTRYPOINT], adapter_profile="dft-capability",
-                interface_contract={},
+                lean_project=PROJECT, entrypoints=[ENTRYPOINT], adapter=DFT_CAPABILITY_PLUGIN,
+                interface_contract=_constraints(),
                 binding_choices=[{"entrypoint": ENTRYPOINT, "binder_path": "0", "candidate_key": "site_count"}],
             ).write(package_path)
             session_path = Path(tmp) / "session.json"
 
             start_rc = main([
-                "start", "--ir", str(ir_path), "--package", str(package_path),
+                "start", "--extraction-result", str(extraction_path), "--package", str(package_path),
                 "--session", str(session_path), "--project", str(PROJECT),
                 "--trusted-local", "--timeout-s", "180",
             ])
@@ -44,31 +52,33 @@ class VerifyCliEndToEndTests(unittest.TestCase):
             resume_rc = main(["resume", "--session", str(session_path)])
             self.assertEqual(resume_rc, 0)
 
-            source_path = Path(tmp) / "Cert.lean"
-            report_path = Path(tmp) / "report.json"
+            output_dir = Path(tmp) / "certificate"
             certify_rc = main([
                 "certify", "--session", str(session_path), "--package", str(package_path),
                 "--project", str(PROJECT), "--entrypoint", ENTRYPOINT,
-                "--lean-import", "Testv2.Requirements", "--source-output", str(source_path),
-                "--report-output", str(report_path), "--trusted-local", "--timeout-s", "180",
+                "--lean-import", "Testv2.Requirements", "--output-dir", str(output_dir),
+                "--trusted-local", "--timeout-s", "180",
             ])
             self.assertEqual(certify_rc, 0)
-            report = json.loads(report_path.read_text())
-            self.assertEqual(report["status"], "certified")
-            self.assertFalse(report["conditional"])
+            manifest = json.loads((output_dir / "manifest.json").read_text())
+            self.assertEqual(manifest["status"], "certified")
+            self.assertFalse(manifest["conditional"])
+            self.assertEqual(manifest["targets"], [ENTRYPOINT])
+            self.assertTrue((output_dir / f"{ENTRYPOINT.replace('.', '_')}.lean").exists())
+            self.assertTrue((output_dir / f"{ENTRYPOINT.replace('.', '_')}-report.json").exists())
 
     def test_certify_refuses_a_blocked_session(self):
         with TemporaryDirectory() as tmp:
-            ir_path = Path(tmp) / "ir.json"
-            ir_path.write_text(json.dumps(_ir(adjacency=_CHAIN3, stages=0, symmetrized=True)), encoding="utf-8")
+            extraction_path = Path(tmp) / "extraction.json"
+            _write_extraction_result(extraction_path, symmetrized=False)
             package_path = Path(tmp) / "package.json"
             VerificationPackageBuilder(
-                lean_project=PROJECT, entrypoints=[ENTRYPOINT], adapter_profile="dft-capability",
-                interface_contract={},
+                lean_project=PROJECT, entrypoints=[ENTRYPOINT], adapter=DFT_CAPABILITY_PLUGIN,
+                interface_contract=_constraints(),
             ).write(package_path)
             session_path = Path(tmp) / "session.json"
             main([
-                "start", "--ir", str(ir_path), "--package", str(package_path),
+                "start", "--extraction-result", str(extraction_path), "--package", str(package_path),
                 "--session", str(session_path), "--project", str(PROJECT),
                 "--trusted-local", "--timeout-s", "180",
             ])
@@ -76,10 +86,24 @@ class VerifyCliEndToEndTests(unittest.TestCase):
             rc = main([
                 "certify", "--session", str(session_path), "--package", str(package_path),
                 "--project", str(PROJECT), "--entrypoint", ENTRYPOINT,
-                "--lean-import", "Testv2.Requirements",
-                "--source-output", str(Path(tmp) / "Cert2.lean"),
-                "--report-output", str(Path(tmp) / "report2.json"),
+                "--lean-import", "Testv2.Requirements", "--output-dir", str(Path(tmp) / "certificate"),
                 "--trusted-local", "--timeout-s", "180",
+            ])
+            self.assertNotEqual(rc, 0)
+
+    def test_extraction_result_requires_trusted_local(self):
+        with TemporaryDirectory() as tmp:
+            extraction_path = Path(tmp) / "extraction.json"
+            _write_extraction_result(extraction_path)
+            package_path = Path(tmp) / "package.json"
+            VerificationPackageBuilder(
+                lean_project=PROJECT, entrypoints=[ENTRYPOINT], adapter=DFT_CAPABILITY_PLUGIN,
+                interface_contract=_constraints(),
+            ).write(package_path)
+            rc = main([
+                "start", "--extraction-result", str(extraction_path), "--package", str(package_path),
+                "--session", str(Path(tmp) / "session.json"), "--project", str(PROJECT),
+                "--timeout-s", "180",
             ])
             self.assertNotEqual(rc, 0)
 
