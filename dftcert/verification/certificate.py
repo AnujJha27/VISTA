@@ -23,15 +23,20 @@ def _ordered_nodes(session: dict[str, Any], entrypoint: str) -> list[tuple[str, 
 
 
 def _companion_free_binder_names(nodes: list[tuple[str, dict[str, Any]]]) -> dict[str, str]:
-    """node_id (of a premise) -> the Lean identifier of the free `Prop`-sort
-    data binder it was resolved alongside (spec section 13's
-    `TargetRequiresNonLocality`/`hPhysical` pair) -- `accept_assumption`
-    links these via `dependency_node_ids`."""
+    """premise node_id -> the Lean identifier of the free `Prop`-sort data
+    binder its own type actually depends on (spec section 13's
+    `TargetRequiresNonLocality`/`hPhysical` pair), read directly from the
+    premise's own Lean-derived `dependency_node_ids` (spec issue 8) --
+    never a `pretty_type == "Prop"` guess."""
+    by_id = dict(nodes)
     result = {}
-    for _, node in nodes:
-        if node["kind"] == "data" and node["status"] == "specified_assumption":
-            for dependent_id in node["dependency_node_ids"]:
-                result[dependent_id] = node["binder_name"]
+    for node_id, node in nodes:
+        if node["kind"] != "premise":
+            continue
+        for dep_id in node["dependency_node_ids"]:
+            dep = by_id.get(dep_id)
+            if dep is not None and dep["kind"] == "data" and dep["status"] == "specified_assumption":
+                result[node_id] = dep["binder_name"]
     return result
 
 

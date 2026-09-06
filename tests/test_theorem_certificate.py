@@ -17,7 +17,7 @@ from dftcert.verification.package import VerificationPackageBuilder
 from dftcert.verification.session import start_session
 
 from tests.test_lean_introspection import _HAS_LEAN, _SKIP_REASON
-from tests.test_structural_capability import _CHAIN3, _ir
+from tests.test_structural_capability import _CHAIN3, _constraints, _inventory
 
 PROJECT = Path(__file__).resolve().parent.parent / "examples" / "dft" / "lean"
 PLAIN_ENTRYPOINT = "Testv2.Requirements.ValidPretrainingArchitecture"
@@ -29,19 +29,26 @@ ALLOWED_AXIOMS = frozenset({"propext", "Classical.choice", "Quot.sound"})
 _FORBIDDEN = re.compile(r"\b(sorry|admit|axiom|unsafe)\b")
 
 
-def _ready_session(entrypoint, tmp, **package_overrides):
+def _package(entrypoint, **overrides):
     kwargs = dict(
-        lean_project=PROJECT, entrypoints=[entrypoint], adapter_profile="dft-capability",
-        interface_contract={},
+        lean_project=PROJECT, entrypoints=[entrypoint], adapter=DFT_CAPABILITY_PLUGIN,
+        interface_contract=_constraints(),
     )
-    kwargs.update(package_overrides)
-    package = VerificationPackageBuilder(**kwargs).as_dict()
-    out = Path(tmp) / "session.json"
-    session = start_session(
-        artifact_sha256="deadbeef", artifact_ir=_ir(adjacency=_CHAIN3, stages=0, symmetrized=True),
-        ir_sha256="cafebabe", package=package, adapter=DFT_CAPABILITY_PLUGIN,
+    kwargs.update(overrides)
+    return VerificationPackageBuilder(**kwargs).as_dict()
+
+
+def _start(package, out, symmetrized=True):
+    return start_session(
+        artifact_sha256="deadbeef", inventory=_inventory(adjacency=_CHAIN3, stages=0, symmetrized=symmetrized),
+        extractor_version="t", package=package, adapter=DFT_CAPABILITY_PLUGIN,
         project_root=PROJECT, output=out, trusted_local=True, timeout_s=180,
     )
+
+
+def _ready_session(entrypoint, tmp, **package_overrides):
+    package = _package(entrypoint, **package_overrides)
+    session = _start(package, Path(tmp) / "session.json")
     for premise in session.unresolved_premises:
         session.accept_assumption(premise_id=premise["id"], rationale="physical target requires non-locality")
     return session, package
@@ -140,16 +147,8 @@ class ConditionalCertificateTests(unittest.TestCase):
 class BlockedCertificateTests(unittest.TestCase):
     def test_unresolved_node_refuses_certificate_generation(self):
         with TemporaryDirectory() as tmp:
-            package = VerificationPackageBuilder(
-                lean_project=PROJECT, entrypoints=[PLAIN_ENTRYPOINT], adapter_profile="dft-capability",
-                interface_contract={},
-            ).as_dict()
-            out = Path(tmp) / "session.json"
-            session = start_session(
-                artifact_sha256="deadbeef", artifact_ir=_ir(adjacency=_CHAIN3, stages=0, symmetrized=True),
-                ir_sha256="cafebabe", package=package, adapter=DFT_CAPABILITY_PLUGIN,
-                project_root=PROJECT, output=out, trusted_local=True, timeout_s=180,
-            )
+            package = _package(PLAIN_ENTRYPOINT)
+            session = _start(package, Path(tmp) / "session.json", symmetrized=False)
             self.assertEqual(session.status, "blocked_on_premise")
             with self.assertRaises(ManifestError):
                 generate_certificate_source(
@@ -173,6 +172,41 @@ class BlockedCertificateTests(unittest.TestCase):
                     certificate_source=source, axiom_closure=["propext", "sorryAx"],
                     allowed_axioms=ALLOWED_AXIOMS,
                 )
+
+    def test_custom_axiom_blocks_unless_named_in_package_axiom_policy(self):
+        """Issue 12: no command-line-only trust escalation -- an extra
+        allowed axiom must come from the package's own hash-bound
+        axiom_policy, never a runtime flag."""
+        with TemporaryDirectory() as tmp:
+            session, package = _ready_session(
+                PLAIN_ENTRYPOINT, tmp,
+                binding_choices=[{"entrypoint": PLAIN_ENTRYPOINT, "binder_path": "0", "candidate_key": "site_count"}],
+            )
+            source = generate_certificate_source(
+                session=session.value, entrypoint=PLAIN_ENTRYPOINT,
+                namespace="VISTA.TestCustomAxiom", lean_import="Testv2.Requirements",
+            )
+            self.assertEqual(package["axiom_policy"], {"additional_allowed": []})
+            with self.assertRaises(ManifestError):
+                assemble_certificate_report(
+                    session=session.value, package=package, entrypoint=PLAIN_ENTRYPOINT,
+                    certificate_source=source, axiom_closure=["propext", "MyCustomAxiom"],
+                    allowed_axioms=ALLOWED_AXIOMS,
+                )
+            package_with_policy = _package(
+                PLAIN_ENTRYPOINT,
+                binding_choices=[{"entrypoint": PLAIN_ENTRYPOINT, "binder_path": "0", "candidate_key": "site_count"}],
+                axiom_policy={"additional_allowed": ["MyCustomAxiom"]},
+            )
+            allowed_with_package_policy = ALLOWED_AXIOMS | frozenset(
+                package_with_policy["axiom_policy"]["additional_allowed"]
+            )
+            report = assemble_certificate_report(
+                session=session.value, package=package_with_policy, entrypoint=PLAIN_ENTRYPOINT,
+                certificate_source=source, axiom_closure=["propext", "MyCustomAxiom"],
+                allowed_axioms=allowed_with_package_policy,
+            )
+            self.assertEqual(report["status"], "certified")
 
 
 if __name__ == "__main__":
