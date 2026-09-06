@@ -37,6 +37,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..manifest import ManifestError
+from ..verification.model import FormalBindingCandidate
 from .plugin import StructuralPlugin, _refs
 
 _ZERO_TARGETS = {
@@ -890,6 +891,53 @@ class DFTCapabilityPlugin(StructuralPlugin):
                 f"{str(checks['all_pairs_reachable']['satisfied']).lower()}"
             )
         return statements
+
+    def formal_binding_candidates(self, value: dict[str, Any]) -> list[FormalBindingCandidate]:
+        """Terms needed to instantiate the DFT theorem entrypoints in
+        `examples/dft/lean/Testv2/Requirements.lean`: site count, operator
+        construction, XC form. Topology (edges/depth) is exposed too since a
+        selected theorem may genuinely need `allPairsReachable`, but the
+        current recognized self-energy recipes never depend on message
+        passing (see `all_pairs_reachable`'s `applicable` flag above)."""
+        topology, operator, xc = value["topology"], value["operator"], value["xc"]
+        capabilities = value["capabilities"]
+        return [
+            FormalBindingCandidate(
+                key="site_count",
+                lean_expr=str(topology["site_count"]),
+                provenance="artifact_grounded",
+                evidence_refs=tuple(topology.get("provenance_nodes", [])),
+                display_label=f"siteCount = {topology['site_count']}",
+            ),
+            FormalBindingCandidate(
+                key="operator_form",
+                lean_expr=_lean_operator(operator["construction"]).replace(".", f"{self.lean_import}.OperatorForm.", 1),
+                provenance="artifact_grounded",
+                evidence_refs=tuple(operator.get("provenance_nodes", [])),
+                display_label=f"operator = {operator['construction']}",
+            ),
+            FormalBindingCandidate(
+                key="xc_form",
+                lean_expr=_lean_xc(xc["form"]).replace(".", f"{self.lean_import}.XCForm.", 1),
+                provenance="artifact_grounded",
+                evidence_refs=tuple(xc.get("provenance_nodes", [])),
+                display_label=f"xc = {xc['form']}",
+            ),
+            FormalBindingCandidate(
+                key="edges",
+                lean_expr=_lean_edges(topology["directed_edges"]),
+                provenance="artifact_grounded",
+                evidence_refs=tuple(topology.get("provenance_nodes", [])),
+                display_label=f"edges = {topology['directed_edges']}",
+            ),
+            FormalBindingCandidate(
+                key="operator_message_depth",
+                lean_expr=str(capabilities["operator_message_depth"] or 0),
+                provenance="artifact_grounded",
+                evidence_refs=tuple(operator.get("provenance_nodes", [])),
+                display_label=f"operatorMessageDepth = {capabilities['operator_message_depth'] or 0}",
+            ),
+        ]
 
 
 DFT_CAPABILITY_PLUGIN = DFTCapabilityPlugin()

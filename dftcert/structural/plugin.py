@@ -18,6 +18,7 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from ..manifest import ManifestError
+from ..verification.model import FormalBindingCandidate
 
 
 def _refs(value: Any) -> list[str]:
@@ -163,3 +164,12 @@ class StructuralPlugin(ABC):
     ) -> dict[str, str]:
         """check name -> Lean theorem statement string. Omit a name if its
         check cannot be stated (e.g. undetermined) rather than faking one."""
+
+    @abstractmethod
+    def formal_binding_candidates(self, value: dict[str, Any]) -> list[FormalBindingCandidate]:
+        """Lean-instantiable terms this adapter can justify from `value` (a
+        validated structural IR), offered to the theorem-centric resolver
+        (`dftcert.verification`) to fill a selected theorem's data binders.
+        Every artifact-grounded candidate must carry evidence references back
+        to the IR's own provenance nodes -- never a candidate manufactured
+        merely because Python can format a Lean string."""
