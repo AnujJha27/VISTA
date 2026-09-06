@@ -25,4 +25,23 @@ theorem propositionBinderExample (n : Nat) (hpos : n > 0) : n ≥ 1 := hpos
 theorem usesHelperLemma (a b : Nat) : sumOfTwoNats a b = sumOfTwoNats b a :=
   sumOfTwoNats_comm a b
 
+/-- Implicit `{n}`, instance-implicit `[DecidableEq Nat]`, and an explicit
+    dependent binder together (theorem-centric-gaps issue 6): the resolver
+    must synthesize the instance via Lean's own typeclass resolution
+    (never offering it an artifact candidate), and must resolve `n`
+    transitively via the unification triggered by elaborating `site`'s own
+    candidate -- never by directly offering `n` an artifact candidate
+    itself (an implicit non-instance binder is a type-level parameter, not
+    an artifact-data slot). -/
+theorem implicitBinderExample {n : Nat} [DecidableEq Nat] (site : Fin n) : True :=
+  trivial
+
+/-- Two independent `Prop`-sorted data binders and one premise depending on
+    only the first (theorem-centric-gaps issue 8): accepting `hP` as an
+    explicit assumption must resolve/associate `P` only, never `Q` -- a
+    same-entrypoint/`pretty_type == "Prop"` heuristic would get this wrong
+    (it can't distinguish `P` from `Q`). -/
+theorem twoIndependentPropParameters (P Q : Prop) (hP : P) : P :=
+  hP
+
 end Testv2.InspectionFixtures
