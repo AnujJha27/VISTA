@@ -99,6 +99,7 @@ def _build_nodes_for_entrypoint(
             "kind": "data", "entrypoint": entrypoint, "binder_path": str(entry["index"]),
             "binder_info": entry["binder_info"], "type_fingerprint": entry["type_fingerprint"],
             "dependency_node_ids": dep_ids(entry), "binder_name": binder_names[entry["index"]],
+            "is_prop_sort": entry["is_prop_sort"],
         }
         if status == "forced_choice_unknown_key":
             raise ManifestError(
@@ -221,15 +222,22 @@ class VerificationSession:
         # -- no adapter candidate can ever ground an arbitrary proposition,
         # and none should try to. Accepting the proof premise as an
         # explicit assumption resolves that companion binder too, using
-        # this premise's OWN Lean-derived dependency_node_ids (never a
-        # `pretty_type == "Prop"` guess, which can't distinguish this
-        # premise's actual parameter from an unrelated same-typed one --
-        # spec issue 8): both stay free binders on the generated
-        # certificate theorem (never a concrete substitution, never an
-        # `axiom`) rather than blocking forever.
+        # this premise's OWN Lean-derived dependency_node_ids -- but ONLY
+        # a dependency whose type Lean itself established is exactly
+        # `Prop` (`is_prop_sort`), never merely because the premise
+        # happens to depend on it (theorem-centric-gaps issue B): `(x :
+        # Nat) (h : Pred x)` must never turn `x` into a `Prop` parameter
+        # just because `h` depends on it -- `x` stays unresolved, blocking
+        # certification, unless it is separately resolved. Both a
+        # qualifying companion and the premise itself stay free binders on
+        # the generated certificate theorem (never a concrete
+        # substitution, never an `axiom`) rather than blocking forever.
         for dep_id in node["dependency_node_ids"]:
             dep = self.value["nodes"].get(dep_id)
-            if dep is not None and dep["kind"] == "data" and dep["status"] == "unresolved":
+            if (
+                dep is not None and dep["kind"] == "data" and dep["status"] == "unresolved"
+                and dep.get("is_prop_sort") is True
+            ):
                 dep["status"] = "specified_assumption"
                 dep["external_assumption"] = {**node["external_assumption"], "premise_id": dep_id}
         self.value["decisions"].append({

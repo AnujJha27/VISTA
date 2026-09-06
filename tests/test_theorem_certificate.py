@@ -1,17 +1,21 @@
 """`dftcert.verification.certificate` against a real Lean toolchain (spec
-sections 19/23/27.4): the generated wrapper theorem must actually compile,
-external assumptions must survive as real binders (never `axiom`), and the
-report must refuse to assemble while anything is unresolved.
+sections 19/23/27.4, theorem-centric-gaps issues A/B/C): the generated
+wrapper theorem must actually compile, external assumptions must survive
+as real binders (never `axiom`), and the report must refuse to assemble
+while anything is unresolved -- gated on the GENERATED certificate
+declaration's own axiom closure, not the entrypoint's.
 """
 import re
-import subprocess
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from dftcert.manifest import ManifestError
+from dftcert.structural.core import verify_structural_certificate
 from dftcert.structural.dft_capability_plugin import DFT_CAPABILITY_PLUGIN
-from dftcert.verification.certificate import assemble_certificate_report, generate_certificate_source
+from dftcert.verification.certificate import (
+    assemble_certificate_report, generate_certificate_source, parse_certificate_axiom_closure,
+)
 from dftcert.verification.lean_inspect import inspect_declarations
 from dftcert.verification.package import VerificationPackageBuilder
 from dftcert.verification.session import start_session
@@ -54,11 +58,20 @@ def _ready_session(entrypoint, tmp, **package_overrides):
     return session, package
 
 
-def _compiles(source: str, imports: str = "import Testv2.Requirements\n\n") -> subprocess.CompletedProcess:
+def _generate(session, entrypoint, namespace):
+    return generate_certificate_source(
+        session=session.value, entrypoint=entrypoint, namespace=namespace, lean_import="Testv2.Requirements",
+        project_root=PROJECT, trusted_local=True, timeout_s=180,
+    )
+
+
+def _compile(source: str):
     with TemporaryDirectory() as tmp:
         path = Path(tmp) / "Cert.lean"
-        path.write_text(imports + source, encoding="utf-8")
-        return subprocess.run(["lake", "env", "lean", "-j", "1", str(path)], cwd=PROJECT, capture_output=True, text=True)
+        path.write_text(source, encoding="utf-8")
+        return verify_structural_certificate(
+            project_root=PROJECT, certificate_source=path, trusted_local=True, timeout_s=180,
+        )
 
 
 @unittest.skipUnless(_HAS_LEAN, _SKIP_REASON)
@@ -70,13 +83,10 @@ class UnconditionalCertificateTests(unittest.TestCase):
                 binding_choices=[{"entrypoint": PLAIN_ENTRYPOINT, "binder_path": "0", "candidate_key": "site_count"}],
             )
             self.assertEqual(session.status, "ready_for_certificate")
-            source = generate_certificate_source(
-                session=session.value, entrypoint=PLAIN_ENTRYPOINT,
-                namespace="VISTA.TestUnconditional", lean_import="Testv2.Requirements",
-            )
+            source = _generate(session, PLAIN_ENTRYPOINT, "VISTA.TestUnconditional")
             self.assertNotRegex(source, _FORBIDDEN)
-            result = _compiles(source)
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            compiled = _compile(source)
+            self.assertEqual(compiled["status"], "verified", compiled["diagnostics"])
 
     def test_report_marks_unconditional_certificate_with_no_assumptions(self):
         with TemporaryDirectory() as tmp:
@@ -84,17 +94,18 @@ class UnconditionalCertificateTests(unittest.TestCase):
                 PLAIN_ENTRYPOINT, tmp,
                 binding_choices=[{"entrypoint": PLAIN_ENTRYPOINT, "binder_path": "0", "candidate_key": "site_count"}],
             )
-            source = generate_certificate_source(
-                session=session.value, entrypoint=PLAIN_ENTRYPOINT,
-                namespace="VISTA.TestUnconditional2", lean_import="Testv2.Requirements",
-            )
-            axioms = inspect_declarations(
+            source = _generate(session, PLAIN_ENTRYPOINT, "VISTA.TestUnconditional2")
+            compiled = _compile(source)
+            self.assertEqual(compiled["status"], "verified", compiled["diagnostics"])
+            entrypoint_axioms = inspect_declarations(
                 project_root=PROJECT, imports=["Testv2.Requirements"], declarations=[PLAIN_ENTRYPOINT],
                 trusted_local=True, timeout_s=120,
             )[PLAIN_ENTRYPOINT]["axioms"]
+            certificate_axioms = parse_certificate_axiom_closure(compiled["diagnostics"])
             report = assemble_certificate_report(
                 session=session.value, package=package, entrypoint=PLAIN_ENTRYPOINT,
-                certificate_source=source, axiom_closure=axioms, allowed_axioms=ALLOWED_AXIOMS,
+                certificate_source=source, entrypoint_axiom_closure=entrypoint_axioms,
+                certificate_axiom_closure=certificate_axioms, allowed_axioms=ALLOWED_AXIOMS,
             )
             self.assertFalse(report["conditional"])
             self.assertEqual(report["external_assumptions"], [])
@@ -111,15 +122,20 @@ class ConditionalCertificateTests(unittest.TestCase):
                 binding_choices=[{"entrypoint": CONDITIONAL_ENTRYPOINT, "binder_path": "0", "candidate_key": "site_count"}],
             )
             self.assertEqual(session.status, "ready_for_certificate")
-            source = generate_certificate_source(
-                session=session.value, entrypoint=CONDITIONAL_ENTRYPOINT,
-                namespace="VISTA.TestConditional", lean_import="Testv2.Requirements",
-            )
+            source = _generate(session, CONDITIONAL_ENTRYPOINT, "VISTA.TestConditional")
             self.assertNotRegex(source, _FORBIDDEN)
-            self.assertIn("(TargetRequiresNonLocality : Prop)", source)
-            self.assertIn("(hPhysical : TargetRequiresNonLocality)", source)
-            result = _compiles(source)
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("TargetRequiresNonLocality : Prop", source)
+            # `hPhysical`'s premise type (`TargetRequiresNonLocality`) is
+            # non-dependent (nothing downstream mentions its value), so
+            # Lean's printer renders that binder in the TYPE as a plain
+            # arrow ("TargetRequiresNonLocality → ...") rather than a named
+            # "(hPhysical : ...)" -- still a genuine binder, not an axiom:
+            # `hPhysical` itself appears as a real lambda-bound parameter
+            # on the VALUE side.
+            self.assertIn("TargetRequiresNonLocality →", source)
+            self.assertIn("fun TargetRequiresNonLocality hPhysical =>", source)
+            compiled = _compile(source)
+            self.assertEqual(compiled["status"], "verified", compiled["diagnostics"])
 
     def test_report_marks_certificate_conditional_on_the_named_assumption(self):
         with TemporaryDirectory() as tmp:
@@ -127,17 +143,18 @@ class ConditionalCertificateTests(unittest.TestCase):
                 CONDITIONAL_ENTRYPOINT, tmp,
                 binding_choices=[{"entrypoint": CONDITIONAL_ENTRYPOINT, "binder_path": "0", "candidate_key": "site_count"}],
             )
-            source = generate_certificate_source(
-                session=session.value, entrypoint=CONDITIONAL_ENTRYPOINT,
-                namespace="VISTA.TestConditional2", lean_import="Testv2.Requirements",
-            )
-            axioms = inspect_declarations(
+            source = _generate(session, CONDITIONAL_ENTRYPOINT, "VISTA.TestConditional2")
+            compiled = _compile(source)
+            self.assertEqual(compiled["status"], "verified", compiled["diagnostics"])
+            entrypoint_axioms = inspect_declarations(
                 project_root=PROJECT, imports=["Testv2.Requirements"], declarations=[CONDITIONAL_ENTRYPOINT],
                 trusted_local=True, timeout_s=120,
             )[CONDITIONAL_ENTRYPOINT]["axioms"]
+            certificate_axioms = parse_certificate_axiom_closure(compiled["diagnostics"])
             report = assemble_certificate_report(
                 session=session.value, package=package, entrypoint=CONDITIONAL_ENTRYPOINT,
-                certificate_source=source, axiom_closure=axioms, allowed_axioms=ALLOWED_AXIOMS,
+                certificate_source=source, entrypoint_axiom_closure=entrypoint_axioms,
+                certificate_axiom_closure=certificate_axioms, allowed_axioms=ALLOWED_AXIOMS,
             )
             self.assertTrue(report["conditional"])
             self.assertEqual(len(report["external_assumptions"]), 1)
@@ -151,10 +168,7 @@ class BlockedCertificateTests(unittest.TestCase):
             session = _start(package, Path(tmp) / "session.json", symmetrized=False)
             self.assertEqual(session.status, "blocked_on_premise")
             with self.assertRaises(ManifestError):
-                generate_certificate_source(
-                    session=session.value, entrypoint=PLAIN_ENTRYPOINT,
-                    namespace="VISTA.TestBlocked", lean_import="Testv2.Requirements",
-                )
+                _generate(session, PLAIN_ENTRYPOINT, "VISTA.TestBlocked")
 
     def test_sorryax_in_axiom_closure_blocks_the_report(self):
         with TemporaryDirectory() as tmp:
@@ -162,15 +176,12 @@ class BlockedCertificateTests(unittest.TestCase):
                 PLAIN_ENTRYPOINT, tmp,
                 binding_choices=[{"entrypoint": PLAIN_ENTRYPOINT, "binder_path": "0", "candidate_key": "site_count"}],
             )
-            source = generate_certificate_source(
-                session=session.value, entrypoint=PLAIN_ENTRYPOINT,
-                namespace="VISTA.TestSorry", lean_import="Testv2.Requirements",
-            )
+            source = _generate(session, PLAIN_ENTRYPOINT, "VISTA.TestSorry")
             with self.assertRaises(ManifestError):
                 assemble_certificate_report(
                     session=session.value, package=package, entrypoint=PLAIN_ENTRYPOINT,
-                    certificate_source=source, axiom_closure=["propext", "sorryAx"],
-                    allowed_axioms=ALLOWED_AXIOMS,
+                    certificate_source=source, entrypoint_axiom_closure=["propext"],
+                    certificate_axiom_closure=["propext", "sorryAx"], allowed_axioms=ALLOWED_AXIOMS,
                 )
 
     def test_custom_axiom_blocks_unless_named_in_package_axiom_policy(self):
@@ -182,16 +193,13 @@ class BlockedCertificateTests(unittest.TestCase):
                 PLAIN_ENTRYPOINT, tmp,
                 binding_choices=[{"entrypoint": PLAIN_ENTRYPOINT, "binder_path": "0", "candidate_key": "site_count"}],
             )
-            source = generate_certificate_source(
-                session=session.value, entrypoint=PLAIN_ENTRYPOINT,
-                namespace="VISTA.TestCustomAxiom", lean_import="Testv2.Requirements",
-            )
+            source = _generate(session, PLAIN_ENTRYPOINT, "VISTA.TestCustomAxiom")
             self.assertEqual(package["axiom_policy"], {"additional_allowed": []})
             with self.assertRaises(ManifestError):
                 assemble_certificate_report(
                     session=session.value, package=package, entrypoint=PLAIN_ENTRYPOINT,
-                    certificate_source=source, axiom_closure=["propext", "MyCustomAxiom"],
-                    allowed_axioms=ALLOWED_AXIOMS,
+                    certificate_source=source, entrypoint_axiom_closure=["propext"],
+                    certificate_axiom_closure=["propext", "MyCustomAxiom"], allowed_axioms=ALLOWED_AXIOMS,
                 )
             package_with_policy = _package(
                 PLAIN_ENTRYPOINT,
@@ -203,7 +211,8 @@ class BlockedCertificateTests(unittest.TestCase):
             )
             report = assemble_certificate_report(
                 session=session.value, package=package_with_policy, entrypoint=PLAIN_ENTRYPOINT,
-                certificate_source=source, axiom_closure=["propext", "MyCustomAxiom"],
+                certificate_source=source, entrypoint_axiom_closure=["propext"],
+                certificate_axiom_closure=["propext", "MyCustomAxiom"],
                 allowed_axioms=allowed_with_package_policy,
             )
             self.assertEqual(report["status"], "certified")

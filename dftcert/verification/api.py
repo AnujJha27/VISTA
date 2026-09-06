@@ -18,7 +18,7 @@ from typing import Any
 from ..manifest import ManifestError, sha256_value
 from ..structural.dft_capability_plugin import DFT_CAPABILITY_PLUGIN
 from ..structural.plugin import StructuralPlugin
-from .certificate import assemble_certificate_report, generate_certificate_source
+from .certificate import assemble_certificate_report, generate_certificate_source, parse_certificate_axiom_closure
 from .lean_inspect import inspect_declarations
 from .package import load_package, package_sha256
 from .session import (
@@ -155,14 +155,16 @@ def _certify_one(
     project_root: str | Path, lean_import: str, namespace: str, output_dir: Path,
     lean_command, timeout_s: int, trusted_local: bool,
 ) -> dict[str, Any]:
-    source = generate_certificate_source(
+    full_source = generate_certificate_source(
         session=session.value, entrypoint=entrypoint, namespace=namespace, lean_import=lean_import,
+        project_root=project_root, lean_command=lean_command, timeout_s=timeout_s, trusted_local=trusted_local,
     )
-    full_source = f"import {lean_import}\n\n{source}"
     safe_name = entrypoint.replace(".", "_")
     source_path = output_dir / f"{safe_name}.lean"
     source_path.write_text(full_source, encoding="utf-8")
-    introspected = inspect_declarations(
+    # Recorded for audit only -- the selected entrypoint's own axiom
+    # closure never gates certification (issue C).
+    entrypoint_introspected = inspect_declarations(
         project_root=project_root, imports=[lean_import], declarations=[entrypoint],
         lean_command=lean_command, timeout_s=timeout_s, trusted_local=trusted_local,
     )[entrypoint]
@@ -173,10 +175,15 @@ def _certify_one(
     )
     if compiled["status"] != "verified":
         return {"entrypoint": entrypoint, "status": "verification_error", "diagnostics": compiled["diagnostics"]}
+    # Issue C: gate on the GENERATED certificate declaration's own axiom
+    # closure (embedded in `full_source` itself and collected in this same
+    # compilation), never the entrypoint's.
+    certificate_axiom_closure = parse_certificate_axiom_closure(compiled["diagnostics"])
     allowed = DEFAULT_ALLOWED_AXIOMS | frozenset(package.get("axiom_policy", {}).get("additional_allowed", []))
     report = assemble_certificate_report(
         session=session.value, package=package, entrypoint=entrypoint,
-        certificate_source=full_source, axiom_closure=introspected["axioms"], allowed_axioms=allowed,
+        certificate_source=full_source, entrypoint_axiom_closure=entrypoint_introspected["axioms"],
+        certificate_axiom_closure=certificate_axiom_closure, allowed_axioms=allowed,
     )
     report_path = output_dir / f"{safe_name}-report.json"
     report_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")

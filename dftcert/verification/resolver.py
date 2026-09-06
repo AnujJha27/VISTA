@@ -205,9 +205,23 @@ private def vistaTryElab (env : Environment) (exprStr : String) (expectedType : 
         report := report.push (Json.mkObj fields.toList)
       else
         let mut status := if isAssignedNow then "resolved" else "unresolved"
+        -- Issue B: a data binder may only ever become a free assumption
+        -- parameter if Lean itself establishes its TYPE is exactly `Prop`
+        -- (e.g. `P : Prop`) -- never merely because a premise happens to
+        -- depend on it. `Nat`, `Type`, `Fin n`, etc. must never qualify.
+        -- A non-assigning STRUCTURAL check: `isDefEq` would happily
+        -- *assign* an unresolved metavariable to `Prop` as a side effect
+        -- (`?α =?= Sort 0` succeeds by unifying `?α := Prop`), silently
+        -- fabricating exactly the "is_prop_sort" evidence issue B forbids
+        -- for a genuinely unresolved binder. Whnf-reduce (in case of a
+        -- reducible alias) and pattern-match the literal `Sort 0` shape
+        -- instead -- this can never assign anything.
+        let isPropSort := match (← whnf finalType) with
+          | .sort .zero => true
+          | _ => false
         let mut fields := #[
           ("index", Json.str (toString i)), ("kind", Json.str "data"),
-          ("binder_info", Json.str bInfo),
+          ("binder_info", Json.str bInfo), ("is_prop_sort", Json.bool isPropSort),
           ("type_display", Json.str display), ("type_fingerprint_source", Json.str canonical),
           ("dependency_indices", Json.arr (deps.map (fun d => Json.str (toString d))))]
         if forcedChoiceUnknown[i]! then
