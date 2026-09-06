@@ -249,5 +249,43 @@ class AssumptionMechanicsTests(unittest.TestCase):
             self.assertEqual(node["status"], "unresolved")
 
 
+@unittest.skipUnless(_HAS_LEAN, _SKIP_REASON)
+class NamespaceModulePathMismatchTests(unittest.TestCase):
+    """Issue 13: `Physics.ValidModel` lives in `Testv2/AltModule.lean` --
+    an entrypoint whose namespace does not match its module path at all.
+    A package must say so via an explicit entry_modules override; the
+    session-building pipeline must import that module (not one guessed
+    from the declaration's own namespace) and actually find/resolve it."""
+
+    def test_entrypoint_is_found_via_explicit_entry_modules_override(self):
+        entrypoint = "Physics.ValidModel"
+        package = VerificationPackageBuilder(
+            lean_project=PROJECT, entrypoints=[entrypoint], adapter=DFT_CAPABILITY_PLUGIN,
+            interface_contract=_constraints(), entry_modules=["Testv2.AltModule"],
+        ).as_dict()
+        with TemporaryDirectory() as tmp:
+            session = _start(package=package, output=Path(tmp) / "session.json")
+            target = next(t for t in session.value["targets"] if t["entrypoint"] == entrypoint)
+            # The DFT adapter's `site_count` candidate (a plain Nat) happens
+            # to typecheck against this fixture's own unrelated Nat binder
+            # too -- expected (nothing here is DFT-specific), just confirms
+            # the entrypoint was actually found/resolved via the override.
+            self.assertEqual(target["conclusion_display"], "3 ≥ 1")
+
+    def test_guessed_module_from_namespace_does_not_exist(self):
+        """The auto-derive fallback (splitting on the last dot) would guess
+        module `Physics` here, which does not exist as an importable
+        module at all -- confirms the override is load-bearing, not
+        incidentally unnecessary."""
+        package = VerificationPackageBuilder(
+            lean_project=PROJECT, entrypoints=["Physics.ValidModel"], adapter=DFT_CAPABILITY_PLUGIN,
+            interface_contract=_constraints(),
+        ).as_dict()
+        self.assertEqual(package["lean_theory"]["entry_modules"], ["Physics"])
+        with TemporaryDirectory() as tmp:
+            with self.assertRaises(Exception):
+                _start(package=package, output=Path(tmp) / "session.json")
+
+
 if __name__ == "__main__":
     unittest.main()
