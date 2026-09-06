@@ -188,26 +188,28 @@ def _finish_declaration(entry: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def inspect_declarations(
-    *, project_root: str | Path, imports: list[str], declarations: list[str],
+def run_marker_probe(
+    *, project_root: str | Path, source: str, marker: str,
     lean_command: Sequence[str] = ("lake", "env", "lean", "-j", "1"),
     timeout_s: int = 300, trusted_local: bool = False,
-) -> dict[str, dict[str, Any]]:
-    """Run the structured inspector for `declarations` (fully qualified Lean
-    names) after `import`ing `imports`, from `project_root` via the caller's
-    own `lean_command`. Returns `{declaration_name: inspection_result}`."""
+) -> Any:
+    """Run a generated Lean probe source from `project_root` via the
+    caller's own `lean_command`, and return the JSON payload of the last
+    `marker`-prefixed line in its output. Shared by every VISTA Lean probe
+    (`inspect_declarations` here, `dftcert.verification.bindings`'
+    candidate-matching probe) -- same subprocess/timeout/trust-boundary
+    shape `dftcert.structural.core.verify_structural_certificate` already
+    uses for generated certificates."""
     if not trusted_local:
         raise ManifestError(
             "Lean introspection requires --trusted-local until a compiler sandbox is configured"
         )
-    if not declarations:
-        raise ManifestError("Lean introspection needs at least one declaration name")
     if not lean_command:
         raise ManifestError("Lean command cannot be empty")
     root = Path(project_root).resolve()
-    source = _render_probe(imports=imports, declarations=declarations)
-    with tempfile.TemporaryDirectory(prefix="vista-inspect-") as directory:
-        probe_path = Path(directory) / "VistaInspectProbe.lean"
+    marker_line = re.compile(re.escape(marker) + r"(.*)$")
+    with tempfile.TemporaryDirectory(prefix="vista-probe-") as directory:
+        probe_path = Path(directory) / "VistaProbe.lean"
         probe_path.write_text(source, encoding="utf-8")
         try:
             process = subprocess.run(
@@ -216,17 +218,33 @@ def inspect_declarations(
                 timeout=timeout_s,
             )
         except subprocess.TimeoutExpired as error:
-            raise LeanIntrospectionError(f"Lean introspection timed out after {timeout_s}s") from error
+            raise LeanIntrospectionError(f"Lean probe timed out after {timeout_s}s") from error
         except OSError as error:
             raise LeanIntrospectionError(f"cannot start Lean: {error}") from error
     diagnostics = (process.stdout or "") + (process.stderr or "")
-    matches = [match.group(1) for line in diagnostics.splitlines() for match in [_MARKER_LINE.search(line)] if match]
+    matches = [match.group(1) for line in diagnostics.splitlines() for match in [marker_line.search(line)] if match]
     if not matches:
         raise LeanIntrospectionError(
-            f"Lean introspection produced no marker payload (exit code {process.returncode}): "
+            f"Lean probe produced no marker payload (exit code {process.returncode}): "
             f"{diagnostics.strip()[-4000:]}"
         )
-    payload = json.loads(matches[-1])
+    return json.loads(matches[-1])
+
+
+def inspect_declarations(
+    *, project_root: str | Path, imports: list[str], declarations: list[str],
+    lean_command: Sequence[str] = ("lake", "env", "lean", "-j", "1"),
+    timeout_s: int = 300, trusted_local: bool = False,
+) -> dict[str, dict[str, Any]]:
+    """Run the structured inspector for `declarations` (fully qualified Lean
+    names) after `import`ing `imports`, from `project_root` via the caller's
+    own `lean_command`. Returns `{declaration_name: inspection_result}`."""
+    if not declarations:
+        raise ManifestError("Lean introspection needs at least one declaration name")
+    payload = run_marker_probe(
+        project_root=project_root, source=_render_probe(imports=imports, declarations=declarations),
+        marker=_MARKER, lean_command=lean_command, timeout_s=timeout_s, trusted_local=trusted_local,
+    )
     if not isinstance(payload, list):
         raise LeanIntrospectionError("Lean introspection payload must be a JSON array")
     return {entry["declaration"]: _finish_declaration(entry) for entry in payload}
