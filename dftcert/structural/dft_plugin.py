@@ -13,6 +13,7 @@ second code path that could silently disagree with it.
 """
 from __future__ import annotations
 
+import itertools
 from typing import Any
 
 from ..manifest import ManifestError
@@ -108,8 +109,68 @@ def _direct_ref(value: Any) -> str | None:
     return refs[0] if len(refs) == 1 else None
 
 
+def _resolve_operator_layout(input_constraints: dict[str, Any]) -> dict[str, Any]:
+    """The operator's declared domain/codomain axis grouping. Default is the
+    plain n x n matrix (`output_axes=[0]`, `input_axes=[1]`, `site_axis=0`),
+    covering every artifact certified before this field existed. A grouped
+    layout -- e.g. site and orbital/spin axes folded together into a shape
+    like `[N, m, N, m]`, still mathematically a linear operator on the
+    flattened Nm-dimensional space once the axis groups are known -- is
+    opt-in via `input_constraints.operator_layout`. Only the canonical
+    contiguous grouping (`output_axes=[0..r-1]`, `input_axes=[r..2r-1]`) is
+    supported; a reordered or interleaved grouping is `unsupported`, never
+    guessed at."""
+    raw = input_constraints.get("operator_layout")
+    if raw is None:
+        return {"output_axes": [0], "input_axes": [1], "site_axis": 0}
+    if not isinstance(raw, dict):
+        raise ManifestError("operator_layout must be an object")
+    output_axes, input_axes, site_axis = raw.get("output_axes"), raw.get("input_axes"), raw.get("site_axis")
+    if not isinstance(output_axes, list) or not output_axes or not isinstance(input_axes, list):
+        raise ManifestError("operator_layout.output_axes/input_axes must be non-empty lists")
+    rank = len(output_axes)
+    if len(input_axes) != rank:
+        raise ManifestError("operator_layout.output_axes and input_axes must have equal length")
+    if output_axes != list(range(rank)) or input_axes != list(range(rank, 2 * rank)):
+        raise ManifestError(
+            "operator_layout only supports the canonical contiguous axis grouping "
+            "(output_axes=[0..r-1], input_axes=[r..2r-1]); a reordered or "
+            "interleaved grouping is not supported"
+        )
+    if not isinstance(site_axis, int) or isinstance(site_axis, bool) or not (0 <= site_axis < rank):
+        raise ManifestError("operator_layout.site_axis must index one axis within each group")
+    return {"output_axes": output_axes, "input_axes": input_axes, "site_axis": site_axis}
+
+
+def _adjoint_permutation(node: dict[str, Any]) -> list[Any] | None:
+    """The literal permutation argument of a `permute` node, if present."""
+    args = node.get("args")
+    positional = args if isinstance(args, list) else []
+    if len(positional) > 1 and isinstance(positional[1], list):
+        return positional[1]
+    kwargs = node.get("kwargs")
+    dims = kwargs.get("dims") if isinstance(kwargs, dict) else None
+    return dims if isinstance(dims, list) else None
+
+
+def _is_adjoint_of(node: dict[str, Any], layout: dict[str, Any]) -> bool:
+    """Whether `node` actually constructs the adjoint under `layout`. For the
+    default single-axis-per-side layout, any reviewed transpose op suffices
+    -- there is only one possible nontrivial permutation of two axes. For a
+    grouped multi-axis layout, only `permute` can even express the required
+    swap of the whole input axis group with the whole output axis group, and
+    its actual permutation argument must equal that swap exactly; the op
+    name alone is not enough once there is more than one axis per side."""
+    rank = len(layout["output_axes"])
+    if rank == 1:
+        return _target(node) in _ADJOINT_TARGETS
+    if _target(node) != "aten.permute.default":
+        return False
+    return _adjoint_permutation(node) == layout["input_axes"] + layout["output_axes"]
+
+
 def _operator_construction(
-    nodes: list[dict[str, Any]], root: str,
+    nodes: list[dict[str, Any]], root: str, layout: dict[str, Any],
 ) -> tuple[str, list[str], dict[str, Any]]:
     """Classify the operator's construction and return a `recipe` describing
     exactly how to compute its concrete matrix from raw extracted parameter
@@ -130,7 +191,7 @@ def _operator_construction(
             left, right = arguments[:2]
             for base, transformed in ((left, right), (right, left)):
                 transformed_node = by_name.get(transformed, {})
-                if _has_target([transformed_node], _ADJOINT_TARGETS):
+                if _is_adjoint_of(transformed_node, layout):
                     transformed_base = _direct_ref(transformed_node.get("args"))
                     if transformed_base == base:
                         return "symmetrized", provenance, {
@@ -265,32 +326,70 @@ def _operator_state_name(inventory: dict[str, Any], node_name: str) -> str | Non
     return None
 
 
-def _param_matrix(
-    inventory: dict[str, Any], node_name: str, site_count: int,
-) -> list[list[float]] | None:
-    """The concrete site_count x site_count matrix of a raw extracted parameter,
-    or None if its real values were not safely capturable (too large, wrong
-    shape, or not a small numeric/boolean/integer tensor)."""
+def _matches_shape(values: Any, shape: list[int]) -> bool:
+    """Whether the raw nested list `values` actually has declared `shape` --
+    checked structurally rather than trusted, so a `shape` field that
+    disagrees with the real exported values fails closed instead of reading
+    the wrong cells."""
+    if not shape:
+        return isinstance(values, (bool, int, float))
+    return (
+        isinstance(values, list) and len(values) == shape[0]
+        and all(_matches_shape(item, shape[1:]) for item in values)
+    )
+
+
+def _get_nested(values: Any, indices: tuple[int, ...]) -> Any:
+    for index in indices:
+        values = values[index]
+    return values
+
+
+def _read_operator_tensor(
+    inventory: dict[str, Any], node_name: str, layout: dict[str, Any], site_count: int,
+) -> dict[str, Any] | None:
+    """The operator's real extracted tensor, flattened under `layout`'s
+    domain/codomain axis grouping into a concrete (output-group-size x
+    input-group-size) matrix, plus which site each flattened row/column
+    belongs to (`layout["site_axis"]`'s coordinate within that row/column's
+    multi-index) -- or None if its real values were not safely capturable
+    (too large, wrong shape, not numeric), its layout does not describe an
+    endomorphism (matching output/input group dimensions), or its site axis
+    does not match the declared topology size."""
     state = inventory.get("state", {})
     state_name = _operator_state_name(inventory, node_name)
     entry = state.get(state_name) if isinstance(state, dict) and state_name else None
     if not isinstance(entry, dict):
         return None
     values = entry.get("structural_values")
+    shape = entry.get("shape")
+    rank = len(layout["output_axes"])
     if (
-        not isinstance(values, list) or len(values) != site_count
-        or any(not isinstance(row, list) or len(row) != site_count for row in values)
-        or any(not isinstance(cell, (bool, int, float)) for row in values for cell in row)
+        not isinstance(shape, list) or len(shape) != 2 * rank
+        or any(not isinstance(dim, int) or isinstance(dim, bool) or dim <= 0 for dim in shape)
+        or not _matches_shape(values, shape)
     ):
         return None
-    return [[float(cell) for cell in row] for row in values]
+    output_shape, input_shape = shape[:rank], shape[rank:]
+    if output_shape != input_shape or output_shape[layout["site_axis"]] != site_count:
+        return None
+    output_indices = list(itertools.product(*(range(dim) for dim in output_shape)))
+    input_indices = list(itertools.product(*(range(dim) for dim in input_shape)))
+    matrix = [
+        [float(_get_nested(values, out_idx + in_idx)) for in_idx in input_indices]
+        for out_idx in output_indices
+    ]
+    row_site = [out_idx[layout["site_axis"]] for out_idx in output_indices]
+    col_site = [in_idx[layout["site_axis"]] for in_idx in input_indices]
+    return {"matrix": matrix, "row_site": row_site, "col_site": col_site}
 
 
 def _operator_matrix(
-    recipe: dict[str, Any], inventory: dict[str, Any], site_count: int,
-) -> list[list[float]] | None:
-    """Compute the operator's concrete matrix from its construction `recipe`
-    (see `_operator_construction`) and safely-extracted raw parameter values.
+    recipe: dict[str, Any], inventory: dict[str, Any], site_count: int, layout: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Compute the operator's concrete flattened (matrix, row_site, col_site)
+    from its construction `recipe` (see `_operator_construction`) and
+    safely-extracted raw parameter values, under `layout`'s axis grouping.
     Returns None when the actual values cannot be determined without
     executing arbitrary graph code (e.g. an unrecognized construction, or a
     parameter too large/not numeric to have been captured) -- callers must
@@ -298,52 +397,74 @@ def _operator_matrix(
     """
     kind = recipe.get("kind")
     if kind == "zero":
-        return [[0.0] * site_count for _ in range(site_count)]
+        sites = list(range(site_count))
+        return {"matrix": [[0.0] * site_count for _ in range(site_count)], "row_site": sites, "col_site": sites}
     if kind == "identity":
-        return [[1.0 if row == col else 0.0 for col in range(site_count)] for row in range(site_count)]
+        sites = list(range(site_count))
+        return {
+            "matrix": [[1.0 if row == col else 0.0 for col in range(site_count)] for row in range(site_count)],
+            "row_site": sites, "col_site": sites,
+        }
     if kind == "param":
-        return _param_matrix(inventory, recipe["node"], site_count)
+        return _read_operator_tensor(inventory, recipe["node"], layout, site_count)
     if kind == "sum_transpose":
-        base = _param_matrix(inventory, recipe["base"], site_count)
-        other = _param_matrix(inventory, recipe["transposed_base"], site_count)
-        if base is None or other is None:
+        # `recipe["base"] == recipe["transposed_base"]` always (see
+        # `_operator_construction`): the adjoint is applied to the SAME
+        # parameter, not a second one. Reading it once and adding its own
+        # (row, col)-swap is exactly B + B^dagger under this layout's
+        # flattening -- (B^dagger)_{row,col} = B_{col,row} once output/input
+        # groups have equal dimension, which is validated in
+        # `_read_operator_tensor`.
+        base = _read_operator_tensor(inventory, recipe["base"], layout, site_count)
+        if base is None:
             return None
-        return [
-            [base[row][col] + other[col][row] for col in range(site_count)]
-            for row in range(site_count)
-        ]
+        rows = len(base["matrix"])
+        return {
+            "matrix": [
+                [base["matrix"][row][col] + base["matrix"][col][row] for col in range(rows)]
+                for row in range(rows)
+            ],
+            "row_site": base["row_site"], "col_site": base["row_site"],
+        }
     return None
 
 
-def _observed_locality(
-    matrix: list[list[float]], site_count: int, rule: dict[str, Any],
-) -> dict[str, Any]:
-    """The actual (source, target) pairs -- convention: row = target, column =
-    source, matching (Sigma e_source)(target) -- whose value exceeds the
-    fixed disclosed threshold, and whether the matrix is therefore local
-    (diagonal-only) or non-local, as a real fact about the extracted values.
+def _observed_locality(operator: dict[str, Any], rule: dict[str, Any]) -> dict[str, Any]:
+    """The actual (source-site, target-site) pairs whose real value exceeds
+    the fixed disclosed threshold at some (row, column) belonging to two
+    DIFFERENT sites, and whether the operator is therefore local (every real
+    coupling stays within a single site -- orbital/spin mixing on the same
+    site is still local) or non-local, as a real fact about the extracted
+    values. For the default single-axis-per-side layout, row/column ARE the
+    site, so this reduces exactly to the original diagonal/off-diagonal
+    check.
     """
     threshold = rule["threshold"]
-    off_diagonal = [
-        {"source": column, "target": row}
-        for row in range(site_count)
-        for column in range(site_count)
-        if row != column and abs(matrix[row][column]) > threshold
-    ]
-    off_diagonal.sort(key=lambda item: (item["source"], item["target"]))
+    matrix, row_site, col_site = operator["matrix"], operator["row_site"], operator["col_site"]
+    pairs = {
+        (col_site[column], row_site[row])
+        for row in range(len(matrix))
+        for column in range(len(matrix[row]))
+        if row_site[row] != col_site[column] and abs(matrix[row][column]) > threshold
+    }
+    off_diagonal = sorted(
+        ({"source": source, "target": target} for source, target in pairs),
+        key=lambda item: (item["source"], item["target"]),
+    )
     return {"local": not off_diagonal, "off_diagonal_nonzero": off_diagonal}
 
 
 def _locality_from_recipe(
-    recipe: dict[str, Any], inventory: dict[str, Any], site_count: int, expected: str,
+    recipe: dict[str, Any], inventory: dict[str, Any], site_count: int,
+    layout: dict[str, Any], expected: str,
 ) -> dict[str, Any]:
-    matrix = _operator_matrix(recipe, inventory, site_count)
-    if matrix is None:
+    operator = _operator_matrix(recipe, inventory, site_count, layout)
+    if operator is None:
         return {
             "expected": expected, "available": False,
             "observed_local": None, "off_diagonal_nonzero": None, "rule": LOCALITY_RULE,
         }
-    observed = _observed_locality(matrix, site_count, LOCALITY_RULE)
+    observed = _observed_locality(operator, LOCALITY_RULE)
     return {
         "expected": expected, "available": True,
         "observed_local": observed["local"],
@@ -411,6 +532,17 @@ def _validate_structure_sections(value: dict[str, Any]) -> None:
         "zero", "identity", "symmetrized", "unconstrained_parameter", "unsupported"
     }:
         raise ManifestError("unsupported operator construction value")
+    layout = operator.get("layout")
+    if not isinstance(layout, dict):
+        raise ManifestError("operator.layout is missing")
+    output_axes, input_axes, site_axis = layout.get("output_axes"), layout.get("input_axes"), layout.get("site_axis")
+    if not isinstance(output_axes, list) or not output_axes or output_axes != list(range(len(output_axes))):
+        raise ManifestError("operator.layout.output_axes is invalid")
+    rank = len(output_axes)
+    if input_axes != list(range(rank, 2 * rank)):
+        raise ManifestError("operator.layout.input_axes is invalid")
+    if not isinstance(site_axis, int) or isinstance(site_axis, bool) or not (0 <= site_axis < rank):
+        raise ManifestError("operator.layout.site_axis is invalid")
 
 
 def _revalidate_structure(
@@ -444,9 +576,15 @@ def _revalidate_structure(
         raise ManifestError("translation XC derivation is invalid")
     if value["xc"] != {"form": derivation["xc_form"], "provenance_nodes": derivation["xc_nodes"]}:
         raise ManifestError("IR XC claim does not match its derivation")
-    if translation.get("operator") != {"root": roles["learned_self_energy"], "construction": derivation["operator"]}:
+    if translation.get("operator") != {
+        "root": roles["learned_self_energy"], "construction": derivation["operator"],
+        "layout": derivation["operator_layout"],
+    }:
         raise ManifestError("translation operator derivation is invalid")
-    if value["operator"] != {"construction": derivation["operator"], "provenance_nodes": derivation["operator_nodes"]}:
+    if value["operator"] != {
+        "construction": derivation["operator"], "provenance_nodes": derivation["operator_nodes"],
+        "layout": derivation["operator_layout"],
+    }:
         raise ManifestError("IR operator claim does not match its derivation")
 
 
@@ -476,11 +614,12 @@ class DFTPlugin(StructuralPlugin):
         expected_locality = input_constraints.get("expected_locality")
         if expected_locality not in {"local", "non_local"}:
             raise ManifestError("input_constraints.expected_locality must be 'local' or 'non_local'")
+        layout = _resolve_operator_layout(input_constraints)
         count, edges, graph_inputs, state_name = _topology(inventory, input_constraints)
         aliases = _adjacency_aliases(nodes, graph_inputs)
         stages, message_recognized = _message_chain(nodes, roles["message_state"], graph_inputs)
         xc_form, xc_nodes = _xc_form(nodes, roles["xc_energy"])
-        operator, operator_nodes, operator_recipe = _operator_construction(nodes, roles["learned_self_energy"])
+        operator, operator_nodes, operator_recipe = _operator_construction(nodes, roles["learned_self_energy"], layout)
         by_name = {node.get("name"): node for node in nodes if isinstance(node.get("name"), str)}
         stage_graph = [by_name[name] for name in stages]
         xc_graph = _ancestors(nodes, roles["xc_energy"])
@@ -536,6 +675,7 @@ class DFTPlugin(StructuralPlugin):
             "depth": len(stages), "stage_nodes": stages, "message_recognized": message_recognized,
             "xc_form": xc_form, "xc_nodes": xc_nodes,
             "operator": operator, "operator_nodes": operator_nodes, "operator_recipe": operator_recipe,
+            "operator_layout": layout,
             "expected_locality": expected_locality,
         }
 
@@ -550,7 +690,8 @@ class DFTPlugin(StructuralPlugin):
             inventory=inventory, nodes=nodes, roles=roles, input_constraints=input_constraints,
         )
         locality = _locality_from_recipe(
-            derivation["operator_recipe"], inventory, derivation["site_count"], derivation["expected_locality"],
+            derivation["operator_recipe"], inventory, derivation["site_count"],
+            derivation["operator_layout"], derivation["expected_locality"],
         )
         return {**derivation, "locality": locality}
 
@@ -566,7 +707,10 @@ class DFTPlugin(StructuralPlugin):
                 "provenance_nodes": derivation["stage_nodes"],
             },
             "xc": {"form": derivation["xc_form"], "provenance_nodes": derivation["xc_nodes"]},
-            "operator": {"construction": derivation["operator"], "provenance_nodes": derivation["operator_nodes"]},
+            "operator": {
+                "construction": derivation["operator"], "provenance_nodes": derivation["operator_nodes"],
+                "layout": derivation["operator_layout"],
+            },
             "locality": derivation["locality"],
         }
 
@@ -588,7 +732,10 @@ class DFTPlugin(StructuralPlugin):
                 "recognized": derivation["message_recognized"],
             },
             "xc": {"root": roles["xc_energy"], "form": derivation["xc_form"]},
-            "operator": {"root": roles["learned_self_energy"], "construction": derivation["operator"]},
+            "operator": {
+                "root": roles["learned_self_energy"], "construction": derivation["operator"],
+                "layout": derivation["operator_layout"],
+            },
             "semantic_derivations": derivation["semantic_derivations"],
         }
 

@@ -143,6 +143,47 @@ unsupported-construction recognition boundaries (`nested`, `indirect`,
 `transformed`, `diagonal`); and general malformed-input diversity (invalid
 `expected_locality`, missing/duplicate output roles, invalid adjacency).
 
+## Operator layout: beyond a literal n x n matrix
+
+The self-energy is not necessarily stored as a plain `[N, N]` tensor. With
+`m` orbitals (or spins) per site, a natural export shape is `[N, m, N, m]`
+(site and orbital axes each split into a domain group and a codomain
+group). Flattening `(site, orbital)` into one combined index still gives an
+ordinary linear operator on the `N*m`-dimensional space -- so VISTA does not
+hard-code "operator = rank-2 tensor." `input_constraints.operator_layout`
+(optional; defaults to `{"output_axes": [0], "input_axes": [1],
+"site_axis": 0}`, i.e. today's plain matrix) declares which axes form the
+codomain group, which form the domain group, and which position within
+each group is the site axis (the rest are orbital/spin/etc. axes, where
+mixing on the SAME site never counts as a coupling across sites). Only the
+canonical contiguous grouping (`output_axes=[0..r-1]`,
+`input_axes=[r..2r-1]`) is supported; a reordered or interleaved grouping
+is rejected outright, not guessed at.
+
+This also changes what counts as the adjoint. For a plain matrix, any
+reviewed transpose op is the (unique) adjoint. For a grouped layout, only
+`aten.permute.default` can express the required swap of the whole domain
+group with the whole codomain group, and its literal permutation argument
+must equal that exact swap; `numpy_T`/`.t()`/`transpose.int` are rejected
+for a grouped layout because none of them can realize a multi-axis block
+swap in one node. `_observed_locality` also changes: instead of raw
+row/column indices, it compares the SITE coordinate of each flattened row
+and column (via `layout.site_axis`), so `off_diagonal_nonzero` reports real
+site-to-site couplings, not merely off-diagonal entries in the flattened
+matrix -- on-site orbital/spin mixing is still local. For the default
+layout this reduces exactly to the original diagonal/off-diagonal check
+(row IS the site, column IS the site), so every certificate issued before
+this field existed is unaffected.
+
+Deliberately out of scope for now (a batch/frequency axis like `Σ(ω)` is
+not itself an operator axis, and treating every extra tensor dimension as
+part of the Hilbert-space operator would be wrong): axes outside the
+declared `output_axes`/`input_axes` groups, complex/conjugate scalars
+(this repo only ever extracts real floats), and non-contiguous or
+reordered axis groupings. Extending to any of these is a `_resolve_operator_layout`/
+`_read_operator_tensor` change, not a rewrite of the recognition or
+locality logic around it.
+
 ## Known limitations
 
 - Locality is only checked for recognized, small (<=4096-element)

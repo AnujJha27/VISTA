@@ -155,7 +155,10 @@ class DFTCapabilityPlugin(DFTPlugin):
                 "provenance_nodes": derivation["stage_nodes"],
             },
             "xc": {"form": derivation["xc_form"], "provenance_nodes": derivation["xc_nodes"]},
-            "operator": {"construction": derivation["operator"], "provenance_nodes": derivation["operator_nodes"]},
+            "operator": {
+                "construction": derivation["operator"], "provenance_nodes": derivation["operator_nodes"],
+                "layout": derivation["operator_layout"],
+            },
             "capabilities": derivation["capabilities"],
         }
 

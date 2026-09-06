@@ -65,6 +65,18 @@ here by never computing it in the first place).
 small bool/int adjacency buffers and no captured numeric weights is fully
 certifiable by these checks.
 
+`non_local_capacity`'s "off-diagonal entry" is layout-agnostic by
+construction: it only asks whether the recipe kind and site count admit
+*some* assignment with a cross-site coupling, never inspecting a concrete
+shape. So `input_constraints.operator_layout` (see `STRUCTURAL_V3.md` for
+the full design -- a self-energy with orbital/spin axes, e.g. shape
+`[N, m, N, m]`, rather than a plain `[N, N]` matrix) needs no special
+handling here; `derive_structure()` resolves and echoes it in
+`operator.layout` for every plugin built on this module, and the adjoint
+recognition it gates (rejecting `numpy_T`/`.t()` for a grouped layout,
+requiring an exact permutation match) is shared, symbolic, structural code
+-- never a reason this plugin would need to touch a float.
+
 ## Lean
 
 `examples/dft/lean/Testv2/StructuralV2.lean` gains two defs, reusing the

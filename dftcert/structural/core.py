@@ -414,6 +414,12 @@ def confirmed_description_ir(
     description_hash = hashlib.sha256(description.encode()).hexdigest()
     if locality.get("expected") not in {"local", "non_local"}:
         raise ManifestError("locality.expected must be 'local' or 'non_local'")
+    # A human-confirmed specification has no real extracted tensor to declare
+    # a grouped domain/codomain axis layout for; default to the plain n x n
+    # matrix layout unless the confirmed claims say otherwise, so existing
+    # confirmed-description operator claims (which never mentioned a layout)
+    # keep working unchanged.
+    operator = {"layout": {"output_axes": [0], "input_axes": [1], "site_axis": 0}, **operator}
     # A pure English-description specification has no real weights to
     # extract: a human confirms both what is expected AND what holds, exactly
     # as they already do for topology/xc/operator in this path. That is a
