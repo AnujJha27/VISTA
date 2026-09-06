@@ -35,6 +35,40 @@ class FormalBindingCandidateTests(unittest.TestCase):
         by_key = {item.key: item for item in DFT_CAPABILITY_PLUGIN.formal_binding_candidates(value)}
         self.assertEqual(by_key["operator_form"].lean_expr, 'Testv2.StructuralV2.OperatorForm.parameter "unconstrained"')
 
+    def test_not_applicable_message_depth_emits_no_fake_zero_candidate(self):
+        """Issue 10: neither recipe this pipeline can build through the
+        public path ever depends on message passing, so
+        `operator_message_depth` is honestly `None` (not applicable) --
+        never silently coerced into the artifact fact `depth = 0`, which
+        would let an unrelated theorem `Nat` binder receive a fabricated
+        value for a property that was never established."""
+        value = _ir(adjacency=_CHAIN3, stages=0, symmetrized=True)
+        self.assertIsNone(value["capabilities"]["operator_message_depth"])
+        keys = {item.key for item in DFT_CAPABILITY_PLUGIN.formal_binding_candidates(value)}
+        self.assertNotIn("operator_message_depth", keys)
+
+    def test_derivation_works_without_expected_locality(self):
+        """Issue 5: theorem-centric artifact-fact derivation is
+        policy-neutral -- `expected_locality` is a requirement a selected
+        Lean theorem's premises express, not something needed merely to
+        describe the artifact's topology/operator/XC facts."""
+        value = _ir(adjacency=_CHAIN3, stages=0, symmetrized=True, expected_locality=None)
+        self.assertIsNone(value["capabilities"]["expected_locality"])
+        candidates = DFT_CAPABILITY_PLUGIN.formal_binding_candidates(value)
+        by_key = {item.key: item for item in candidates}
+        self.assertEqual(by_key["site_count"].lean_expr, "3")
+        self.assertEqual(by_key["xc_form"].lean_expr, "Testv2.StructuralV2.XCForm.hinge")
+
+    def test_legacy_checks_still_require_expected_locality(self):
+        """The fixed legacy policy judgment (`vista structural`'s own
+        `checks()`) is unaffected -- it still can't judge non-local
+        capacity without a concrete requirement, so no behavior change for
+        existing legacy callers."""
+        from dftcert.manifest import ManifestError
+        value = _ir(adjacency=_CHAIN3, stages=0, symmetrized=True, expected_locality=None)
+        with self.assertRaises(ManifestError):
+            DFT_CAPABILITY_PLUGIN.checks(value)
+
 
 if __name__ == "__main__":
     unittest.main()

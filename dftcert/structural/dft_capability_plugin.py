@@ -570,8 +570,14 @@ class DFTCapabilityPlugin(StructuralPlugin):
         buffer, never a trainable float), message-passing depth, XC form,
         operator-construction recipe. Never reads a single extracted
         parameter's floating-point content."""
+        # `expected_locality` is a *requirement* (what the caller wants),
+        # not an artifact fact -- optional here so a theorem-centric caller
+        # can derive pure structural facts without supplying one; the fixed
+        # legacy policy check (`checks()`, the only place that judges it)
+        # still requires a concrete value, so `vista structural` callers
+        # see no behavior change.
         expected_locality = input_constraints.get("expected_locality")
-        if expected_locality not in {"local", "non_local"}:
+        if expected_locality not in {"local", "non_local", None}:
             raise ManifestError("input_constraints.expected_locality must be 'local' or 'non_local'")
         layout = _resolve_operator_layout(input_constraints)
         count, edges, graph_inputs, state_name, adjacency_selection_provenance = _topology(inventory, input_constraints)
@@ -710,7 +716,7 @@ class DFTCapabilityPlugin(StructuralPlugin):
         capabilities = value.get("capabilities")
         if not isinstance(capabilities, dict):
             raise ManifestError("structural IR is missing capabilities")
-        if capabilities.get("expected_locality") not in {"local", "non_local"}:
+        if capabilities.get("expected_locality") not in {"local", "non_local", None}:
             raise ManifestError("capabilities.expected_locality must be 'local' or 'non_local'")
         if not isinstance(capabilities.get("all_pairs_reachable"), bool):
             raise ManifestError("capabilities.all_pairs_reachable must be boolean")
@@ -750,6 +756,13 @@ class DFTCapabilityPlugin(StructuralPlugin):
     def checks(self, value: dict[str, Any]) -> dict[str, dict[str, Any]]:
         capabilities = value["capabilities"]
         expected = capabilities["expected_locality"]
+        # The legacy fixed-policy judgment (unlike theorem-centric
+        # `formal_binding_candidates`, which needs no locality requirement
+        # at all) genuinely cannot judge `non_local_capacity` without one.
+        if expected not in {"local", "non_local"}:
+            raise ManifestError(
+                "capabilities.expected_locality must be 'local' or 'non_local' to evaluate structural checks"
+            )
         return {
             "xc_discontinuity_compatible": {
                 "satisfied": value["xc"]["form"] == "hinge",
@@ -901,7 +914,7 @@ class DFTCapabilityPlugin(StructuralPlugin):
         passing (see `all_pairs_reachable`'s `applicable` flag above)."""
         topology, operator, xc = value["topology"], value["operator"], value["xc"]
         capabilities = value["capabilities"]
-        return [
+        candidates = [
             FormalBindingCandidate(
                 key="site_count",
                 lean_expr=str(topology["site_count"]),
@@ -930,14 +943,22 @@ class DFTCapabilityPlugin(StructuralPlugin):
                 evidence_refs=tuple(topology.get("provenance_nodes", [])),
                 display_label=f"edges = {topology['directed_edges']}",
             ),
-            FormalBindingCandidate(
+        ]
+        # `operator_message_depth = None` means "not applicable" (the
+        # operator's construction recipe doesn't depend on message passing
+        # at all -- see `_reachability`), not the artifact fact "depth =
+        # 0". Emitting a fabricated zero candidate here would let an
+        # unrelated theorem `Nat` binder silently receive a made-up value
+        # for a property that was never established at all.
+        if capabilities["operator_message_depth"] is not None:
+            candidates.append(FormalBindingCandidate(
                 key="operator_message_depth",
-                lean_expr=str(capabilities["operator_message_depth"] or 0),
+                lean_expr=str(capabilities["operator_message_depth"]),
                 provenance="artifact_grounded",
                 evidence_refs=tuple(operator.get("provenance_nodes", [])),
-                display_label=f"operatorMessageDepth = {capabilities['operator_message_depth'] or 0}",
-            ),
-        ]
+                display_label=f"operatorMessageDepth = {capabilities['operator_message_depth']}",
+            ))
+        return candidates
 
 
 DFT_CAPABILITY_PLUGIN = DFTCapabilityPlugin()

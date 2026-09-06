@@ -48,6 +48,29 @@ class StructuralPlugin(ABC):
     policy_version: str
     compiler_version: str
 
+    @property
+    def semantic_identity(self) -> dict[str, str]:
+        """This adapter's own identity (spec/theorem-centric-gaps issue 4):
+        `profile` + `semantic_version` are the plugin's own declared
+        attributes; `implementation_sha256` is a hash of the adapter's own
+        source file. Derived from the executing code, never from
+        package-authored text -- a package's recorded adapter binding is
+        checked against this, not trusted at face value."""
+        import hashlib
+        import inspect
+        from pathlib import Path
+
+        source_path = inspect.getsourcefile(type(self))
+        implementation_sha256 = (
+            hashlib.sha256(Path(source_path).read_bytes()).hexdigest()
+            if source_path else "unknown"
+        )
+        return {
+            "profile": self.name,
+            "semantic_version": self.analyzer_version,
+            "implementation_sha256": implementation_sha256,
+        }
+
     @abstractmethod
     def role_requirements(self) -> set[str]:
         """Required `output_contracts` roles, e.g. {"xc_energy", ...}."""
