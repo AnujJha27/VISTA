@@ -25,3 +25,15 @@ jobs:
 
       - name: Smoke benchmark
         run: make benchmark
+
+      - name: Theorem-centric verification tests
+        # research-readiness audit section 10: `make test` above never
+        # exercised the theorem-centric suite (session/certificate
+        # generation, generic Lean introspection, real-artifact E2E) at
+        # all. `lake exe cache get` fetches prebuilt mathlib oleans rather
+        # than building from source. Bubblewrap-sandbox-specific tests
+        # skip themselves explicitly (visible in the test output) when
+        # `bwrap` or a torch-capable sandboxed interpreter isn't
+        # available on this runner -- never faked.
+        timeout-minutes: 45
+        run: make verification-test

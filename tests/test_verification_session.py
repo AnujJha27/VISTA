@@ -278,6 +278,39 @@ class AssumptionMechanicsTests(unittest.TestCase):
             self.assertEqual(restarted.status, "ready_for_certificate")
             self.assertEqual(restarted.value["nodes"][premise["id"]]["status"], "specified_assumption")
 
+    def test_removing_the_assumption_blocks_the_target_again(self):
+        """research-readiness audit section 6: there is no one-way ratchet
+        -- revoking a previously-accepted external assumption (removing it
+        from the package's external_assumptions) must put the premise back
+        to unresolved on the next re-derivation, never leave it silently
+        certifiable from a decision that no longer exists anywhere."""
+        with TemporaryDirectory() as tmp:
+            package_path = Path(tmp) / "package.json"
+            VerificationPackageBuilder(
+                lean_project=PROJECT, entrypoints=[CONDITIONAL_ENTRYPOINT], adapter=DFT_CAPABILITY_PLUGIN,
+                interface_contract=_constraints(),
+                binding_choices=[{"entrypoint": CONDITIONAL_ENTRYPOINT, "binder_path": "0", "candidate_key": "site_count"}],
+            ).write(package_path)
+            out = Path(tmp) / "session.json"
+            session = _start(package=load_package(package_path), output=out)
+            premise = session.unresolved_premises[0]
+
+            add_external_assumption(
+                package_path, premise_id=premise["id"],
+                proposition_fingerprint=premise["type_fingerprint"], rationale="physical target requires non-locality",
+            )
+            accepted = _start(package=load_package(package_path), output=out)
+            self.assertEqual(accepted.status, "ready_for_certificate")
+
+            # Revoke it: same package, external_assumptions now empty again.
+            package = load_package(package_path)
+            package["external_assumptions"] = []
+            Path(package_path).write_text(json.dumps(package, indent=2, sort_keys=True), encoding="utf-8")
+
+            revoked = _start(package=load_package(package_path), output=out)
+            self.assertEqual(revoked.status, "blocked_on_premise")
+            self.assertEqual(revoked.value["nodes"][premise["id"]]["status"], "unresolved")
+
 
 @unittest.skipUnless(_HAS_LEAN, _SKIP_REASON)
 class NamespaceModulePathMismatchTests(unittest.TestCase):

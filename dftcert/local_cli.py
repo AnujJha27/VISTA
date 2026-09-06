@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import curses
 import json
 import os
 import shlex
@@ -21,13 +20,9 @@ from .legacy.model_assessment import (
     read_description,
 )
 from .legacy.hypothesis import draft_hypothesis
-from .legacy.pipeline import (
-    LocalPipeline, LocalPipelineConfig, LocalRun, PipelineError, command_tuple,
-)
 from .legacy.policy import Policy
 from .legacy.pt2 import pending_manifest
 from .legacy.report import sanity_report
-from .sandbox import BubblewrapExtractor
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -267,6 +262,13 @@ def _manifest(options: argparse.Namespace, policy: Policy) -> ArchitectureManife
         path=options.pt2, model_id=options.model_id,
         policy=policy, input_constraints=constraints,
     )
+    # Deferred: `dftcert.sandbox` imports the POSIX-only `resource` module
+    # at load time; only this (legacy) command path needs it, and a
+    # module-level import here would break every `noether`/`vista`
+    # subcommand on Windows, including `verify` (research-readiness audit
+    # section 8).
+    from .sandbox import BubblewrapExtractor
+
     result = BubblewrapExtractor().extract(options.pt2)
     analysis = analyze_inventory(
         inventory=result["inventory"], policy=policy,
@@ -486,11 +488,23 @@ def _run_assess(options: argparse.Namespace, policy: Policy) -> int:
     if not options.non_interactive and sys.stdin.isatty():
         if sys.stdout.isatty():
             try:
-                from .tui import confirm_assumptions_tui
+                # `curses` (POSIX-only) and `dftcert.tui`, which imports it
+                # at module level, both stay deferred to exactly here -- a
+                # module-level `import curses` in *this* file would break
+                # every `noether`/`vista` subcommand on Windows, not just
+                # this one (research-readiness audit section 8: caught by
+                # actually running the documented workflow's CLI
+                # entrypoint).
+                import curses
 
-                confirm_assumptions_tui(manifest, policy)
-            except curses.error:
+                from .tui import confirm_assumptions_tui
+            except ModuleNotFoundError:
                 confirm_assumptions_interactively(manifest, policy)
+            else:
+                try:
+                    confirm_assumptions_tui(manifest, policy)
+                except curses.error:
+                    confirm_assumptions_interactively(manifest, policy)
         else:
             confirm_assumptions_interactively(manifest, policy)
     report = sanity_report(manifest=manifest, policy=policy)
@@ -539,6 +553,14 @@ def main(argv: list[str] | None = None) -> int:
         if options.command == "verify":
             from .verification.cli import main as verify_main
             return verify_main(options.verify_args)
+        # Deferred: `dftcert.legacy.pipeline` imports the POSIX-only
+        # `fcntl` module at load time; only the legacy (non-`verify`/
+        # `structural`/`agentic`) commands below need it, and a
+        # module-level import would break every `noether`/`vista`
+        # subcommand on Windows, including `verify` (research-readiness
+        # audit section 8).
+        from .legacy.pipeline import LocalPipeline, LocalPipelineConfig, LocalRun, command_tuple
+
         policy = Policy.load(options.policy)
         if options.command == "status":
             run = LocalRun(options.run_dir)

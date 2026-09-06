@@ -18,7 +18,7 @@ BENCH_SRC := src/benchmark.cpp $(CORE_SRC)
 
 .PHONY: all test benchmark benchmark-repeat clean lean check-cpp-deps orchestrator-test dftcert-test dftcert-example \
 	dftcert-obligations dftcert-assemble-example dftcert-certify-example \
-	dftcert-search-example sanity-demo tui wsl-smoke noether-demo
+	dftcert-search-example sanity-demo tui wsl-smoke noether-demo verification-test
 
 all: $(BUILD)/proof-search
 
@@ -51,6 +51,22 @@ orchestrator-test:
 
 dftcert-test:
 	python3 -m unittest -v tests.test_dftcert
+
+# research-readiness audit section 10: `make test` above never ran the
+# theorem-centric verification suite (session/certificate generation, real
+# artifact E2E, generic Lean introspection) at all -- only the two legacy
+# `dftcert.legacy`/`orchestrator` unittest modules. This is the smallest
+# addition that exercises it: build the theorem-centric Lean project
+# (`lake exe cache get` avoids a from-source mathlib build), install the
+# small extra Python deps that path needs (`pytest`, CPU `torch` for real
+# `.pt2` loading), then run the whole `tests/` suite via pytest (which
+# already skips Lean- or Bubblewrap-unavailable cases explicitly rather
+# than failing). Deliberately a separate target, not folded into `test`,
+# so a plain local `make test` stays fast and dependency-light.
+verification-test:
+	cd examples/dft/lean && $(LAKE) exe cache get && $(LAKE) build
+	python3 -m pip install --quiet --upgrade pytest torch
+	python3 -m pytest tests/ -q --ignore=tests/test_dftcert.py --ignore=tests/test_orchestrator.py
 
 dftcert-example:
 	test -n "$(DFT_PROJECT)"

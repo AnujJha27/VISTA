@@ -114,6 +114,19 @@ class RealArtifactEndToEndTests(unittest.TestCase):
             source = (output_dir / f"{ENTRYPOINT.replace('.', '_')}.lean").read_text(encoding="utf-8")
             self.assertNotRegex(source, r"\b(sorry|admit|axiom|unsafe)\b")
 
+            # research-readiness audit section 3: independently re-derive
+            # every hash/fingerprint the bundle claims, including the real
+            # artifact hash from a fresh extraction (not the synthetic
+            # "deadbeef" fixture used elsewhere) -- never trust a field
+            # merely because it is already stored inside the bundle.
+            from dftcert.verification import api as verification_api
+            consistency = verification_api.verify_certificate_bundle(
+                str(output_dir), package=str(package_path), project=str(PROJECT),
+                extraction_result=str(extraction_path), trusted_local=True,
+            )
+            self.assertTrue(consistency["consistent"], consistency["checks"])
+            self.assertTrue(consistency["checks"]["artifact_hash_matches_binding"]["ok"])
+
     def test_tampered_semantic_fact_after_extraction_cannot_certify(self):
         """Edit a semantic fact (xc form) in an otherwise-genuine IR built
         from the real artifact, keeping the artifact hash untouched --

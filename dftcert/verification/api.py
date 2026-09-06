@@ -11,6 +11,7 @@ use, but a normal caller only ever needs the three functions here.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -283,7 +284,14 @@ def _certify_one(
     )
     safe_name = entrypoint.replace(".", "_")
     source_path = output_dir / f"{safe_name}.lean"
-    source_path.write_text(full_source, encoding="utf-8")
+    # `certificate_source_sha256` (assembled below) hashes this exact
+    # in-memory string's UTF-8 bytes -- `newline=""` is required so the
+    # file written to disk is byte-for-byte identical to that, rather than
+    # having Python's default text-mode newline translation rewrite every
+    # `\n` to `\r\n` on Windows, which would make the recorded hash never
+    # actually match the file it claims to describe (research-readiness
+    # audit section 3: caught by `verify_certificate_bundle`).
+    source_path.write_text(full_source, encoding="utf-8", newline="")
     # Recorded for audit only -- the selected entrypoint's own axiom
     # closure never gates certification (issue C).
     entrypoint_introspected = inspect_declarations(
@@ -315,3 +323,104 @@ def _certify_one(
         "certificate_source_sha256": report["certificate_source_sha256"],
         "report_sha256": report["report_sha256"],
     }
+
+
+def verify_certificate_bundle(
+    bundle_dir: str | Path, *, artifact: str | Path | None = None,
+    extraction_result: str | Path | None = None, package: str | Path | None = None,
+    project: str | Path | None = None, bubblewrap: str = "bwrap",
+    extractor_python: str = "/usr/bin/python3", trusted_local: bool = False,
+) -> dict[str, Any]:
+    """Independently re-derive and check every hash/fingerprint a certified
+    bundle (`certify_session`'s `output_dir`) claims about itself
+    (research-readiness audit section 3) -- never trusting a field merely
+    because it is already stored inside the object being checked. Always
+    checks (no live inputs required): the manifest's own self-hash; each
+    per-target report's own self-hash; the manifest's `report_sha256`
+    reference against the actual report file; each generated certificate
+    `.lean` source file's actual bytes-hash against its report's recorded
+    `certificate_source_sha256`; the certified target set against the
+    package's full selected-entrypoint set recorded in the manifest.
+    Optionally also checks (when the corresponding live input is given):
+    the package's current hash, the live adapter identity, the live
+    Lean-project fingerprint, and the artifact hash from a fresh
+    extraction -- each against the manifest's own recorded binding.
+    Returns `{"consistent": bool, "checks": {name: {"ok": bool, ...}}}`."""
+    bundle = Path(bundle_dir)
+    manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
+    checks: dict[str, Any] = {}
+
+    stored_manifest_hash = manifest.get("manifest_sha256")
+    recomputed_manifest = {k: v for k, v in manifest.items() if k != "manifest_sha256"}
+    recomputed_manifest_hash = sha256_value(recomputed_manifest)
+    checks["manifest_self_hash"] = {
+        "ok": recomputed_manifest_hash == stored_manifest_hash,
+        "recorded": stored_manifest_hash, "recomputed": recomputed_manifest_hash,
+    }
+
+    package_entrypoints = set(manifest.get("package_entrypoints", []))
+    certified_targets = set(manifest.get("targets", []))
+    checks["certified_targets_are_a_subset_of_package_entrypoints"] = {
+        "ok": certified_targets <= package_entrypoints if package_entrypoints else True,
+        "package_entrypoints": sorted(package_entrypoints), "certified_targets": sorted(certified_targets),
+    }
+    if manifest.get("certificate_scope") == "full_package":
+        checks["full_package_scope_actually_covers_every_entrypoint"] = {
+            "ok": certified_targets == package_entrypoints,
+        }
+
+    for item in manifest.get("per_target", []):
+        entrypoint = item["entrypoint"]
+        source_path = Path(item["source"])
+        report_path = Path(item["report"])
+        source_hash = hashlib.sha256(source_path.read_bytes()).hexdigest()
+        checks[f"{entrypoint}:certificate_source_hash"] = {
+            "ok": source_hash == item.get("certificate_source_sha256"),
+            "recorded": item.get("certificate_source_sha256"), "recomputed": source_hash,
+        }
+        report_value = json.loads(report_path.read_text(encoding="utf-8"))
+        stored_report_hash = report_value.get("report_sha256")
+        recomputed_report = {k: v for k, v in report_value.items() if k != "report_sha256"}
+        recomputed_report_hash = sha256_value(recomputed_report)
+        checks[f"{entrypoint}:report_self_hash"] = {
+            "ok": recomputed_report_hash == stored_report_hash,
+            "recorded": stored_report_hash, "recomputed": recomputed_report_hash,
+        }
+        checks[f"{entrypoint}:manifest_report_reference"] = {
+            "ok": item.get("report_sha256") == stored_report_hash,
+        }
+
+    if package is not None:
+        package_value = load_package(package)
+        live_package_hash = package_sha256(package_value)
+        checks["package_hash_matches_binding"] = {
+            "ok": live_package_hash == manifest["formal_package_binding"]["package_sha256"],
+            "recorded": manifest["formal_package_binding"]["package_sha256"], "recomputed": live_package_hash,
+        }
+        try:
+            live_identity = _resolve_adapter(package_value).semantic_identity
+            checks["adapter_identity_matches_binding"] = {
+                "ok": live_identity == manifest["adapter_binding"],
+                "recorded": manifest["adapter_binding"], "recomputed": live_identity,
+            }
+        except ManifestError as error:
+            checks["adapter_identity_matches_binding"] = {"ok": False, "error": str(error)}
+        if project is not None:
+            try:
+                check_package_freshness(package_value, project)
+                checks["lean_project_fresh_against_package"] = {"ok": True}
+            except ManifestError as error:
+                checks["lean_project_fresh_against_package"] = {"ok": False, "error": str(error)}
+
+    if artifact is not None or extraction_result is not None:
+        result = _extraction_result(
+            artifact=artifact, extraction_result=extraction_result,
+            bubblewrap=bubblewrap, extractor_python=extractor_python, trusted_local=trusted_local,
+        )
+        checks["artifact_hash_matches_binding"] = {
+            "ok": result["artifact_sha256"] == manifest["artifact_binding"]["artifact_sha256"],
+            "recorded": manifest["artifact_binding"]["artifact_sha256"], "recomputed": result["artifact_sha256"],
+        }
+
+    consistent = all(check.get("ok", False) for check in checks.values())
+    return {"consistent": consistent, "checks": checks}

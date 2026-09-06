@@ -65,7 +65,10 @@ from __future__ import annotations
 
 from .package import VerificationPackageBuilder
 
-__all__ = ["VerificationPackageBuilder", "start_session", "resume_session", "certify_session"]
+__all__ = [
+    "VerificationPackageBuilder", "start_session", "resume_session", "certify_session",
+    "verify_certificate_bundle",
+]
 
 # `dftcert.verification.api` imports `dftcert.structural.dft_capability_plugin`,
 # which itself imports `dftcert.verification.model` -- importing `api` eagerly
@@ -73,7 +76,7 @@ __all__ = ["VerificationPackageBuilder", "start_session", "resume_session", "cer
 # access (PEP 562) defers it until an attribute is actually used, by which
 # point both packages have finished initializing.
 def __getattr__(name: str):
-    if name in {"start_session", "resume_session", "certify_session"}:
+    if name in {"start_session", "resume_session", "certify_session", "verify_certificate_bundle"}:
         from . import api
         return getattr(api, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

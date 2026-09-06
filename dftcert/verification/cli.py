@@ -97,6 +97,19 @@ def parser() -> argparse.ArgumentParser:
     certify.add_argument("--lean-command", default="lake env lean -j 1")
     certify.add_argument("--timeout-s", type=int, default=300)
     certify.add_argument("--trusted-local", action="store_true")
+
+    verify_bundle = commands.add_parser(
+        "verify-bundle",
+        help="independently recompute a certified bundle's own hashes/fingerprints (never trust stored fields)",
+    )
+    verify_bundle.add_argument("--bundle-dir", required=True, help="the certify --output-dir to check")
+    verify_bundle.add_argument("--package", default=None, help="also re-check package/adapter identity")
+    verify_bundle.add_argument("--project", default=None, help="also re-check Lean project freshness")
+    verify_bundle.add_argument("--artifact", default=None, help="also re-check the artifact hash (via BubblewrapExtractor)")
+    verify_bundle.add_argument("--extraction-result", default=None, help="also re-check the artifact hash (trusted-local)")
+    verify_bundle.add_argument("--bubblewrap", default="bwrap")
+    verify_bundle.add_argument("--extractor-python", default="/usr/bin/python3")
+    verify_bundle.add_argument("--trusted-local", action="store_true")
     return root
 
 
@@ -143,6 +156,15 @@ def main(argv: list[str] | None = None) -> int:
         elif options.command == "interact":
             from .tui import run_interactive
             return run_interactive(options.session, package_path=options.package)
+        elif options.command == "verify-bundle":
+            output = api.verify_certificate_bundle(
+                options.bundle_dir, package=options.package, project=options.project,
+                artifact=options.artifact, extraction_result=options.extraction_result,
+                bubblewrap=options.bubblewrap, extractor_python=options.extractor_python,
+                trusted_local=options.trusted_local,
+            )
+            print(json.dumps(output, sort_keys=True, default=str))
+            return 0 if output["consistent"] else 1
         else:
             raise ManifestError(f"unknown command {options.command!r}")
         print(json.dumps(output, sort_keys=True, default=str))

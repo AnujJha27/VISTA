@@ -176,6 +176,85 @@ class WorkspaceRefreshTests(unittest.TestCase):
                 api.refresh_session(str(session_path))
 
 
+@unittest.skipUnless(_HAS_LEAN, _SKIP_REASON)
+class CertificateBundleSelfConsistencyTests(unittest.TestCase):
+    """research-readiness audit section 3: a certificate bundle's own
+    recorded hashes must be independently re-derivable from the actual
+    files on disk, never merely trusted because they are already present
+    inside the bundle being checked."""
+
+    def _certified_bundle(self, tmp):
+        extraction_path = Path(tmp) / "extraction.json"
+        _write_extraction_result(extraction_path)
+        package_path = Path(tmp) / "package.json"
+        VerificationPackageBuilder(
+            lean_project=PROJECT, entrypoints=[ENTRYPOINT], adapter=DFT_CAPABILITY_PLUGIN,
+            interface_contract=_constraints(),
+            binding_choices=[{"entrypoint": ENTRYPOINT, "binder_path": "0", "candidate_key": "site_count"}],
+        ).write(package_path)
+        session_path = Path(tmp) / "session.json"
+        start_session(
+            extraction_result=str(extraction_path), package=str(package_path),
+            session=str(session_path), project=str(PROJECT), trusted_local=True, timeout_s=180,
+        )
+        output_dir = Path(tmp) / "certificate"
+        certify_session(
+            session=str(session_path), package=str(package_path), project=str(PROJECT),
+            lean_import="Testv2.Requirements", output_dir=str(output_dir), trusted_local=True, timeout_s=180,
+        )
+        return package_path, output_dir
+
+    def test_freshly_certified_bundle_is_self_consistent(self):
+        with TemporaryDirectory() as tmp:
+            package_path, output_dir = self._certified_bundle(tmp)
+            result = api.verify_certificate_bundle(str(output_dir), package=str(package_path), project=str(PROJECT))
+            self.assertTrue(result["consistent"], result["checks"])
+            self.assertTrue(all(check["ok"] for check in result["checks"].values()))
+
+    def test_tampered_certificate_source_bytes_are_detected(self):
+        with TemporaryDirectory() as tmp:
+            _, output_dir = self._certified_bundle(tmp)
+            source_path = output_dir / f"{ENTRYPOINT.replace('.', '_')}.lean"
+            source_path.write_text(source_path.read_text(encoding="utf-8") + "\n-- tampered\n", encoding="utf-8")
+            result = api.verify_certificate_bundle(str(output_dir))
+            self.assertFalse(result["consistent"])
+            self.assertFalse(result["checks"][f"{ENTRYPOINT}:certificate_source_hash"]["ok"])
+
+    def test_tampered_report_field_is_detected(self):
+        with TemporaryDirectory() as tmp:
+            _, output_dir = self._certified_bundle(tmp)
+            report_path = output_dir / f"{ENTRYPOINT.replace('.', '_')}-report.json"
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            report["conditional"] = not report["conditional"]  # flip a field, keep the old report_sha256
+            report_path.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
+            result = api.verify_certificate_bundle(str(output_dir))
+            self.assertFalse(result["consistent"])
+            self.assertFalse(result["checks"][f"{ENTRYPOINT}:report_self_hash"]["ok"])
+
+    def test_tampered_manifest_field_is_detected(self):
+        with TemporaryDirectory() as tmp:
+            _, output_dir = self._certified_bundle(tmp)
+            manifest_path = output_dir / "manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["conditional"] = not manifest["conditional"]  # flip a field, keep the old manifest_sha256
+            manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
+            result = api.verify_certificate_bundle(str(output_dir))
+            self.assertFalse(result["consistent"])
+            self.assertFalse(result["checks"]["manifest_self_hash"]["ok"])
+
+    def test_changed_package_after_certification_is_detected(self):
+        with TemporaryDirectory() as tmp:
+            package_path, output_dir = self._certified_bundle(tmp)
+            other_package = VerificationPackageBuilder(
+                lean_project=PROJECT, entrypoints=[ENTRYPOINT], adapter=DFT_CAPABILITY_PLUGIN,
+                interface_contract=_constraints(),
+                # a different package body -- its sha256 cannot match the certified binding.
+            ).write(package_path)
+            result = api.verify_certificate_bundle(str(output_dir), package=str(package_path))
+            self.assertFalse(result["consistent"])
+            self.assertFalse(result["checks"]["package_hash_matches_binding"]["ok"])
+
+
 CONDITIONAL_ENTRYPOINT = "Testv2.Requirements.ValidPretrainingArchitectureConditional"
 
 
