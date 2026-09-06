@@ -110,6 +110,30 @@ def add_binding_choice(
     return sha256_value(package)
 
 
+def add_external_assumption(
+    path: str | Path, *, premise_id: str, proposition_fingerprint: str, rationale: str,
+) -> str:
+    """Persist an interactively-accepted assumption into the package file
+    itself (spec/theorem-centric-gaps issue E: an accepted assumption is
+    authored package state, exactly like a binding choice via
+    `add_binding_choice`, not TUI-local/session-local state that vanishes
+    the next time the session is re-derived). Replaces any prior assumption
+    for the same `premise_id`. Returns the package's new sha256; the caller
+    must re-run `start_session` (which re-checks the exact proposition
+    fingerprint against Lean) to actually apply it."""
+    package = load_package(path)
+    assumptions = [
+        item for item in package["external_assumptions"] if item["premise_id"] != premise_id
+    ]
+    assumptions.append({
+        "premise_id": premise_id, "proposition_fingerprint": proposition_fingerprint, "rationale": rationale,
+    })
+    package["external_assumptions"] = sorted(assumptions, key=lambda item: item["premise_id"])
+    validate_package(package)
+    Path(path).write_text(json.dumps(package, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return sha256_value(package)
+
+
 def package_sha256(value: dict[str, Any]) -> str:
     validate_package(value)
     return sha256_value(value)

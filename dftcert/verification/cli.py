@@ -14,7 +14,7 @@ from pathlib import Path
 from ..manifest import ManifestError
 from . import api
 from .lean_inspect import inspect_declarations
-from .session import VerificationSession, resume_session
+from .session import VerificationSession
 
 
 def _summary(session: VerificationSession) -> dict:
@@ -67,6 +67,17 @@ def parser() -> argparse.ArgumentParser:
 
     resume = commands.add_parser("resume", help="print a session's current status/unresolved premises")
     resume.add_argument("--session", required=True)
+    resume.add_argument(
+        "--package", default=None,
+        help="validate freshness against this package (spec/theorem-centric-gaps issue D); "
+             "omit for a plain read-only load",
+    )
+    resume.add_argument("--project", default=None, help="validate Lean project/toolchain freshness")
+    resume.add_argument("--artifact", default=None, help="validate artifact hash freshness (via BubblewrapExtractor)")
+    resume.add_argument("--extraction-result", default=None, help="validate artifact hash freshness (trusted-local)")
+    resume.add_argument("--bubblewrap", default="bwrap")
+    resume.add_argument("--extractor-python", default="/usr/bin/python3")
+    resume.add_argument("--trusted-local", action="store_true")
 
     certify = commands.add_parser("certify", help="generate + verify the final certificate theorem")
     certify.add_argument("--session", required=True)
@@ -74,6 +85,12 @@ def parser() -> argparse.ArgumentParser:
     certify.add_argument("--project", required=True)
     certify.add_argument("--entrypoint", action="append", dest="entrypoints",
                           help="repeatable; omit to certify every selected target (spec section 11)")
+    certify.add_argument(
+        "--allow-subset-certificate", action="store_true",
+        help="required to certify only some of --entrypoint when the package selected more "
+             "(spec/theorem-centric-gaps issue G): the resulting bundle is marked "
+             "certificate_scope=selected_subset, never claimed as a full package certificate",
+    )
     certify.add_argument("--lean-import", required=True)
     certify.add_argument("--namespace", default=None)
     certify.add_argument("--output-dir", required=True, help="directory to write the certificate bundle into")
@@ -102,17 +119,24 @@ def main(argv: list[str] | None = None) -> int:
                 trusted_local=options.trusted_local,
             )
         elif options.command == "resume":
-            output = _summary(resume_session(options.session))
+            output = _summary(api.resume_session(
+                options.session, package=options.package, project=options.project,
+                artifact=options.artifact, extraction_result=options.extraction_result,
+                bubblewrap=options.bubblewrap, extractor_python=options.extractor_python,
+                trusted_local=options.trusted_local,
+            ))
         elif options.command == "certify":
             manifest = api.certify_session(
                 session=options.session, package=options.package, project=options.project,
                 lean_import=options.lean_import, output_dir=options.output_dir,
-                entrypoints=options.entrypoints, namespace=options.namespace,
+                entrypoints=options.entrypoints, allow_subset_certificate=options.allow_subset_certificate,
+                namespace=options.namespace,
                 lean_command=shlex.split(options.lean_command), timeout_s=options.timeout_s,
                 trusted_local=options.trusted_local,
             )
             output = {
                 "status": manifest["status"], "conditional": manifest["conditional"],
+                "certificate_scope": manifest["certificate_scope"],
                 "manifest": str((Path(options.output_dir) / "manifest.json").resolve()),
                 "targets": manifest["targets"],
             }

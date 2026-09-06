@@ -23,7 +23,7 @@ from .lean_inspect import inspect_declarations
 from .package import load_package, package_sha256
 from .session import (
     VerificationSession, check_package_freshness,
-    resume_session as _resume_session,
+    load_session as _load_session,
     start_session as _start_session_from_inventory,
 )
 
@@ -63,6 +63,33 @@ def _extraction_result(
     return value
 
 
+def _workspace_descriptor_path(session: str | Path) -> Path:
+    session_path = Path(session)
+    return session_path.with_name(session_path.stem + ".workspace.json")
+
+
+def _write_workspace_descriptor(
+    *, session: str | Path, package: str | Path, project: str | Path,
+    artifact: str | Path | None, extraction_result: str | Path | None,
+    bubblewrap: str, extractor_python: str, lean_command, timeout_s: int, trusted_local: bool,
+) -> None:
+    """A safe, explicit, on-disk record of the inputs `start_session` was
+    called with (spec/theorem-centric-gaps issue F) -- lets a later
+    `refresh_session` re-invoke the same trusted backend after a package
+    decision changes, without the TUI ever caching those inputs itself as
+    hidden in-process state."""
+    descriptor = {
+        "package": str(Path(package).resolve()), "project": str(Path(project).resolve()),
+        "artifact": str(Path(artifact).resolve()) if artifact is not None else None,
+        "extraction_result": str(Path(extraction_result).resolve()) if extraction_result is not None else None,
+        "bubblewrap": bubblewrap, "extractor_python": extractor_python,
+        "lean_command": list(lean_command), "timeout_s": timeout_s, "trusted_local": trusted_local,
+    }
+    _workspace_descriptor_path(session).write_text(
+        json.dumps(descriptor, indent=2, sort_keys=True) + "\n", encoding="utf-8",
+    )
+
+
 def start_session(
     *, artifact: str | Path | None = None, extraction_result: str | Path | None = None,
     package: str | Path, session: str | Path, project: str | Path,
@@ -81,32 +108,117 @@ def start_session(
         artifact=artifact, extraction_result=extraction_result,
         bubblewrap=bubblewrap, extractor_python=extractor_python, trusted_local=trusted_local,
     )
-    return _start_session_from_inventory(
+    session_result = _start_session_from_inventory(
         artifact_sha256=result["artifact_sha256"], inventory=result["inventory"],
         extractor_version=result["extractor_version"], package=package_value, adapter=adapter,
         project_root=project, output=session, lean_command=lean_command,
         timeout_s=timeout_s, trusted_local=trusted_local,
     )
+    _write_workspace_descriptor(
+        session=session, package=package, project=project, artifact=artifact,
+        extraction_result=extraction_result, bubblewrap=bubblewrap, extractor_python=extractor_python,
+        lean_command=lean_command, timeout_s=timeout_s, trusted_local=trusted_local,
+    )
+    return session_result
 
 
-def resume_session(session: str | Path) -> VerificationSession:
-    return _resume_session(session)
+def refresh_session(session: str | Path) -> VerificationSession:
+    """Re-invoke the same trusted `start_session` backend with the exact
+    inputs it was originally called with (spec/theorem-centric-gaps issue
+    F) -- for a TUI/interactive caller that just persisted a package
+    decision (a binding choice or an external assumption) and wants the
+    theorem tree refreshed in place, without duplicating any resolver
+    logic of its own. Requires a workspace descriptor next to `session`
+    (written automatically by `start_session`); raises `ManifestError` if
+    none exists -- the caller should fall back to telling the user to
+    re-run `vista verify start` manually."""
+    descriptor_path = _workspace_descriptor_path(session)
+    if not descriptor_path.is_file():
+        raise ManifestError(
+            f"no workspace descriptor at {descriptor_path} -- this session was not created via "
+            f"dftcert.verification.api.start_session, so it cannot be automatically refreshed"
+        )
+    descriptor = json.loads(descriptor_path.read_text(encoding="utf-8"))
+    return start_session(
+        artifact=descriptor["artifact"], extraction_result=descriptor["extraction_result"],
+        package=descriptor["package"], session=session, project=descriptor["project"],
+        bubblewrap=descriptor["bubblewrap"], extractor_python=descriptor["extractor_python"],
+        lean_command=descriptor["lean_command"], timeout_s=descriptor["timeout_s"],
+        trusted_local=descriptor["trusted_local"],
+    )
+
+
+def resume_session(
+    session: str | Path, *, package: str | Path | None = None, project: str | Path | None = None,
+    artifact: str | Path | None = None, extraction_result: str | Path | None = None,
+    bubblewrap: str = "bwrap", extractor_python: str = "/usr/bin/python3", trusted_local: bool = False,
+) -> VerificationSession:
+    """The validated resume (spec/theorem-centric-gaps issue D): with no
+    extra arguments this is a plain read-only load (equivalent to
+    `dftcert.verification.session.load_session`) -- pass `package`/
+    `project` and/or `artifact`/`extraction_result` to actually check the
+    loaded session is still fresh against them. A stale session's `status`
+    is reported as `"stale"` in the returned (in-memory only) object --
+    the file on disk is never touched, so no decision is ever silently
+    overwritten."""
+    resumed = _load_session(session)
+    if package is None and project is None and artifact is None and extraction_result is None:
+        return resumed
+    stale_reasons: list[str] = []
+    if package is not None:
+        package_value = load_package(package)
+        if package_sha256(package_value) != resumed.value["formal_package_binding"]["package_sha256"]:
+            stale_reasons.append("package hash mismatch")
+        if project is not None:
+            try:
+                check_package_freshness(package_value, project)
+            except ManifestError as error:
+                stale_reasons.append(str(error))
+        try:
+            live_identity = _resolve_adapter(package_value).semantic_identity
+        except ManifestError as error:
+            stale_reasons.append(str(error))
+        else:
+            if live_identity != resumed.value["adapter_binding"]:
+                stale_reasons.append("adapter identity mismatch")
+    if artifact is not None or extraction_result is not None:
+        result = _extraction_result(
+            artifact=artifact, extraction_result=extraction_result,
+            bubblewrap=bubblewrap, extractor_python=extractor_python, trusted_local=trusted_local,
+        )
+        if result["artifact_sha256"] != resumed.value["artifact_binding"]["artifact_sha256"]:
+            stale_reasons.append("artifact hash mismatch")
+    if stale_reasons:
+        resumed.value["status"] = "stale"
+        resumed.value["stale_reasons"] = stale_reasons
+    return resumed
 
 
 def certify_session(
     *, session: str | Path, package: str | Path, project: str | Path,
     lean_import: str, output_dir: str | Path, entrypoints: list[str] | None = None,
+    allow_subset_certificate: bool = False,
     namespace: str | None = None, lean_command=("lake", "env", "lean", "-j", "1"),
     timeout_s: int = 300, trusted_local: bool = False,
 ) -> dict[str, Any]:
     """Generate + Lean-check the final certificate theorem for every
-    selected target (or just `entrypoints`, if given) and assemble the
-    hash-bound certificate bundle (spec section 11): `manifest.json` plus
-    one `.lean`/`-report.json` pair per target in `output_dir`. Refuses if
-    the session isn't `ready_for_certificate`, if `package` doesn't match
-    what the session was built from, or if the Lean project has drifted
-    since the package was authored."""
-    resumed = _resume_session(session)
+    selected target and assemble the hash-bound certificate bundle (spec
+    section 11): `manifest.json` plus one `.lean`/`-report.json` pair per
+    target in `output_dir`. Refuses if the session isn't
+    `ready_for_certificate`, if `package` doesn't match what the session
+    was built from, or if the Lean project has drifted since the package
+    was authored.
+
+    By default certifies every entrypoint the package selected. Passing
+    `entrypoints` as a strict subset of those produces a debug/partial
+    bundle, not a package certificate -- spec/theorem-centric-gaps issue G
+    requires that be an explicit, deliberate choice (`allow_subset_
+    certificate=True`), never silently implied by just passing
+    `entrypoints`, and the resulting manifest records `certificate_scope`
+    (`"full_package"` vs `"selected_subset"`) plus the full
+    `package_entrypoints` list so a subset bundle can never be mistaken
+    for a complete package certificate."""
+    resumed = _load_session(session)
     package_value = load_package(package)
     if package_sha256(package_value) != resumed.value["formal_package_binding"]["package_sha256"]:
         raise ManifestError(
@@ -119,7 +231,15 @@ def certify_session(
             f"session is {resumed.status!r}, not ready_for_certificate -- refusing to certify "
             f"while nodes remain unresolved: {[item['id'] for item in resumed.unresolved_premises]}"
         )
-    targets = entrypoints or [target["entrypoint"] for target in resumed.value["targets"]]
+    package_entrypoints = sorted(target["entrypoint"] for target in resumed.value["targets"])
+    targets = sorted(entrypoints) if entrypoints else package_entrypoints
+    certificate_scope = "full_package" if targets == package_entrypoints else "selected_subset"
+    if certificate_scope == "selected_subset" and not allow_subset_certificate:
+        raise ManifestError(
+            f"certify_session was given a subset of the package's selected entrypoints "
+            f"({targets} of {package_entrypoints}) -- pass allow_subset_certificate=True to "
+            f"explicitly certify a non-package-complete debug bundle (spec/theorem-centric-gaps issue G)"
+        )
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     per_target = [
@@ -137,6 +257,8 @@ def certify_session(
     all_certified = all(item["status"] == "certified" for item in per_target)
     manifest = {
         "status": "certified" if all_certified else "verification_error",
+        "certificate_scope": certificate_scope,
+        "package_entrypoints": package_entrypoints,
         "targets": [item["entrypoint"] for item in per_target],
         "conditional": any(item.get("conditional") for item in per_target),
         "artifact_binding": resumed.value["artifact_binding"],

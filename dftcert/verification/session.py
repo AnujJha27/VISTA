@@ -171,9 +171,41 @@ def _build_nodes_for_entrypoint(
         if status == "specified_assumption":
             node["external_assumption"] = assumption
         nodes[node_id] = node
+        if status == "specified_assumption":
+            _apply_companion_conversions(nodes, node)
     for node_id, node in nodes.items():
         validate_node(node_id, node)
     return nodes
+
+
+def _apply_companion_conversions(nodes: dict[str, dict[str, Any]], premise_node: dict[str, Any]) -> None:
+    """A premise like `hPhysical : TargetRequiresNonLocality` (spec section
+    13) is preceded by its own bare `Prop`-sorted DATA binder -- no adapter
+    candidate can ever ground an arbitrary proposition, and none should
+    try to. Accepting the proof premise as an explicit assumption resolves
+    that companion binder too, using this premise's OWN Lean-derived
+    dependency_node_ids -- but ONLY a dependency whose type Lean itself
+    established is exactly `Prop` (`is_prop_sort`), never merely because
+    the premise happens to depend on it (theorem-centric-gaps issue B):
+    `(x : Nat) (h : Pred x)` must never turn `x` into a `Prop` parameter
+    just because `h` depends on it -- `x` stays unresolved, blocking
+    certification, unless it is separately resolved. Both a qualifying
+    companion and the premise itself stay free binders on the generated
+    certificate theorem (never a concrete substitution, never an
+    `axiom`) rather than blocking forever.
+
+    Shared by `accept_assumption` (the session-local acceptance path) and
+    `_build_nodes_for_entrypoint` (a package-declared assumption applied
+    fresh at `start_session` time, spec/theorem-centric-gaps issue E) so
+    the two paths can never silently diverge on this semantics."""
+    for dep_id in premise_node["dependency_node_ids"]:
+        dep = nodes.get(dep_id)
+        if (
+            dep is not None and dep["kind"] == "data" and dep["status"] == "unresolved"
+            and dep.get("is_prop_sort") is True
+        ):
+            dep["status"] = "specified_assumption"
+            dep["external_assumption"] = {**premise_node["external_assumption"], "premise_id": dep_id}
 
 
 def _session_status(nodes: dict[str, dict[str, Any]]) -> str:
@@ -217,29 +249,7 @@ class VerificationSession:
             "premise_id": premise_id, "proposition_fingerprint": node["type_fingerprint"],
             "pretty_proposition": node["pretty_type"], "entrypoints": [node["entrypoint"]], "rationale": rationale,
         }
-        # A premise like `hPhysical : TargetRequiresNonLocality` (spec
-        # section 13) is preceded by its own bare `Prop`-sorted DATA binder
-        # -- no adapter candidate can ever ground an arbitrary proposition,
-        # and none should try to. Accepting the proof premise as an
-        # explicit assumption resolves that companion binder too, using
-        # this premise's OWN Lean-derived dependency_node_ids -- but ONLY
-        # a dependency whose type Lean itself established is exactly
-        # `Prop` (`is_prop_sort`), never merely because the premise
-        # happens to depend on it (theorem-centric-gaps issue B): `(x :
-        # Nat) (h : Pred x)` must never turn `x` into a `Prop` parameter
-        # just because `h` depends on it -- `x` stays unresolved, blocking
-        # certification, unless it is separately resolved. Both a
-        # qualifying companion and the premise itself stay free binders on
-        # the generated certificate theorem (never a concrete
-        # substitution, never an `axiom`) rather than blocking forever.
-        for dep_id in node["dependency_node_ids"]:
-            dep = self.value["nodes"].get(dep_id)
-            if (
-                dep is not None and dep["kind"] == "data" and dep["status"] == "unresolved"
-                and dep.get("is_prop_sort") is True
-            ):
-                dep["status"] = "specified_assumption"
-                dep["external_assumption"] = {**node["external_assumption"], "premise_id": dep_id}
+        _apply_companion_conversions(self.value["nodes"], node)
         self.value["decisions"].append({
             "kind": "accept_assumption", "premise_id": premise_id, "rationale": rationale, "at": _now(),
         })
@@ -353,6 +363,18 @@ def start_session(
     return result
 
 
-def resume_session(path: str | Path) -> VerificationSession:
+def load_session(path: str | Path) -> VerificationSession:
+    """Raw deserialization for read-only inspection -- does NOT check the
+    session is still fresh against any live input (spec/theorem-centric-
+    gaps issue D). Prefer `dftcert.verification.resume_session` (the
+    validated public API) for anything that will make a decision or
+    certify based on the result."""
     value = json.loads(Path(path).read_text(encoding="utf-8"))
     return VerificationSession(value, path=Path(path))
+
+
+# Historical alias -- every internal caller that only ever needed a raw
+# load (never re-validated the loaded session against anything) keeps
+# working unchanged; new code should call `load_session` by that name to
+# make clear it is NOT the validated resume.
+resume_session = load_session

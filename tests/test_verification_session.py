@@ -18,7 +18,7 @@ from tempfile import TemporaryDirectory
 from dftcert.manifest import ManifestError
 from dftcert.structural.core import structural_ir_from_inventory
 from dftcert.structural.dft_capability_plugin import DFT_CAPABILITY_PLUGIN
-from dftcert.verification.package import VerificationPackageBuilder
+from dftcert.verification.package import VerificationPackageBuilder, add_external_assumption, load_package
 from dftcert.verification.session import resume_session, start_session
 
 from tests.test_lean_introspection import _HAS_LEAN, _SKIP_REASON
@@ -247,6 +247,36 @@ class AssumptionMechanicsTests(unittest.TestCase):
             session = _start(package=package, output=Path(tmp) / "session.json")
             node = session.value["nodes"][f"{CONDITIONAL_ENTRYPOINT}#7"]
             self.assertEqual(node["status"], "unresolved")
+
+    def test_add_external_assumption_persists_into_package_and_applies_on_restart(self):
+        """Issue E: an interactively-accepted assumption must be
+        normalized into package state the same way a binding choice is
+        (`add_binding_choice`) -- `add_external_assumption` writes it into
+        the package file itself, and a fresh `start_session` against that
+        package (not `session.accept_assumption`) is what applies it, so
+        the decision survives the session being re-derived from scratch."""
+        with TemporaryDirectory() as tmp:
+            package_path = Path(tmp) / "package.json"
+            VerificationPackageBuilder(
+                lean_project=PROJECT, entrypoints=[CONDITIONAL_ENTRYPOINT], adapter=DFT_CAPABILITY_PLUGIN,
+                interface_contract=_constraints(),
+                binding_choices=[{"entrypoint": CONDITIONAL_ENTRYPOINT, "binder_path": "0", "candidate_key": "site_count"}],
+            ).write(package_path)
+            out = Path(tmp) / "session.json"
+            session = _start(package=load_package(package_path), output=out)
+            premise = session.unresolved_premises[0]
+            self.assertEqual(session.status, "blocked_on_premise")
+
+            add_external_assumption(
+                package_path, premise_id=premise["id"],
+                proposition_fingerprint=premise["type_fingerprint"], rationale="physical target requires non-locality",
+            )
+            reapplied = load_package(package_path)
+            self.assertEqual(len(reapplied["external_assumptions"]), 1)
+
+            restarted = _start(package=reapplied, output=out)
+            self.assertEqual(restarted.status, "ready_for_certificate")
+            self.assertEqual(restarted.value["nodes"][premise["id"]]["status"], "specified_assumption")
 
 
 @unittest.skipUnless(_HAS_LEAN, _SKIP_REASON)

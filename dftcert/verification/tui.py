@@ -16,12 +16,33 @@ state -- spec issues 7/9) and tells the user to re-run `vista verify
 start`, which re-checks the choice against Lean and produces a fresh
 session; it never flips a node's status in this process without Lean
 re-verifying it, and never silently picks among ambiguous candidates.
+
+The `[a] accept assumption` action follows the same pattern (spec/
+theorem-centric-gaps issue E): with `--package` given it writes the
+assumption into the package file via `package.add_external_assumption`
+-- exactly the same normalized, re-derivable package state a binding
+choice gets -- rather than leaving it as session-local state that
+vanishes the next time the session is re-derived from the package.
+Without `--package` it falls back to the old session-local-only
+`VerificationSession.accept_assumption` so the action still works, just
+without surviving a re-derived session.
+
+Both actions then try `api.refresh_session` (spec/theorem-centric-gaps
+issue F): if the session was created via `dftcert.verification.api.
+start_session`, a workspace descriptor sits next to it recording the
+exact inputs that call needs, and refreshing just re-invokes that same
+trusted backend -- never reimplementing resolution here. If no
+descriptor exists (the session was built some other way), the action
+falls back to telling the user to re-run `vista verify start` manually;
+either way this module adds no resolution semantics of its own.
 """
 from __future__ import annotations
 
 from typing import Any
 
-from .package import add_binding_choice
+from ..manifest import ManifestError
+from . import api
+from .package import add_binding_choice, add_external_assumption
 from .session import VerificationSession, resume_session
 
 _STATUS_TAG = {
@@ -105,6 +126,18 @@ def run_interactive(session_path: str, *, package_path: str | None = None) -> in
 
     session = resume_session(session_path)
 
+    def _refresh_after_package_write(recorded_what: str) -> str:
+        """Issue F: re-invoke the same trusted `start_session` backend via
+        the session's own workspace descriptor, rather than duplicating
+        resolver logic or manually telling the user every time -- falls
+        back to the manual instruction only when no descriptor exists."""
+        nonlocal session
+        try:
+            session = api.refresh_session(session_path)
+        except ManifestError:
+            return f"{recorded_what} in the package -- re-run `vista verify start` to apply it"
+        return f"{recorded_what} and refreshed the session"
+
     def main(screen: Any) -> None:
         curses.curs_set(0)
         screen.keypad(True)
@@ -152,8 +185,19 @@ def run_interactive(session_path: str, *, package_path: str | None = None) -> in
                 screen.refresh()
                 rationale = screen.getstr(detail_row + 21, 11, 200).decode("utf-8", errors="replace")
                 curses.noecho()
-                session.accept_assumption(premise_id=current_id, rationale=rationale or "accepted via TUI")
-                message = f"accepted {current_id} as an explicit assumption"
+                rationale = rationale or "accepted via TUI"
+                if package_path is None:
+                    # No package to author into -- fall back to the old
+                    # session-local acceptance so the action still works,
+                    # but it will not survive a re-derived session.
+                    session.accept_assumption(premise_id=current_id, rationale=rationale)
+                    message = f"accepted {current_id} as an explicit assumption (session-local only; no --package given)"
+                else:
+                    add_external_assumption(
+                        package_path, premise_id=current_id,
+                        proposition_fingerprint=node["type_fingerprint"], rationale=rationale,
+                    )
+                    message = _refresh_after_package_write(f"recorded the assumption for {current_id}")
             elif key in ("b", "B"):
                 node = session.value["nodes"][current_id]
                 if node["kind"] != "data" or node["status"] != "ambiguous_binding":
@@ -175,7 +219,7 @@ def run_interactive(session_path: str, *, package_path: str | None = None) -> in
                     package_path, entrypoint=node["entrypoint"],
                     binder_path=node["binder_path"], candidate_key=chosen,
                 )
-                message = f"recorded {chosen!r} for {current_id} in the package -- re-run `vista verify start` to apply it"
+                message = _refresh_after_package_write(f"recorded {chosen!r} for {current_id}")
 
     curses.wrapper(main)
     return 0
