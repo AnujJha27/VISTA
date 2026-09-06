@@ -78,3 +78,14 @@ certificates trust the human-confirmed interpretation. Both require Lean.
 Structural V2 is the primary workflow: it produces reviewable Lean proofs for
 artifact-backed structural claims or human-confirmed specifications. Legacy V1
 remains available only to reproduce its policy-based prototype results.
+
+A theorem-centric evolution of Structural V2 (`vista verify ...`,
+`dftcert/verification/`) inverts which side defines the requirement: a
+selected *Lean theorem's* premises are the mathematical requirement, and an
+artifact adapter only supplies Lean-instantiable facts to try to satisfy
+them. It checks whether artifact-grounded structural facts are sufficient
+to establish those selected requirements under explicit interface and
+external assumptions -- never that Lean verifies the model itself, and
+never that an accepted external assumption has thereby been proven true.
+See `VISTA_THEOREM_CENTRIC_CODEX_SPEC.md`. `vista structural` (this
+section's workflow above) is unaffected and still the default.

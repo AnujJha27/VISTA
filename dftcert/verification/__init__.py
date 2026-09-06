@@ -31,6 +31,35 @@ verify`'s CLI calls these same functions, never a second implementation:
         session="session.json", package="vista-package.json", project="examples/dft/lean",
         lean_import="Testv2.Requirements", output_dir="build/vista/certificate", trusted_local=True,
     )
+
+The defensible claim this package establishes: VISTA checks whether
+artifact-grounded structural facts are sufficient to establish selected
+Lean requirements under explicit interface and external assumptions --
+never that Lean verifies the model itself, and never that an accepted
+external assumption has thereby been proven true (it remains a free
+binder on the generated certificate theorem, exactly as recorded).
+
+Trust boundary, by node/fact provenance:
+
+    EXTRACTED           exact artifact hash, graph/state facts directly
+                        from safe extraction (`dftcert.sandbox`/
+                        `extractors.torch_export_worker`).
+    INFERRED / DERIVED  adapter semantic classifications (`artifact_
+                        grounded` nodes) recomputed from extracted
+                        evidence, independently revalidated against it.
+    SPECIFIED INTERFACE output roles/layout/semantic interpretation
+                        supplied by the package's `interface_contract`.
+    SPECIFIED ASSUMPTION a theorem premise explicitly accepted by a user/
+                        domain expert (`specified_assumption` nodes) --
+                        stays a real binder on the certificate, never an
+                        `axiom`.
+    FORMALLY CHECKED    Lean elaboration/kernel checking: theorem
+                        introspection, premise discharge
+                        (`formally_discharged`), the generated certificate
+                        theorem itself.
+    UNVERIFIED          any physical/modeling claim outside those explicit
+                        theorem premises -- this package makes no claim
+                        about it at all.
 """
 from __future__ import annotations
 
