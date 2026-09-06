@@ -92,6 +92,7 @@ class UnconditionalCertificateTests(unittest.TestCase):
             self.assertFalse(report["conditional"])
             self.assertEqual(report["external_assumptions"], [])
             self.assertEqual(report["status"], "certified")
+            self.assertTrue(report["used_facts"], "used_facts should list the IR evidence nodes actually relied on")
 
 
 @unittest.skipUnless(_HAS_LEAN, _SKIP_REASON)

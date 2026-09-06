@@ -118,11 +118,16 @@ def assemble_certificate_report(
         node["external_assumption"] for node in nodes.values()
         if node["status"] == "specified_assumption" and node["kind"] == "premise"
     ]
+    # Spec section 18: the certificate records exactly which IR provenance
+    # nodes actually supported a selected theorem's binders -- not a new
+    # general-purpose IR projection, just this target's own evidence_refs.
+    used_facts = sorted({ref for node in nodes.values() for ref in node.get("evidence_refs", [])})
     report = {
         "status": "certified",
         "entrypoint": entrypoint,
         "conditional": bool(assumptions),
         "external_assumptions": assumptions,
+        "used_facts": used_facts,
         "artifact_grounded_nodes": by_status.get("artifact_grounded", []),
         "specified_interface_nodes": by_status.get("specified_interface", []),
         "formally_discharged_nodes": by_status.get("formally_discharged", []),
