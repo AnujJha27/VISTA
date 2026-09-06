@@ -62,7 +62,7 @@ private def vistaTryElab (env : Environment) (exprStr : String) (expectedType : 
   | none =>
     logInfo m!"{marker}{{Json.mkObj [("error", Json.str "entrypoint not found")]}}"
   | some ci => liftTermElabM do
-    let (mvars, _, _) ← Meta.forallMetaTelescope ci.type
+    let (mvars, _, concl) ← Meta.forallMetaTelescope ci.type
     let resolvedData : List (Nat × String) := {resolved_data}
     let tactics : List String := {tactics}
     let mut report : Array Json := #[]
@@ -108,6 +108,13 @@ private def vistaTryElab (env : Environment) (exprStr : String) (expectedType : 
             report := report.push (Json.mkObj [("index", Json.str (toString i)), ("kind", Json.str "data"), ("status", Json.str "resolved")])
           | none =>
             report := report.push (Json.mkObj [("index", Json.str (toString i)), ("kind", Json.str "data"), ("status", Json.str "unresolved")])
+    let conclInstantiated ← instantiateMVars concl
+    let conclDisplay := toString (← Meta.ppExpr conclInstantiated)
+    let conclCanonical := toString (← withOptions (fun _ => vistaCanonicalOptions) <| Meta.ppExpr conclInstantiated)
+    report := report.push (Json.mkObj [
+      ("kind", Json.str "conclusion"), ("type_display", Json.str conclDisplay),
+      ("type_fingerprint_source", Json.str conclCanonical),
+      ("has_unresolved_dependency", Json.bool conclInstantiated.hasExprMVar)])
     logInfo m!"{marker}{{(Json.arr report).compress}}"
 '''
 
@@ -171,7 +178,8 @@ def discharge_premises(
         raise ManifestError("premise discharge payload must be a JSON array")
     results = []
     for entry in payload:
-        entry = {**entry, "index": int(entry["index"])}
+        if "index" in entry:
+            entry = {**entry, "index": int(entry["index"])}
         if "type_fingerprint_source" in entry:
             entry["type_fingerprint"] = _fingerprint(entry["type_fingerprint_source"])
         results.append(entry)
@@ -187,9 +195,13 @@ def resolve_entrypoint(
     """The full section-12 pipeline for one entrypoint: resolve data binders
     against adapter candidates, then attempt deterministic discharge of
     every proposition binder given whatever data got resolved. Returns
-    `{"data_binders": [...], "premises": [...]}`, both ordered by binder
-    index; a caller (a `VerificationSession`) merges these into nodes and
-    handles Route 3 (explicit assumption) itself."""
+    `{"data_binders": [...], "premises": [...], "conclusion": {...}}` --
+    the first two ordered by binder index; a caller (a
+    `VerificationSession`) merges these into nodes and handles Route 3
+    (explicit assumption) itself. `conclusion` is the target's own
+    conclusion type, fully data-instantiated (its own
+    `has_unresolved_dependency` flag says whether any data binder it needs
+    is still unresolved/ambiguous)."""
     by_key = {candidate.key: candidate.lean_expr for candidate in candidates}
     data_results = resolve_data_binders(
         project_root=project_root, imports=imports, entrypoint=entrypoint,
@@ -206,7 +218,9 @@ def resolve_entrypoint(
         timeout_s=timeout_s, trusted_local=trusted_local,
     )
     premises_by_index = {entry["index"]: entry for entry in premise_results if entry["kind"] == "premise"}
+    conclusion = next(entry for entry in premise_results if entry["kind"] == "conclusion")
     return {
         "data_binders": [entry for entry in data_results if entry["kind"] == "data"],
         "premises": [premises_by_index[index] for index in sorted(premises_by_index)],
+        "conclusion": conclusion,
     }

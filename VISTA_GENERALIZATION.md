@@ -151,3 +151,17 @@ translation validation, and certificate assembly unchanged.
 
 This document will be updated (not silently replaced) as the design evolves
 further, e.g. when a second plugin is actually written.
+
+## Superseding direction: theorem-centric verification
+
+This note's `StructuralPlugin` still defines what it means for the DFT
+plugin's own *fixed* `checks()` to be satisfied. A deeper architectural
+change, specified in `VISTA_THEOREM_CENTRIC_CODEX_SPEC.md` and implemented
+under `dftcert/verification/`, inverts that: the selected Lean *theorem*
+now defines the mathematical requirement, and the artifact adapter (this
+same `StructuralPlugin`, plus its new `formal_binding_candidates()`) only
+supplies Lean-instantiable facts. `StructuralPlugin.checks()`/`lean_
+statements()` and the `vista structural` CLI commands are unchanged and
+still work -- the theorem-centric path (`vista verify ...`) is additive,
+not a replacement, until a direct test proves equivalence and deletion is
+explicitly approved (per that spec's section 20.2).

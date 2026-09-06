@@ -156,6 +156,11 @@ def parser() -> argparse.ArgumentParser:
     )
     structural.add_argument("structural_args", nargs=argparse.REMAINDER)
 
+    verify = commands.add_parser(
+        "verify", help="run the theorem-centric verification workflow"
+    )
+    verify.add_argument("verify_args", nargs=argparse.REMAINDER)
+
     demo = commands.add_parser("demo", help="run a bundled Noether workflow demo")
     demo.add_argument(
         "kind",
@@ -520,7 +525,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         raw_args = list(argv) if argv is not None else sys.argv[1:]
         forwarded = next(
-            (name for name in ("agentic", "structural") if name in raw_args), None
+            (name for name in ("agentic", "structural", "verify") if name in raw_args), None
         )
         if forwarded:
             index = raw_args.index(forwarded)
@@ -531,6 +536,9 @@ def main(argv: list[str] | None = None) -> int:
         if options.command == "structural":
             from .structural.cli import main as structural_main
             return structural_main(options.structural_args)
+        if options.command == "verify":
+            from .verification.cli import main as verify_main
+            return verify_main(options.verify_args)
         policy = Policy.load(options.policy)
         if options.command == "status":
             run = LocalRun(options.run_dir)
