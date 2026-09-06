@@ -345,7 +345,7 @@ class DFTCapabilityPlugin(DFTPlugin):
             ),
             "non_local_capacity": (
                 f"theorem generated_capacity_structure : ({namespace}.expectedLocal || "
-                f"{self.lean_import}.canRepresentNonLocal {namespace}.operatorForm) = "
+                f"{self.lean_import}.canRepresentNonLocal {namespace}.siteCount {namespace}.operatorForm) = "
                 f"{str(checks['non_local_capacity']['satisfied']).lower()}"
             ),
             "self_adjoint": (

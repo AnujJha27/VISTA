@@ -160,13 +160,20 @@ canonical contiguous grouping (`output_axes=[0..r-1]`,
 `input_axes=[r..2r-1]`) is supported; a reordered or interleaved grouping
 is rejected outright, not guessed at.
 
-This also changes what counts as the adjoint. For a plain matrix, any
-reviewed transpose op is the (unique) adjoint. For a grouped layout, only
-`aten.permute.default` can express the required swap of the whole domain
-group with the whole codomain group, and its literal permutation argument
-must equal that exact swap; `numpy_T`/`.t()`/`transpose.int` are rejected
-for a grouped layout because none of them can realize a multi-axis block
-swap in one node. `_observed_locality` also changes: instead of raw
+This also changes what counts as the adjoint. `.t()`/`numpy_T` (no axis
+arguments, unambiguous for a two-axis tensor) are accepted only for the
+plain single-axis-per-side layout. `transpose.int(x, dim0, dim1)` and
+`permute.default(x, dims)` are checked against their REAL arguments, at
+every rank -- a no-op call (`transpose.int(x, 0, 0)`, or
+`permute(x, [0, 1])`) is not a transpose at all and is never accepted just
+because its op name is on the reviewed list. For a plain matrix, the only
+valid nontrivial permutation is the swap `[1, 0]`; for a grouped layout,
+only `permute` can express the required swap of the whole domain group
+with the whole codomain group, and its literal permutation argument must
+equal that exact swap -- `numpy_T`/`.t()`/`transpose.int` are rejected
+outright once there is more than one axis per side, because none of them
+can realize a multi-axis block swap in one node. `_observed_locality` also
+changes: instead of raw
 row/column indices, it compares the SITE coordinate of each flattened row
 and column (via `layout.site_axis`), so `off_diagonal_nonzero` reports real
 site-to-site couplings, not merely off-diagonal entries in the flattened
@@ -184,6 +191,47 @@ reordered axis groupings. Extending to any of these is a `_resolve_operator_layo
 `_read_operator_tensor` change, not a rewrite of the recognition or
 locality logic around it.
 
+## An `unconstrained_parameter` must actually be a parameter
+
+`_operator_construction` used to classify ANY `placeholder`/`get_attr` root
+as `unconstrained_parameter` -- including one that is actually a plain
+runtime input (an activation, not a trained weight), if the analyst's
+declared `learned_self_energy` role happened to resolve there. That is a
+real gap: `non_local_capacity`/`self_adjoint` describe a free, trainable
+matrix, not whatever tensor a model happens to receive at inference time.
+`_is_plausible_parameter_node` now checks the extractor's own `state_kind`
+classification (from `torch.export`'s `graph_signature.input_specs`) and
+rejects an explicit user-input classification; it stays permissive when no
+classification is available at all (older extractor, hand-authored
+specification), since that metadata is optional, not because the node is
+assumed to be fine. This never applies to the `symmetrized` recipe's own
+add/adjoint pair (`B + B^dagger` is self-adjoint for ANY `B`, trained or
+not -- the check only matters for the `unconstrained_parameter` capacity
+claim).
+
+## Adjacency selection is either declared or a labeled heuristic
+
+`input_constraints.adjacency_state_name` is optional; when omitted, the
+adjacency buffer is found by a name-match heuristic (any state entry whose
+name contains `"adjacency"`). That heuristic was previously
+indistinguishable from an explicit declaration in the resulting IR.
+`semantic_derivations.topology.metadata.selection_provenance` now records
+`"declared"` or `"heuristic_name_match"`, so a reader (or a future stricter
+profile) can tell which happened without re-deriving it.
+
+## Lean now encodes the site-count precondition it always required
+
+`canRepresentNonLocal` (`Testv2/StructuralV2.lean`) used to ignore site
+count entirely, while the Python `non_local_capacity` check (in the
+capability plugin) required `site_count >= 2` (a 1x1 matrix has no
+off-diagonal entry for any recipe). That meant the actual Lean theorem
+generated for a `site_count == 1` non-local claim didn't encode the reason
+Python said it was unsatisfied -- the Lean-checked proposition was strictly
+weaker than what the certificate's English description claimed. `canRepresentNonLocal`
+now takes `siteCount : Nat` explicitly and requires `siteCount >= 2` in
+every branch that previously returned `true` unconditionally; the generated
+obligation now passes `namespace.siteCount` alongside `operatorForm`.
+
 ## Known limitations
 
 - Locality is only checked for recognized, small (<=4096-element)
@@ -197,3 +245,22 @@ locality logic around it.
   optimizer noise) would be misjudged. This is the same fixed-tolerance
   trade-off any exact-vs-numeric boundary makes; it is recorded in every
   certificate's `locality.rule`, never applied silently.
+- `adjacency_convention` and `operator_layout` still silently default
+  (`target_source` and the plain n x n matrix respectively) rather than
+  being required. A stricter profile could reject a missing declaration
+  outright instead of defaulting -- deliberately not done here, since it
+  would break every existing certificate that relied on the default; it is
+  a real design question, not a bug, and is left for a profile that
+  explicitly opts into "no silent defaults."
+- The original `constraints.json`/specification file's own hash is not
+  separately bound anywhere; only its normalized, resolved meaning (via
+  `translation`/the IR) is hashed. Binding `specification_sha256` alongside
+  the artifact hash would let a certificate state "this artifact was
+  checked against exactly this supplied file," which is a `core.py` change
+  applying to every plugin, not done here.
+- The IR does not visually separate "the analyst specified this" from "this
+  was derived from the artifact" beyond individual field names/values (e.g.
+  `expected_locality` vs. `observed_local`) and the `selection_provenance`
+  label above -- there is no single `interface`/`requirements` vs.
+  `artifact_facts` top-level partition. Worth doing for readability, but a
+  restructuring of every plugin's IR shape, not attempted here.

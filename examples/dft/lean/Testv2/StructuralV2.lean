@@ -70,15 +70,19 @@ def allPairsReachable (edges : List (Nat × Nat)) (depth : Nat) (siteCount : Nat
 /-- V4: does this operator construction admit *some* parameter assignment
     with a nonzero off-diagonal entry? `.zero`/`.identity` never can, for any
     assignment; an unconstrained `.parameter` and a symmetrized
-    `.add p (.adjoint p)` (or its mirror) always can. A fact about the
-    construction alone -- never about the values currently stored in it (see
+    `.add p (.adjoint p)` (or its mirror) can, PROVIDED there are at least
+    two sites for an off-diagonal entry to exist at all -- a 1x1 matrix has
+    none, for any recipe, so `siteCount` is a real precondition of this
+    claim, not a separate Python-only check layered on top of a Lean fact
+    that doesn't mention it. A fact about the construction and site count
+    alone -- never about the values currently stored in it (see
     `localityMatches` for that). -/
-def canRepresentNonLocal : OperatorForm → Bool
+def canRepresentNonLocal (siteCount : Nat) : OperatorForm → Bool
   | .zero => false
   | .identity => false
-  | .parameter _ => true
-  | .add _ (.adjoint _) => true
-  | .add (.adjoint _) _ => true
+  | .parameter _ => siteCount >= 2
+  | .add _ (.adjoint _) => siteCount >= 2
+  | .add (.adjoint _) _ => siteCount >= 2
   | _ => false
 
 end Testv2.StructuralV2

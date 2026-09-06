@@ -197,15 +197,17 @@ def structural_model_description(
     source = value["source"]
     translation = value.get("translation", {})
     lines = [
-        "Artifact-derived model description (not an LLM interpretation):",
+        "Structural report context (deterministic, not an LLM interpretation) --"
+        " combines the analyst's declared interface/requirements with facts"
+        " derived from the exported graph; individual lines below say which is which:",
         f"- Source: {source['kind']}; binding hash: {source.get('artifact_sha256', source.get('description_sha256', 'unknown'))}.",
         *plugin.model_description_lines(value),
     ]
     if source["kind"] == "torch_export":
         lines.extend([
-            f"- Declared output roots: {translation.get('roles', {})}.",
-            f"- Adjacency evidence: state {translation.get('topology', {}).get('state_name')!r}; graph nodes {translation.get('topology', {}).get('adjacency_aliases', [])}.",
-            "- Translation validation rechecked these claims, including locality, against the raw exported inventory.",
+            f"- Declared output roots (specified): {translation.get('roles', {})}.",
+            f"- Adjacency evidence (derived): state {translation.get('topology', {}).get('state_name')!r}; graph nodes {translation.get('topology', {}).get('adjacency_aliases', [])}.",
+            "- Translation validation independently rechecked every derived claim above against the raw exported inventory.",
         ])
     lines.append(
         "Scope: structural/value compatibility only; this does not assess training convergence, numerical accuracy, or experiment."

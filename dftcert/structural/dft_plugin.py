@@ -24,10 +24,6 @@ _ZERO_TARGETS = {
 }
 _IDENTITY_TARGETS = {"aten.eye.default"}
 _ADD_TARGETS = {"aten.add.tensor"}
-_ADJOINT_TARGETS = {
-    "aten.transpose.int", "aten.permute.default", "aten.t.default",
-    "aten.numpy_t.default",
-}
 _HINGE_TARGETS = {
     "aten.relu.default", "aten.leaky_relu.default", "aten.clamp_min.default",
     "aten.maximum.default", "aten.abs.default", "aten.hardtanh.default",
@@ -154,29 +150,67 @@ def _adjoint_permutation(node: dict[str, Any]) -> list[Any] | None:
 
 
 def _is_adjoint_of(node: dict[str, Any], layout: dict[str, Any]) -> bool:
-    """Whether `node` actually constructs the adjoint under `layout`. For the
-    default single-axis-per-side layout, any reviewed transpose op suffices
-    -- there is only one possible nontrivial permutation of two axes. For a
-    grouped multi-axis layout, only `permute` can even express the required
-    swap of the whole input axis group with the whole output axis group, and
-    its actual permutation argument must equal that swap exactly; the op
-    name alone is not enough once there is more than one axis per side."""
+    """Whether `node` actually constructs the adjoint under `layout` -- by
+    inspecting its real permutation/axis arguments, never by op name alone.
+    A `permute`/`transpose.int` call with a no-op or wrong permutation (e.g.
+    `transpose.int(x, 0, 0)`, or `permute(x, [0, 1])` -- neither actually
+    swaps anything) must not be accepted just because its op name is on the
+    reviewed list; only `.t()`/`numpy_T` have no axis arguments to check and
+    are unambiguous for a two-axis tensor."""
+    target = _target(node)
+    if target == "aten.permute.default":
+        return _adjoint_permutation(node) == layout["input_axes"] + layout["output_axes"]
     rank = len(layout["output_axes"])
-    if rank == 1:
-        return _target(node) in _ADJOINT_TARGETS
-    if _target(node) != "aten.permute.default":
-        return False
-    return _adjoint_permutation(node) == layout["input_axes"] + layout["output_axes"]
+    if rank != 1:
+        return False  # only `permute` can express a swap of more than two axes
+    if target == "aten.transpose.int":
+        args = node.get("args")
+        positional = args if isinstance(args, list) else []
+        if len(positional) < 3:
+            return False
+        dim0, dim1 = positional[1], positional[2]
+        return {dim0, dim1} == {0, 1} and dim0 != dim1
+    return target in {"aten.t.default", "aten.numpy_t.default"}
+
+
+_NON_PARAMETER_STATE_KIND_MARKERS = ("user_input",)
+
+
+def _is_plausible_parameter_node(inventory: dict[str, Any], node_name: str) -> bool:
+    """Whether `node_name` does NOT resolve to a state entry the extractor
+    classified as a plain runtime input -- so a "built from an unconstrained
+    parameter" claim (implying trainable freedom, used for `non_local_capacity`
+    and for reading real values in `_operator_matrix`) can never secretly be
+    built from a raw activation input that was never a trainable weight at
+    all. Fails permissive (True) when no classification is available at all
+    (`state_kind` absent or unrecognized, since a hand-authored specification
+    or an older extractor version may not carry it); fails closed only on an
+    explicit user-input classification -- a real signal, not a guess."""
+    state = inventory.get("state", {})
+    if not isinstance(state, dict):
+        return True
+    state_name = _operator_state_name(inventory, node_name)
+    entry = state.get(state_name) if state_name else None
+    if not isinstance(entry, dict):
+        return True
+    kind = str(entry.get("state_kind", "")).lower()
+    return not any(marker in kind for marker in _NON_PARAMETER_STATE_KIND_MARKERS)
 
 
 def _operator_construction(
-    nodes: list[dict[str, Any]], root: str, layout: dict[str, Any],
+    nodes: list[dict[str, Any]], root: str, layout: dict[str, Any], inventory: dict[str, Any],
 ) -> tuple[str, list[str], dict[str, Any]]:
     """Classify the operator's construction and return a `recipe` describing
     exactly how to compute its concrete matrix from raw extracted parameter
     values (see `_operator_matrix`) -- the single source of truth shared by
     the classification and the actual-value computation, so they can never
     silently disagree.
+
+    Self-adjointness (the `symmetrized` recipe, `add(base, adjoint(base))`)
+    holds for *any* `base` -- B + B^dagger is self-adjoint regardless of
+    whether B is a trained weight, so that branch never needs a parameter
+    check. `unconstrained_parameter` is different: it claims `base` is a
+    free, trainable matrix, which does need `_is_plausible_parameter_node`.
     """
     by_name = {node["name"]: node for node in nodes if isinstance(node.get("name"), str)}
     provenance = [node["name"] for node in _ancestors(nodes, root)]
@@ -201,11 +235,13 @@ def _operator_construction(
                         transformed_base in by_name
                         and by_name.get(base, {}).get("op") in {"placeholder", "get_attr"}
                         and by_name[transformed_base].get("op") in {"placeholder", "get_attr"}
+                        and _is_plausible_parameter_node(inventory, base)
+                        and _is_plausible_parameter_node(inventory, transformed_base)
                     ):
                         return "unconstrained_parameter", provenance, {
                             "kind": "sum_transpose", "base": base, "transposed_base": transformed_base,
                         }
-    if root_node.get("op") in {"placeholder", "get_attr"}:
+    if root_node.get("op") in {"placeholder", "get_attr"} and _is_plausible_parameter_node(inventory, root):
         return "unconstrained_parameter", provenance, {"kind": "param", "node": root}
     return "unsupported", provenance, {"kind": "unsupported"}
 
@@ -286,8 +322,15 @@ def _state_name(inventory: dict[str, Any], requested: str | None) -> str | None:
 
 def _topology(
     inventory: dict[str, Any], input_constraints: dict[str, Any],
-) -> tuple[int, list[list[int]], list[str], str]:
-    state_name = _state_name(inventory, input_constraints.get("adjacency_state_name"))
+) -> tuple[int, list[list[int]], list[str], str, str]:
+    requested = input_constraints.get("adjacency_state_name")
+    state_name = _state_name(inventory, requested)
+    # Which state entry became "the adjacency" is either exactly what the
+    # analyst declared, or a heuristic name-match fallback (any state entry
+    # whose name contains "adjacency") when they didn't -- a real
+    # interpretation choice, not an artifact fact, so it is recorded rather
+    # than left indistinguishable from a declared name.
+    selection_provenance = "declared" if requested is not None and state_name == requested else "heuristic_name_match"
     entry = _state_entry(inventory, state_name)
     if not entry:
         raise ManifestError("artifact has no extractable structural adjacency buffer")
@@ -312,7 +355,10 @@ def _topology(
                     [column, row] if convention == "target_source" else [row, column]
                 )
     provenance = entry.get("graph_inputs", [])
-    return size, edges, [str(item) for item in provenance if isinstance(item, str)], state_name
+    return (
+        size, edges, [str(item) for item in provenance if isinstance(item, str)],
+        state_name, selection_provenance,
+    )
 
 
 def _operator_state_name(inventory: dict[str, Any], node_name: str) -> str | None:
@@ -615,11 +661,11 @@ class DFTPlugin(StructuralPlugin):
         if expected_locality not in {"local", "non_local"}:
             raise ManifestError("input_constraints.expected_locality must be 'local' or 'non_local'")
         layout = _resolve_operator_layout(input_constraints)
-        count, edges, graph_inputs, state_name = _topology(inventory, input_constraints)
+        count, edges, graph_inputs, state_name, adjacency_selection_provenance = _topology(inventory, input_constraints)
         aliases = _adjacency_aliases(nodes, graph_inputs)
         stages, message_recognized = _message_chain(nodes, roles["message_state"], graph_inputs)
         xc_form, xc_nodes = _xc_form(nodes, roles["xc_energy"])
-        operator, operator_nodes, operator_recipe = _operator_construction(nodes, roles["learned_self_energy"], layout)
+        operator, operator_nodes, operator_recipe = _operator_construction(nodes, roles["learned_self_energy"], layout, inventory)
         by_name = {node.get("name"): node for node in nodes if isinstance(node.get("name"), str)}
         stage_graph = [by_name[name] for name in stages]
         xc_graph = _ancestors(nodes, roles["xc_energy"])
@@ -631,7 +677,8 @@ class DFTPlugin(StructuralPlugin):
                 root=state_name, evidence_nodes=aliases, rule="topology.adjacency_state",
                 observed_nodes=topology_graph,
                 metadata={"state_name": state_name, "graph_inputs": graph_inputs,
-                          "adjacency_convention": input_constraints.get("adjacency_convention", "target_source")},
+                          "adjacency_convention": input_constraints.get("adjacency_convention", "target_source"),
+                          "selection_provenance": adjacency_selection_provenance},
             ),
             "message_passing": _derivation(
                 claim="message_passing.depth", value=len(stages), root=roles["message_state"],
