@@ -462,6 +462,93 @@ def _reachability(
     return {"applicable": True, "satisfied": not unreachable, "depth": depth, "unreachable_pairs": unreachable}
 
 
+def _validate_structure_sections(value: dict[str, Any]) -> None:
+    """Shape checks for `topology`/`message_passing`/`xc`/`operator` --
+    never `capabilities`, which is each plugin's own concern. Factored out
+    (not just inlined into one class) so a future second plugin sharing this
+    same DFT-shaped topology/xc/operator IR (a different check set over the
+    same architecture facts) can reuse it instead of re-deriving it."""
+    topology = value.get("topology")
+    message = value.get("message_passing")
+    xc = value.get("xc")
+    operator = value.get("operator")
+    if not all(isinstance(item, dict) for item in (topology, message, xc, operator)):
+        raise ManifestError("structural IR sections are missing")
+    count = topology.get("site_count")
+    edges = topology.get("directed_edges")
+    if not isinstance(count, int) or isinstance(count, bool) or count <= 0:
+        raise ManifestError("site_count must be positive")
+    if not isinstance(edges, list) or any(
+        not isinstance(edge, list) or len(edge) != 2
+        or any(not isinstance(node, int) or node < 0 or node >= count for node in edge)
+        for edge in edges
+    ):
+        raise ManifestError("directed_edges are invalid")
+    depth = message.get("depth")
+    if not isinstance(depth, int) or isinstance(depth, bool) or depth < 0:
+        raise ManifestError("message-passing depth must be non-negative")
+    if "recognized" in message and not isinstance(message["recognized"], bool):
+        raise ManifestError("message-passing recognition must be boolean")
+    if xc.get("form") not in {"hinge", "smooth", "unsupported"}:
+        raise ManifestError("unsupported XC form value")
+    if operator.get("construction") not in {
+        "zero", "identity", "symmetrized", "unconstrained_parameter", "unsupported"
+    }:
+        raise ManifestError("unsupported operator construction value")
+    layout = operator.get("layout")
+    if not isinstance(layout, dict):
+        raise ManifestError("operator.layout is missing")
+    output_axes, input_axes = layout.get("output_axes"), layout.get("input_axes")
+    if not isinstance(output_axes, list) or not output_axes or output_axes != list(range(len(output_axes))):
+        raise ManifestError("operator.layout.output_axes is invalid")
+    rank = len(output_axes)
+    if input_axes != list(range(rank, 2 * rank)):
+        raise ManifestError("operator.layout.input_axes is invalid")
+
+
+def _revalidate_structure(
+    *, value: dict[str, Any], input_constraints: dict[str, Any],
+    derivation: dict[str, Any], roles: dict[str, str],
+) -> None:
+    """Independently rechecks `topology`/`message_passing`/`xc`/`operator`/
+    `semantic_derivations` against a freshly recomputed `derivation` --
+    never `capabilities`. Factored out for the same reason as
+    `_validate_structure_sections` above."""
+    translation = value["translation"]
+    if translation.get("semantic_derivations") != derivation["semantic_derivations"]:
+        raise ManifestError("translation semantic derivations do not match the raw exported graph")
+    topology = translation.get("topology")
+    if topology != {
+        "state_name": derivation["adjacency_state"],
+        "graph_inputs": derivation["graph_inputs"],
+        "adjacency_aliases": derivation["adjacency_aliases"],
+        "adjacency_convention": input_constraints.get("adjacency_convention", "target_source"),
+    } or value["topology"]["site_count"] != derivation["site_count"] or value["topology"]["directed_edges"] != derivation["edges"]:
+        raise ManifestError("translation topology claim does not match its adjacency evidence")
+    if translation.get("message_passing") != {
+        "root": roles["message_state"], "stages": derivation["stage_nodes"], "recognized": derivation["message_recognized"],
+    }:
+        raise ManifestError("translation message-passing derivation is invalid")
+    if value["message_passing"] != {
+        "depth": derivation["depth"], "recognized": derivation["message_recognized"], "provenance_nodes": derivation["stage_nodes"],
+    }:
+        raise ManifestError("IR message-passing claim does not match its derivation")
+    if translation.get("xc") != {"root": roles["xc_energy"], "form": derivation["xc_form"]}:
+        raise ManifestError("translation XC derivation is invalid")
+    if value["xc"] != {"form": derivation["xc_form"], "provenance_nodes": derivation["xc_nodes"]}:
+        raise ManifestError("IR XC claim does not match its derivation")
+    if translation.get("operator") != {
+        "root": roles["learned_self_energy"], "construction": derivation["operator"],
+        "layout": derivation["operator_layout"],
+    }:
+        raise ManifestError("translation operator derivation is invalid")
+    if value["operator"] != {
+        "construction": derivation["operator"], "provenance_nodes": derivation["operator_nodes"],
+        "layout": derivation["operator_layout"],
+    }:
+        raise ManifestError("IR operator claim does not match its derivation")
+
+
 class DFTCapabilityPlugin(StructuralPlugin):
     name = "dft-capability"
     lean_import = "Testv2.StructuralV2"
@@ -617,42 +704,8 @@ class DFTCapabilityPlugin(StructuralPlugin):
         }
 
     def validate_ir_sections(self, value: dict[str, Any]) -> None:
-        topology = value.get("topology")
-        message = value.get("message_passing")
-        xc = value.get("xc")
-        operator = value.get("operator")
-        if not all(isinstance(item, dict) for item in (topology, message, xc, operator)):
-            raise ManifestError("structural IR sections are missing")
-        count = topology.get("site_count")
-        edges = topology.get("directed_edges")
-        if not isinstance(count, int) or isinstance(count, bool) or count <= 0:
-            raise ManifestError("site_count must be positive")
-        if not isinstance(edges, list) or any(
-            not isinstance(edge, list) or len(edge) != 2
-            or any(not isinstance(node, int) or node < 0 or node >= count for node in edge)
-            for edge in edges
-        ):
-            raise ManifestError("directed_edges are invalid")
-        depth = message.get("depth")
-        if not isinstance(depth, int) or isinstance(depth, bool) or depth < 0:
-            raise ManifestError("message-passing depth must be non-negative")
-        if "recognized" in message and not isinstance(message["recognized"], bool):
-            raise ManifestError("message-passing recognition must be boolean")
-        if xc.get("form") not in {"hinge", "smooth", "unsupported"}:
-            raise ManifestError("unsupported XC form value")
-        if operator.get("construction") not in {
-            "zero", "identity", "symmetrized", "unconstrained_parameter", "unsupported"
-        }:
-            raise ManifestError("unsupported operator construction value")
-        layout = operator.get("layout")
-        if not isinstance(layout, dict):
-            raise ManifestError("operator.layout is missing")
-        output_axes, input_axes = layout.get("output_axes"), layout.get("input_axes")
-        if not isinstance(output_axes, list) or not output_axes or output_axes != list(range(len(output_axes))):
-            raise ManifestError("operator.layout.output_axes is invalid")
-        rank = len(output_axes)
-        if input_axes != list(range(rank, 2 * rank)):
-            raise ManifestError("operator.layout.input_axes is invalid")
+        _validate_structure_sections(value)
+        count = value["topology"]["site_count"]
         capabilities = value.get("capabilities")
         if not isinstance(capabilities, dict):
             raise ManifestError("structural IR is missing capabilities")
@@ -686,39 +739,7 @@ class DFTCapabilityPlugin(StructuralPlugin):
         self, *, inventory: dict[str, Any], value: dict[str, Any],
         input_constraints: dict[str, Any], derivation: dict[str, Any], roles: dict[str, str],
     ) -> None:
-        translation = value["translation"]
-        if translation.get("semantic_derivations") != derivation["semantic_derivations"]:
-            raise ManifestError("translation semantic derivations do not match the raw exported graph")
-        topology = translation.get("topology")
-        if topology != {
-            "state_name": derivation["adjacency_state"],
-            "graph_inputs": derivation["graph_inputs"],
-            "adjacency_aliases": derivation["adjacency_aliases"],
-            "adjacency_convention": input_constraints.get("adjacency_convention", "target_source"),
-        } or value["topology"]["site_count"] != derivation["site_count"] or value["topology"]["directed_edges"] != derivation["edges"]:
-            raise ManifestError("translation topology claim does not match its adjacency evidence")
-        if translation.get("message_passing") != {
-            "root": roles["message_state"], "stages": derivation["stage_nodes"], "recognized": derivation["message_recognized"],
-        }:
-            raise ManifestError("translation message-passing derivation is invalid")
-        if value["message_passing"] != {
-            "depth": derivation["depth"], "recognized": derivation["message_recognized"], "provenance_nodes": derivation["stage_nodes"],
-        }:
-            raise ManifestError("IR message-passing claim does not match its derivation")
-        if translation.get("xc") != {"root": roles["xc_energy"], "form": derivation["xc_form"]}:
-            raise ManifestError("translation XC derivation is invalid")
-        if value["xc"] != {"form": derivation["xc_form"], "provenance_nodes": derivation["xc_nodes"]}:
-            raise ManifestError("IR XC claim does not match its derivation")
-        if translation.get("operator") != {
-            "root": roles["learned_self_energy"], "construction": derivation["operator"],
-            "layout": derivation["operator_layout"],
-        }:
-            raise ManifestError("translation operator derivation is invalid")
-        if value["operator"] != {
-            "construction": derivation["operator"], "provenance_nodes": derivation["operator_nodes"],
-            "layout": derivation["operator_layout"],
-        }:
-            raise ManifestError("IR operator claim does not match its derivation")
+        _revalidate_structure(value=value, input_constraints=input_constraints, derivation=derivation, roles=roles)
         if value["capabilities"] != derivation["capabilities"]:
             raise ManifestError("capabilities claim does not match its derivation")
 

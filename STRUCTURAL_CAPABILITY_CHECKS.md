@@ -10,9 +10,15 @@ real trained weights to check numeric locality; it has been removed
 entirely, so that claim can't be ambiguous.
 
 It is the harness's default: every function in `dftcert/structural/core.py`
-uses it unless a different `plugin=` is passed explicitly, and the CLI
-(`dftcert/structural/cli.py`) has no plugin-selection flag at all, since
-there is nothing to select between.
+uses it unless a different `plugin=` is passed explicitly. The CLI
+(`dftcert/structural/cli.py`) still keeps a plugin registry (`PROFILES`,
+selected via `--profile` on `analyze-pt2`/`analyze-extraction`; `generate`/
+`report`/`assemble` resolve the plugin from the loaded IR's own
+`ir_schema_version`, so the choice is certificate-bound rather than a flag
+that could be pointed at the wrong plugin after the fact) with a single
+entry registered today -- kept as a registry rather than hardcoded to one
+plugin specifically so a future second plugin (a different verification
+domain, or a second DFT variant) is "add an entry," not "redesign the CLI."
 
 ## What it checks
 
