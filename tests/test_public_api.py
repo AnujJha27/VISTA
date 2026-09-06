@@ -91,5 +91,78 @@ class PublicApiTests(unittest.TestCase):
             self.assertEqual(api_value["status"], cli_value["status"])
 
 
+CONDITIONAL_ENTRYPOINT = "Testv2.Requirements.ValidPretrainingArchitectureConditional"
+
+
+@unittest.skipUnless(_HAS_LEAN, _SKIP_REASON)
+class MultiTargetCertificationTests(unittest.TestCase):
+    """Issue 11: a package selecting multiple entrypoints produces one
+    aggregate certificate bundle; any unresolved target blocks it."""
+
+    def _package(self, tmp, **overrides):
+        extraction_path = Path(tmp) / "extraction.json"
+        _write_extraction_result(extraction_path)
+        package_path = Path(tmp) / "package.json"
+        kwargs = dict(
+            lean_project=PROJECT, entrypoints=[ENTRYPOINT, CONDITIONAL_ENTRYPOINT],
+            adapter=DFT_CAPABILITY_PLUGIN, interface_contract=_constraints(),
+            binding_choices=[
+                {"entrypoint": ENTRYPOINT, "binder_path": "0", "candidate_key": "site_count"},
+                {"entrypoint": CONDITIONAL_ENTRYPOINT, "binder_path": "0", "candidate_key": "site_count"},
+            ],
+        )
+        kwargs.update(overrides)
+        VerificationPackageBuilder(**kwargs).write(package_path)
+        return extraction_path, package_path
+
+    def test_two_entrypoint_package_produces_an_aggregate_bundle(self):
+        with TemporaryDirectory() as tmp:
+            extraction_path, package_path = self._package(tmp)
+            session_path = Path(tmp) / "session.json"
+            session = start_session(
+                extraction_result=str(extraction_path), package=str(package_path),
+                session=str(session_path), project=str(PROJECT), trusted_local=True, timeout_s=180,
+            )
+            for premise in session.unresolved_premises:
+                session.accept_assumption(premise_id=premise["id"], rationale="physical target requires non-locality")
+            self.assertEqual(session.status, "ready_for_certificate")
+
+            output_dir = Path(tmp) / "certificate"
+            manifest = certify_session(
+                session=str(session_path), package=str(package_path), project=str(PROJECT),
+                lean_import="Testv2.Requirements", output_dir=str(output_dir),
+                trusted_local=True, timeout_s=180,
+            )
+            self.assertEqual(manifest["status"], "certified")
+            self.assertEqual(set(manifest["targets"]), {ENTRYPOINT, CONDITIONAL_ENTRYPOINT})
+            self.assertTrue(manifest["conditional"])  # the conditional entrypoint needed an assumption
+            for entrypoint in (ENTRYPOINT, CONDITIONAL_ENTRYPOINT):
+                safe = entrypoint.replace(".", "_")
+                self.assertTrue((output_dir / f"{safe}.lean").exists())
+                self.assertTrue((output_dir / f"{safe}-report.json").exists())
+
+    def test_one_unresolved_target_blocks_the_aggregate_certificate(self):
+        with TemporaryDirectory() as tmp:
+            extraction_path, package_path = self._package(
+                tmp, binding_choices=[
+                    {"entrypoint": ENTRYPOINT, "binder_path": "0", "candidate_key": "site_count"},
+                    # deliberately no binding_choice for CONDITIONAL_ENTRYPOINT's siteCount:
+                    # it stays ambiguous_binding.
+                ],
+            )
+            session_path = Path(tmp) / "session.json"
+            session = start_session(
+                extraction_result=str(extraction_path), package=str(package_path),
+                session=str(session_path), project=str(PROJECT), trusted_local=True, timeout_s=180,
+            )
+            self.assertEqual(session.status, "blocked_on_premise")
+            with self.assertRaises(Exception):
+                certify_session(
+                    session=str(session_path), package=str(package_path), project=str(PROJECT),
+                    lean_import="Testv2.Requirements", output_dir=str(Path(tmp) / "certificate"),
+                    trusted_local=True, timeout_s=180,
+                )
+
+
 if __name__ == "__main__":
     unittest.main()
