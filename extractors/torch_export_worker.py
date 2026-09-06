@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 
-EXTRACTOR_VERSION = "torch-export-inventory-v3"
+EXTRACTOR_VERSION = "torch-export-inventory-pretraining-1"
 
 
 def sha256_file(path: Path) -> str:
@@ -89,20 +89,18 @@ def state_inventory(program: Any) -> dict[str, Any]:
             "state_kind": state_kinds.get(name, "unknown"),
             "aliases": sorted(aliases[tensor.untyped_storage().data_ptr()]),
         }
+        # Only small exact integer/boolean state (adjacency buffers, masks --
+        # architecture-shape evidence) is captured by literal value. VISTA
+        # is a pre-training architectural-capability pipeline: it never uses
+        # a trained parameter's actual floating-point content as evidence,
+        # so this extractor never captures one, structurally, not merely by
+        # policy. `shape`/`dtype`/`sha256`/`state_kind` above are recorded
+        # for every tensor regardless -- exposing nothing about the trained
+        # values, only the architecture.
         if detached.dtype in {
             torch.bool, torch.int8, torch.int16, torch.int32, torch.int64,
         } and detached.numel() <= 4096:
             entry["structural_values"] = detached.tolist()
-        elif detached.dtype in {
-            torch.float16, torch.float32, torch.float64,
-        } and detached.numel() <= 4096:
-            # Exact integer/boolean state above is architecture-shape evidence.
-            # Float state is the model's actual trained values -- captured
-            # only so the analyzer can check real numeric facts (e.g. is a
-            # learned operator's off-diagonal actually nonzero) against an
-            # explicit, disclosed threshold rule. Never treated as exact.
-            entry["structural_values"] = detached.tolist()
-            entry["structural_value_kind"] = "numeric"
         result[str(name)] = entry
     return result
 

@@ -44,11 +44,16 @@ def structural_ir_from_inventory(
     derivation = plugin.derive(inventory=inventory, nodes=nodes, roles=roles, input_constraints=input_constraints)
     inventory_sha256 = sha256_value(inventory)
     state = inventory.get("state", {})
+    # Deliberately excludes each tensor's own `sha256` (a content hash of its
+    # raw bytes -- for a float parameter, its actual trained values). This
+    # fingerprints only the architecture -- shape, dtype, extractor-declared
+    # kind, storage aliasing -- so it is unaffected by training and cannot
+    # be used, even indirectly through a hash, as evidence about what a
+    # parameter's trained values are.
     parameter_structure = {
         name: {
             "shape": value.get("shape"),
             "dtype": value.get("dtype"),
-            "sha256": value.get("sha256"),
             "state_kind": value.get("state_kind"),
             "aliases": value.get("aliases", [name]),
         }
@@ -210,7 +215,9 @@ def structural_model_description(
             "- Translation validation independently rechecked every derived claim above against the raw exported inventory.",
         ])
     lines.append(
-        "Scope: structural/value compatibility only; this does not assess training convergence, numerical accuracy, or experiment."
+        "Scope: pre-training architectural capability only; VISTA never uses trained "
+        "parameter values as verification evidence, and this does not assess training "
+        "convergence, numerical accuracy, or experiment."
     )
     return "\n".join(lines)
 
