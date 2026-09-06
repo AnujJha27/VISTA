@@ -41,12 +41,13 @@ operator names:
 
 - `output_contracts` must map exactly three exported output indices to
   `xc_energy`, `learned_self_energy`, and `message_state`.
-- `required_couplings` (**V2/legacy only -- removed from the live pipeline,
-  see `STRUCTURAL_V3.md`**) listed directed source/target pairs whose
-  coverage was to be proved, hand-authored alongside the candidate
-  constraints. V3 does not use coupling pairs at all, from any source: it
-  checks a global `expected_locality` claim (`"local"`/`"non_local"`)
-  against the candidate's own extracted operator values instead.
+- `required_couplings` (**V2/legacy only -- removed from the live pipeline**)
+  listed directed source/target pairs whose coverage was to be proved,
+  hand-authored alongside the candidate constraints. The live pipeline does
+  not use coupling pairs at all, from any source: it checks a global
+  `expected_locality` claim (`"local"`/`"non_local"`) against the
+  candidate's architectural capability instead -- see
+  `STRUCTURAL_CAPABILITY_CHECKS.md`.
 - `adjacency_state_name` selects the exported structural adjacency state. If
   omitted, the only supported fallback is a state name containing `adjacency`.
 - `adjacency_convention` is `target_source` by default or `source_target`.

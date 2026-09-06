@@ -4,8 +4,8 @@ VISTA's harness (`dftcert.structural.core`) -- extraction plumbing, hashing,
 translation-validation re-derivation, certificate assembly/binding, Lean
 invocation -- is domain-agnostic. Everything that knows what a "claim" means
 for one verification target lives behind this interface, implemented once
-per domain. `dftcert.structural.dft_plugin.DFT_PLUGIN` is the first (and,
-today, only) implementation; it is also the harness's default, so every
+per domain. `dftcert.structural.dft_capability_plugin.DFT_CAPABILITY_PLUGIN`
+is the only implementation; it is also the harness's default, so every
 existing caller keeps working unchanged.
 
 Each plugin owns its own default Lean import (`lean_import`): the module its

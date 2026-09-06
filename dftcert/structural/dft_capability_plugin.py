@@ -1,16 +1,15 @@
 """Pre-training architectural-capability certification for the DFT/GNN target.
 
-`dft_plugin.DFTPlugin` certifies a real fact about a candidate's own
-*extracted trained floats*: is the learned self-energy operator actually
-diagonal, or does it actually have a nonzero off-diagonal entry. That fact
-cannot exist before training -- there are no weights yet, and `derive()`
-gets there by calling `_operator_matrix`/`_locality_from_recipe`, which read
-a parameter's actual floating-point content.
+This is the project's ONLY structural plugin: it certifies architectural
+*capability* before a single weight is trained, and never reads an
+extracted parameter's floating-point content anywhere in its derivation,
+IR, or checks. There used to be a second, post-training plugin that read
+real trained weights to check numeric locality (`operator_locality_verified`)
+-- it has been removed entirely: this project's claim is a pre-training
+check, and keeping a post-training plugin alongside it made that claim
+ambiguous. See `STRUCTURAL_CAPABILITY_CHECKS.md`.
 
-This plugin asks the question that *can* be answered before training, from
-`derive_structure()` alone -- topology, message-passing chains, and operator
-construction *classification* -- and never calls anything that reads a
-parameter's floating-point content:
+Checks:
 
 - `all_pairs_reachable`: every ordered pair of sites is reachable from every
   other within the message-passing depth found *strictly within the
@@ -27,26 +26,378 @@ parameter's floating-point content:
   never can; `symmetrized` (`B + B^T`) and `unconstrained_parameter` can,
   provided a second site actually exists for an off-diagonal entry to live
   at (a 1x1 matrix has none, for any recipe). A fact about the recipe and
-  site count, reusing `DFTPlugin`'s own construction classification --
-  never about the values currently stored in it.
-- `self_adjoint`/`xc_discontinuity_compatible`: unchanged from `DFTPlugin`
-  -- already recipe-only, no floats.
-
-`DFTPlugin`'s real-weight `locality` observation never enters this plugin's
-derivation, IR, or checks at all -- not merely non-gating. See
-`STRUCTURAL_CAPABILITY_CHECKS.md`.
+  site count, never about the values currently stored in it.
+- `self_adjoint`: the declared operator output is structurally zero,
+  identity, or a parameter plus its transpose -- recipe-only, no floats.
+- `xc_discontinuity_compatible`: the declared XC output path contains a
+  supported hinge construction.
 """
 from __future__ import annotations
 
 from typing import Any
 
 from ..manifest import ManifestError
-from .dft_plugin import (
-    DFTPlugin, _ancestors, _lean_edges, _lean_operator, _lean_xc,
-    _message_chain, _revalidate_structure, _validate_structure_sections,
-)
+from .plugin import StructuralPlugin, _refs
 
+_ZERO_TARGETS = {
+    "aten.zeros.default", "aten.zeros_like.default", "aten.zero.default",
+}
+_IDENTITY_TARGETS = {"aten.eye.default"}
+_ADD_TARGETS = {"aten.add.tensor"}
+_HINGE_TARGETS = {
+    "aten.relu.default", "aten.leaky_relu.default", "aten.clamp_min.default",
+    "aten.maximum.default", "aten.abs.default", "aten.hardtanh.default",
+}
+_SMOOTH_TARGETS = {
+    "aten.sigmoid.default", "aten.softplus.default", "aten.tanh.default",
+    "aten.silu.default", "aten.gelu.default",
+}
+_ADJACENCY_ALIAS_TARGETS = {
+    "aten.to.dtype", "aten._to_copy.default", "prims.convert_element_type.default",
+    "aten.alias.default", "aten.clone.default", "aten.contiguous.default",
+    "aten.detach.default",
+}
+_MESSAGE_TARGETS = {
+    "aten.matmul.default", "aten.mm.default", "aten.bmm.default", "aten.mv.default",
+}
 _NON_LOCAL_CAPABLE_RECIPES = {"sum_transpose", "param"}
+_NON_PARAMETER_STATE_KIND_MARKERS = ("user_input",)
+
+
+def _observed_ops(nodes: list[dict[str, Any]]) -> list[str]:
+    return sorted({_target(node) for node in nodes if _target(node)})
+
+
+def _derivation(
+    *, claim: str, value: Any, root: str | None, evidence_nodes: list[str],
+    rule: str, observed_nodes: list[dict[str, Any]], metadata: dict[str, Any] | None = None,
+    rule_version: int = 1,
+) -> dict[str, Any]:
+    """Compact, hash-bound explanation for one semantic lowering result."""
+    result = {
+        "claim": claim,
+        "value": value,
+        "root": root,
+        "evidence_nodes": evidence_nodes,
+        "rule": rule,
+        "rule_version": rule_version,
+        "observed_ops": _observed_ops(observed_nodes),
+    }
+    if metadata:
+        result["metadata"] = metadata
+    return result
+
+
+def _ancestors(nodes: list[dict[str, Any]], root: str) -> list[dict[str, Any]]:
+    by_name = {
+        node.get("name"): node for node in nodes
+        if isinstance(node, dict) and isinstance(node.get("name"), str)
+    }
+    seen: set[str] = set()
+    pending = [root]
+    ordered: list[dict[str, Any]] = []
+    while pending:
+        name = pending.pop()
+        if name in seen or name not in by_name:
+            continue
+        seen.add(name)
+        node = by_name[name]
+        ordered.append(node)
+        pending.extend(_refs(node.get("args")))
+        pending.extend(_refs(node.get("kwargs")))
+    return ordered
+
+
+def _target(node: dict[str, Any]) -> str:
+    return str(node.get("target", "")).lower()
+
+
+def _has_target(nodes: list[dict[str, Any]], targets: set[str]) -> bool:
+    return any(_target(node) in targets for node in nodes)
+
+
+def _direct_ref(value: Any) -> str | None:
+    refs = _refs(value)
+    return refs[0] if len(refs) == 1 else None
+
+
+def _resolve_operator_layout(input_constraints: dict[str, Any]) -> dict[str, Any]:
+    """The operator's declared domain/codomain axis grouping. Default is the
+    plain n x n matrix (`output_axes=[0]`, `input_axes=[1]`), covering every
+    artifact certified before this field existed. A grouped layout -- e.g.
+    site and orbital/spin axes folded together into a shape like
+    `[N, m, N, m]`, still mathematically a linear operator on the flattened
+    Nm-dimensional space once the axis groups are known -- is opt-in via
+    `input_constraints.operator_layout`. Only the canonical contiguous
+    grouping (`output_axes=[0..r-1]`, `input_axes=[r..2r-1]`) is supported;
+    a reordered or interleaved grouping is `unsupported`, never guessed at.
+    This only matters for correctly recognizing the adjoint construction
+    (`_is_adjoint_of`) -- there is no float-reading anywhere in this plugin
+    that would need to know which axis is a "site" versus an "orbital"."""
+    raw = input_constraints.get("operator_layout")
+    if raw is None:
+        return {"output_axes": [0], "input_axes": [1]}
+    if not isinstance(raw, dict):
+        raise ManifestError("operator_layout must be an object")
+    output_axes, input_axes = raw.get("output_axes"), raw.get("input_axes")
+    if not isinstance(output_axes, list) or not output_axes or not isinstance(input_axes, list):
+        raise ManifestError("operator_layout.output_axes/input_axes must be non-empty lists")
+    rank = len(output_axes)
+    if len(input_axes) != rank:
+        raise ManifestError("operator_layout.output_axes and input_axes must have equal length")
+    if output_axes != list(range(rank)) or input_axes != list(range(rank, 2 * rank)):
+        raise ManifestError(
+            "operator_layout only supports the canonical contiguous axis grouping "
+            "(output_axes=[0..r-1], input_axes=[r..2r-1]); a reordered or "
+            "interleaved grouping is not supported"
+        )
+    return {"output_axes": output_axes, "input_axes": input_axes}
+
+
+def _adjoint_permutation(node: dict[str, Any]) -> list[Any] | None:
+    """The literal permutation argument of a `permute` node, if present."""
+    args = node.get("args")
+    positional = args if isinstance(args, list) else []
+    if len(positional) > 1 and isinstance(positional[1], list):
+        return positional[1]
+    kwargs = node.get("kwargs")
+    dims = kwargs.get("dims") if isinstance(kwargs, dict) else None
+    return dims if isinstance(dims, list) else None
+
+
+def _is_adjoint_of(node: dict[str, Any], layout: dict[str, Any]) -> bool:
+    """Whether `node` actually constructs the adjoint under `layout` -- by
+    inspecting its real permutation/axis arguments, never by op name alone.
+    A `permute`/`transpose.int` call with a no-op or wrong permutation (e.g.
+    `transpose.int(x, 0, 0)`, or `permute(x, [0, 1])` -- neither actually
+    swaps anything) must not be accepted just because its op name is on the
+    reviewed list; only `.t()`/`numpy_T` have no axis arguments to check and
+    are unambiguous for a two-axis tensor."""
+    target = _target(node)
+    if target == "aten.permute.default":
+        return _adjoint_permutation(node) == layout["input_axes"] + layout["output_axes"]
+    rank = len(layout["output_axes"])
+    if rank != 1:
+        return False  # only `permute` can express a swap of more than two axes
+    if target == "aten.transpose.int":
+        args = node.get("args")
+        positional = args if isinstance(args, list) else []
+        if len(positional) < 3:
+            return False
+        dim0, dim1 = positional[1], positional[2]
+        return {dim0, dim1} == {0, 1} and dim0 != dim1
+    return target in {"aten.t.default", "aten.numpy_t.default"}
+
+
+def _operator_state_name(inventory: dict[str, Any], node_name: str) -> str | None:
+    """Reverse-lookup: which extracted state entry does this graph node alias?"""
+    state = inventory.get("state", {})
+    if not isinstance(state, dict):
+        return None
+    for name, entry in state.items():
+        if isinstance(entry, dict) and node_name in entry.get("graph_inputs", []):
+            return name
+    return None
+
+
+def _is_plausible_parameter_node(inventory: dict[str, Any], node_name: str) -> bool:
+    """Whether `node_name` does NOT resolve to a state entry the extractor
+    classified as a plain runtime input -- so a "built from an unconstrained
+    parameter" claim (implying trainable freedom, used for `non_local_capacity`)
+    can never secretly be built from a raw activation input that was never a
+    trainable weight at all. Fails permissive (True) when no classification
+    is available at all (`state_kind` absent or unrecognized, since a
+    hand-authored specification or an older extractor version may not carry
+    it); fails closed only on an explicit user-input classification -- a
+    real signal, not a guess."""
+    state = inventory.get("state", {})
+    if not isinstance(state, dict):
+        return True
+    state_name = _operator_state_name(inventory, node_name)
+    entry = state.get(state_name) if state_name else None
+    if not isinstance(entry, dict):
+        return True
+    kind = str(entry.get("state_kind", "")).lower()
+    return not any(marker in kind for marker in _NON_PARAMETER_STATE_KIND_MARKERS)
+
+
+def _operator_construction(
+    nodes: list[dict[str, Any]], root: str, layout: dict[str, Any], inventory: dict[str, Any],
+) -> tuple[str, list[str], dict[str, Any]]:
+    """Classify the operator's construction and return a `recipe` describing
+    it, purely from graph shape -- never a float.
+
+    Self-adjointness (the `symmetrized` recipe, `add(base, adjoint(base))`)
+    holds for *any* `base` -- B + B^dagger is self-adjoint regardless of
+    whether B is a trained weight, so that branch never needs a parameter
+    check. `unconstrained_parameter` is different: it claims `base` is a
+    free, trainable matrix, which does need `_is_plausible_parameter_node`.
+    """
+    by_name = {node["name"]: node for node in nodes if isinstance(node.get("name"), str)}
+    provenance = [node["name"] for node in _ancestors(nodes, root)]
+    root_node = by_name.get(root, {})
+    if _has_target([root_node], _ZERO_TARGETS):
+        return "zero", provenance, {"kind": "zero"}
+    if _has_target([root_node], _IDENTITY_TARGETS):
+        return "identity", provenance, {"kind": "identity"}
+    if _has_target([root_node], _ADD_TARGETS):
+        arguments = _refs(root_node.get("args"))
+        if len(arguments) >= 2:
+            left, right = arguments[:2]
+            for base, transformed in ((left, right), (right, left)):
+                transformed_node = by_name.get(transformed, {})
+                if _is_adjoint_of(transformed_node, layout):
+                    transformed_base = _direct_ref(transformed_node.get("args"))
+                    if transformed_base == base:
+                        return "symmetrized", provenance, {
+                            "kind": "sum_transpose", "base": base, "transposed_base": transformed_base,
+                        }
+                    if (
+                        transformed_base in by_name
+                        and by_name.get(base, {}).get("op") in {"placeholder", "get_attr"}
+                        and by_name[transformed_base].get("op") in {"placeholder", "get_attr"}
+                        and _is_plausible_parameter_node(inventory, base)
+                        and _is_plausible_parameter_node(inventory, transformed_base)
+                    ):
+                        return "unconstrained_parameter", provenance, {
+                            "kind": "sum_transpose", "base": base, "transposed_base": transformed_base,
+                        }
+    if root_node.get("op") in {"placeholder", "get_attr"} and _is_plausible_parameter_node(inventory, root):
+        return "unconstrained_parameter", provenance, {"kind": "param", "node": root}
+    return "unsupported", provenance, {"kind": "unsupported"}
+
+
+def _xc_form(nodes: list[dict[str, Any]], root: str) -> tuple[str, list[str]]:
+    ancestors = _ancestors(nodes, root)
+    provenance = [node["name"] for node in ancestors]
+    hinge = _has_target(ancestors, _HINGE_TARGETS)
+    smooth = _has_target(ancestors, _SMOOTH_TARGETS)
+    if hinge and smooth:
+        return "unsupported", provenance
+    if hinge:
+        return "hinge", provenance
+    if smooth:
+        return "smooth", provenance
+    return "unsupported", provenance
+
+
+def _adjacency_aliases(nodes: list[dict[str, Any]], adjacency_inputs: list[str]) -> list[str]:
+    aliases = set(adjacency_inputs)
+    while True:
+        additions = {
+            node["name"] for node in nodes
+            if isinstance(node.get("name"), str)
+            and _has_target([node], _ADJACENCY_ALIAS_TARGETS)
+            and len(_refs(node.get("args"))) == 1
+            and _refs(node.get("args"))[0] in aliases
+        }
+        if additions <= aliases:
+            return [node["name"] for node in nodes if node.get("name") in aliases]
+        aliases.update(additions)
+
+
+def _message_chain(
+    nodes: list[dict[str, Any]], root: str, adjacency_inputs: list[str],
+) -> tuple[list[str], bool]:
+    """Follow only consecutive adjacency-fed matmuls from the declared output."""
+    by_name = {node["name"]: node for node in nodes if isinstance(node.get("name"), str)}
+    adjacency_aliases = set(_adjacency_aliases(nodes, adjacency_inputs))
+    current, stages = root, []
+    while True:
+        node = by_name.get(current, {})
+        refs = _refs(node.get("args"))
+        if not _has_target([node], _MESSAGE_TARGETS):
+            return stages, node.get("op") == "placeholder"
+        adjacency = [ref for ref in refs if ref in adjacency_aliases]
+        state = [ref for ref in refs if ref not in adjacency_aliases]
+        if len(adjacency) != 1 or len(state) != 1:
+            return stages, False
+        stages.append(current)
+        current = state[0]
+
+
+def _state_entry(inventory: dict[str, Any], requested: str | None) -> dict[str, Any] | None:
+    state = inventory.get("state", {})
+    if not isinstance(state, dict):
+        return None
+    if requested and isinstance(state.get(requested), dict):
+        return state[requested]
+    for name, value in state.items():
+        if "adjacency" in name.lower() and isinstance(value, dict):
+            return value
+    return None
+
+
+def _state_name(inventory: dict[str, Any], requested: str | None) -> str | None:
+    state = inventory.get("state", {})
+    if not isinstance(state, dict):
+        return None
+    if requested and isinstance(state.get(requested), dict):
+        return requested
+    return next(
+        (name for name, value in state.items()
+         if isinstance(name, str) and "adjacency" in name.lower() and isinstance(value, dict)),
+        None,
+    )
+
+
+def _topology(
+    inventory: dict[str, Any], input_constraints: dict[str, Any],
+) -> tuple[int, list[list[int]], list[str], str, str]:
+    requested = input_constraints.get("adjacency_state_name")
+    state_name = _state_name(inventory, requested)
+    # Which state entry became "the adjacency" is either exactly what the
+    # analyst declared, or a heuristic name-match fallback (any state entry
+    # whose name contains "adjacency") when they didn't -- a real
+    # interpretation choice, not an artifact fact, so it is recorded rather
+    # than left indistinguishable from a declared name.
+    selection_provenance = "declared" if requested is not None and state_name == requested else "heuristic_name_match"
+    entry = _state_entry(inventory, state_name)
+    if not entry:
+        raise ManifestError("artifact has no extractable structural adjacency buffer")
+    values = entry.get("structural_values")
+    if (
+        not isinstance(values, list) or not values
+        or any(not isinstance(row, list) for row in values)
+        or any(not isinstance(cell, (bool, int)) for row in values for cell in row)
+    ):
+        raise ManifestError("adjacency buffer must be a small exported boolean/integer matrix")
+    size = len(values)
+    if any(len(row) != size for row in values):
+        raise ManifestError("adjacency buffer must be square")
+    convention = input_constraints.get("adjacency_convention", "target_source")
+    if convention not in {"target_source", "source_target"}:
+        raise ManifestError("adjacency_convention must be target_source or source_target")
+    edges = []
+    for row, values_row in enumerate(values):
+        for column, connected in enumerate(values_row):
+            if bool(connected):
+                edges.append(
+                    [column, row] if convention == "target_source" else [row, column]
+                )
+    provenance = entry.get("graph_inputs", [])
+    return (
+        size, edges, [str(item) for item in provenance if isinstance(item, str)],
+        state_name, selection_provenance,
+    )
+
+
+def _lean_edges(edges: list[list[int]]) -> str:
+    return "[" + ", ".join(f"({left}, {right})" for left, right in edges) + "]"
+
+
+def _lean_xc(form: str) -> str:
+    return {"hinge": ".hinge", "smooth": ".smooth", "unsupported": ".unsupported"}[form]
+
+
+def _lean_operator(construction: str) -> str:
+    return {
+        "zero": ".zero",
+        "identity": ".identity",
+        "symmetrized": '.add (.parameter "base") (.adjoint (.parameter "base"))',
+        "unconstrained_parameter": '.parameter "unconstrained"',
+        "unsupported": ".unsupported",
+    }[construction]
 
 
 def _non_local_capacity(recipe: dict[str, Any], site_count: int) -> bool:
@@ -111,20 +462,99 @@ def _reachability(
     return {"applicable": True, "satisfied": not unreachable, "depth": depth, "unreachable_pairs": unreachable}
 
 
-class DFTCapabilityPlugin(DFTPlugin):
+class DFTCapabilityPlugin(StructuralPlugin):
     name = "dft-capability"
-    ir_schema_version = 4
+    lean_import = "Testv2.StructuralV2"
+    ir_schema_version = 1
     analyzer_version = "dft-structural-capability-analysis-1"
     policy_version = "dft-structural-capability-1"
     compiler_version = "dft-structural-capability-lean-1"
+
+    def role_requirements(self) -> set[str]:
+        return {"xc_energy", "learned_self_energy", "message_state"}
+
+    def derive_structure(
+        self, *, inventory: dict[str, Any], nodes: list[dict[str, Any]],
+        roles: dict[str, str], input_constraints: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Everything computable from graph shape and construction
+        classification alone -- topology (a declared bool/int adjacency
+        buffer, never a trainable float), message-passing depth, XC form,
+        operator-construction recipe. Never reads a single extracted
+        parameter's floating-point content."""
+        expected_locality = input_constraints.get("expected_locality")
+        if expected_locality not in {"local", "non_local"}:
+            raise ManifestError("input_constraints.expected_locality must be 'local' or 'non_local'")
+        layout = _resolve_operator_layout(input_constraints)
+        count, edges, graph_inputs, state_name, adjacency_selection_provenance = _topology(inventory, input_constraints)
+        aliases = _adjacency_aliases(nodes, graph_inputs)
+        stages, message_recognized = _message_chain(nodes, roles["message_state"], graph_inputs)
+        xc_form, xc_nodes = _xc_form(nodes, roles["xc_energy"])
+        operator, operator_nodes, operator_recipe = _operator_construction(nodes, roles["learned_self_energy"], layout, inventory)
+        by_name = {node.get("name"): node for node in nodes if isinstance(node.get("name"), str)}
+        stage_graph = [by_name[name] for name in stages]
+        xc_graph = _ancestors(nodes, roles["xc_energy"])
+        operator_graph = _ancestors(nodes, roles["learned_self_energy"])
+        topology_graph = [by_name[name] for name in aliases if name in by_name]
+        semantic_derivations = {
+            "topology": _derivation(
+                claim="topology.adjacency", value={"site_count": count, "directed_edges": edges},
+                root=state_name, evidence_nodes=aliases, rule="topology.adjacency_state",
+                observed_nodes=topology_graph,
+                metadata={"state_name": state_name, "graph_inputs": graph_inputs,
+                          "adjacency_convention": input_constraints.get("adjacency_convention", "target_source"),
+                          "selection_provenance": adjacency_selection_provenance},
+            ),
+            "message_passing": _derivation(
+                claim="message_passing.depth", value=len(stages), root=roles["message_state"],
+                evidence_nodes=stages, rule="message.adjacency_fed_matmul",
+                observed_nodes=stage_graph, rule_version=2,
+                metadata={"stages": stages, "recognized": message_recognized},
+            ),
+            "xc": _derivation(
+                claim="xc.form", value=xc_form, root=roles["xc_energy"],
+                evidence_nodes=xc_nodes,
+                rule={"hinge": "xc.hinge_activation", "smooth": "xc.smooth_activation"}.get(xc_form, "xc.unrecognized_composition"),
+                rule_version=2,
+                observed_nodes=xc_graph,
+                metadata=(
+                    {"reason": "mixed hinge and smooth activation composition"}
+                    if (xc_form == "unsupported" and _has_target(xc_graph, _HINGE_TARGETS) and _has_target(xc_graph, _SMOOTH_TARGETS))
+                    else {"reason": "no supported hinge or smooth activation"} if xc_form == "unsupported" else None
+                ),
+            ),
+            "operator": _derivation(
+                claim="operator.construction", value=operator, root=roles["learned_self_energy"],
+                evidence_nodes=operator_nodes,
+                rule={
+                    "zero": "operator.zero_root", "identity": "operator.identity_root",
+                    "symmetrized": "operator.add_adjoint_pair",
+                    "unconstrained_parameter": "operator.unconstrained_root",
+                }.get(operator, "operator.unrecognized_composition"),
+                rule_version=2 if operator == "unconstrained_parameter" else 1,
+                observed_nodes=operator_graph,
+                metadata={
+                    "recipe": operator_recipe,
+                    **({"reason": "unrecognized operator composition"} if operator == "unsupported" else {}),
+                },
+            ),
+        }
+        adjacency_aliases_list = _adjacency_aliases(nodes, graph_inputs)
+        return {
+            "semantic_derivations": semantic_derivations,
+            "site_count": count, "edges": edges, "graph_inputs": graph_inputs,
+            "adjacency_state": state_name, "adjacency_aliases": adjacency_aliases_list,
+            "depth": len(stages), "stage_nodes": stages, "message_recognized": message_recognized,
+            "xc_form": xc_form, "xc_nodes": xc_nodes,
+            "operator": operator, "operator_nodes": operator_nodes, "operator_recipe": operator_recipe,
+            "operator_layout": layout,
+            "expected_locality": expected_locality,
+        }
 
     def derive(
         self, *, inventory: dict[str, Any], nodes: list[dict[str, Any]],
         roles: dict[str, str], input_constraints: dict[str, Any],
     ) -> dict[str, Any]:
-        """`derive_structure()` only -- never `derive()`, which would also
-        compute the real-weight `locality` observation from extracted
-        floats. This plugin's derivation never reads a trainable value."""
         derivation = self.derive_structure(
             inventory=inventory, nodes=nodes, roles=roles, input_constraints=input_constraints,
         )
@@ -165,12 +595,64 @@ class DFTCapabilityPlugin(DFTPlugin):
     def translation_sections(
         self, *, derivation: dict[str, Any], roles: dict[str, str], input_constraints: dict[str, Any],
     ) -> dict[str, Any]:
-        sections = super().translation_sections(derivation=derivation, roles=roles, input_constraints=input_constraints)
-        sections["schema_version"] = self.ir_schema_version
-        return sections
+        return {
+            "schema_version": self.ir_schema_version,
+            "roles": roles,
+            "topology": {
+                "state_name": derivation["adjacency_state"],
+                "graph_inputs": derivation["graph_inputs"],
+                "adjacency_aliases": derivation["adjacency_aliases"],
+                "adjacency_convention": input_constraints.get("adjacency_convention", "target_source"),
+            },
+            "message_passing": {
+                "root": roles["message_state"], "stages": derivation["stage_nodes"],
+                "recognized": derivation["message_recognized"],
+            },
+            "xc": {"root": roles["xc_energy"], "form": derivation["xc_form"]},
+            "operator": {
+                "root": roles["learned_self_energy"], "construction": derivation["operator"],
+                "layout": derivation["operator_layout"],
+            },
+            "semantic_derivations": derivation["semantic_derivations"],
+        }
 
     def validate_ir_sections(self, value: dict[str, Any]) -> None:
-        _validate_structure_sections(value)
+        topology = value.get("topology")
+        message = value.get("message_passing")
+        xc = value.get("xc")
+        operator = value.get("operator")
+        if not all(isinstance(item, dict) for item in (topology, message, xc, operator)):
+            raise ManifestError("structural IR sections are missing")
+        count = topology.get("site_count")
+        edges = topology.get("directed_edges")
+        if not isinstance(count, int) or isinstance(count, bool) or count <= 0:
+            raise ManifestError("site_count must be positive")
+        if not isinstance(edges, list) or any(
+            not isinstance(edge, list) or len(edge) != 2
+            or any(not isinstance(node, int) or node < 0 or node >= count for node in edge)
+            for edge in edges
+        ):
+            raise ManifestError("directed_edges are invalid")
+        depth = message.get("depth")
+        if not isinstance(depth, int) or isinstance(depth, bool) or depth < 0:
+            raise ManifestError("message-passing depth must be non-negative")
+        if "recognized" in message and not isinstance(message["recognized"], bool):
+            raise ManifestError("message-passing recognition must be boolean")
+        if xc.get("form") not in {"hinge", "smooth", "unsupported"}:
+            raise ManifestError("unsupported XC form value")
+        if operator.get("construction") not in {
+            "zero", "identity", "symmetrized", "unconstrained_parameter", "unsupported"
+        }:
+            raise ManifestError("unsupported operator construction value")
+        layout = operator.get("layout")
+        if not isinstance(layout, dict):
+            raise ManifestError("operator.layout is missing")
+        output_axes, input_axes = layout.get("output_axes"), layout.get("input_axes")
+        if not isinstance(output_axes, list) or not output_axes or output_axes != list(range(len(output_axes))):
+            raise ManifestError("operator.layout.output_axes is invalid")
+        rank = len(output_axes)
+        if input_axes != list(range(rank, 2 * rank)):
+            raise ManifestError("operator.layout.input_axes is invalid")
         capabilities = value.get("capabilities")
         if not isinstance(capabilities, dict):
             raise ManifestError("structural IR is missing capabilities")
@@ -182,11 +664,10 @@ class DFTCapabilityPlugin(DFTPlugin):
             raise ManifestError("capabilities.all_pairs_reachable_applicable must be boolean")
         if not isinstance(capabilities.get("non_local_capacity"), bool):
             raise ManifestError("capabilities.non_local_capacity must be boolean")
-        count = value["topology"]["site_count"]
-        depth = capabilities.get("operator_message_depth")
+        capability_depth = capabilities.get("operator_message_depth")
         unreachable = capabilities.get("unreachable_pairs")
         if capabilities["all_pairs_reachable_applicable"]:
-            if not isinstance(depth, int) or isinstance(depth, bool) or depth < 0:
+            if not isinstance(capability_depth, int) or isinstance(capability_depth, bool) or capability_depth < 0:
                 raise ManifestError("capabilities.operator_message_depth must be non-negative when applicable")
             if not isinstance(unreachable, list) or any(
                 not isinstance(item, dict)
@@ -198,14 +679,46 @@ class DFTCapabilityPlugin(DFTPlugin):
                 raise ManifestError("capabilities.unreachable_pairs is invalid")
             if bool(unreachable) == capabilities["all_pairs_reachable"]:
                 raise ManifestError("capabilities.all_pairs_reachable contradicts unreachable_pairs")
-        elif depth is not None or unreachable is not None or not capabilities["all_pairs_reachable"]:
+        elif capability_depth is not None or unreachable is not None or not capabilities["all_pairs_reachable"]:
             raise ManifestError("a not-applicable coverage claim must carry no depth/witness and be vacuously true")
 
     def revalidate(
         self, *, inventory: dict[str, Any], value: dict[str, Any],
         input_constraints: dict[str, Any], derivation: dict[str, Any], roles: dict[str, str],
     ) -> None:
-        _revalidate_structure(value=value, input_constraints=input_constraints, derivation=derivation, roles=roles)
+        translation = value["translation"]
+        if translation.get("semantic_derivations") != derivation["semantic_derivations"]:
+            raise ManifestError("translation semantic derivations do not match the raw exported graph")
+        topology = translation.get("topology")
+        if topology != {
+            "state_name": derivation["adjacency_state"],
+            "graph_inputs": derivation["graph_inputs"],
+            "adjacency_aliases": derivation["adjacency_aliases"],
+            "adjacency_convention": input_constraints.get("adjacency_convention", "target_source"),
+        } or value["topology"]["site_count"] != derivation["site_count"] or value["topology"]["directed_edges"] != derivation["edges"]:
+            raise ManifestError("translation topology claim does not match its adjacency evidence")
+        if translation.get("message_passing") != {
+            "root": roles["message_state"], "stages": derivation["stage_nodes"], "recognized": derivation["message_recognized"],
+        }:
+            raise ManifestError("translation message-passing derivation is invalid")
+        if value["message_passing"] != {
+            "depth": derivation["depth"], "recognized": derivation["message_recognized"], "provenance_nodes": derivation["stage_nodes"],
+        }:
+            raise ManifestError("IR message-passing claim does not match its derivation")
+        if translation.get("xc") != {"root": roles["xc_energy"], "form": derivation["xc_form"]}:
+            raise ManifestError("translation XC derivation is invalid")
+        if value["xc"] != {"form": derivation["xc_form"], "provenance_nodes": derivation["xc_nodes"]}:
+            raise ManifestError("IR XC claim does not match its derivation")
+        if translation.get("operator") != {
+            "root": roles["learned_self_energy"], "construction": derivation["operator"],
+            "layout": derivation["operator_layout"],
+        }:
+            raise ManifestError("translation operator derivation is invalid")
+        if value["operator"] != {
+            "construction": derivation["operator"], "provenance_nodes": derivation["operator_nodes"],
+            "layout": derivation["operator_layout"],
+        }:
+            raise ManifestError("IR operator claim does not match its derivation")
         if value["capabilities"] != derivation["capabilities"]:
             raise ManifestError("capabilities claim does not match its derivation")
 
@@ -320,10 +833,6 @@ class DFTCapabilityPlugin(DFTPlugin):
         ]
 
     def lean_preamble_fields(self, value: dict[str, Any], namespace: str) -> str:
-        # Deliberately not `super().lean_preamble_fields()`: that reads
-        # `value["locality"]` (the real-weight observation), which does not
-        # exist in this plugin's IR at all -- there is no float-derived
-        # field anywhere in this preamble.
         capabilities = value["capabilities"]
         depth = capabilities["operator_message_depth"] if capabilities["operator_message_depth"] is not None else 0
         return (

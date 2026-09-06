@@ -21,29 +21,6 @@ from .core import (
     structural_report,
     verify_structural_certificate,
 )
-from .dft_capability_plugin import DFT_CAPABILITY_PLUGIN
-from .dft_plugin import DFT_PLUGIN
-from .plugin import StructuralPlugin
-
-# Every plugin this CLI knows how to run, by the `--profile` name analyze
-# commands select and by the `ir_schema_version` a produced IR is stamped
-# with. `_resolve_plugin` below reads a loaded IR's OWN schema version to
-# pick the plugin back up -- the choice is certificate-bound (covered by
-# `ir_sha256`/`report_sha256`), not a separate flag `generate`/`report`/
-# `assemble` could be pointed at the wrong plugin with after the fact.
-PROFILES: dict[str, StructuralPlugin] = {DFT_PLUGIN.name: DFT_PLUGIN, DFT_CAPABILITY_PLUGIN.name: DFT_CAPABILITY_PLUGIN}
-PLUGINS_BY_SCHEMA_VERSION: dict[int, StructuralPlugin] = {
-    plugin.ir_schema_version: plugin for plugin in PROFILES.values()
-}
-
-
-def _resolve_plugin(ir: dict[str, Any]) -> StructuralPlugin:
-    version = ir.get("ir_schema_version")
-    plugin = PLUGINS_BY_SCHEMA_VERSION.get(version)
-    if plugin is None:
-        raise ManifestError(f"no known plugin for ir_schema_version {version!r}")
-    return plugin
-
 
 CLAIMS_SCHEMA = {
     "type": "object",
@@ -124,7 +101,7 @@ def _atomic_claims(claims: dict[str, Any], *, description: str, reviewed: bool) 
 
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(
-        prog="vista structural", description="Artifact-grounded VISTA Structural V3 workflow"
+        prog="vista structural", description="Artifact-grounded VISTA pre-training structural capability workflow"
     )
     commands = root.add_subparsers(dest="command", required=True)
 
@@ -134,7 +111,6 @@ def parser() -> argparse.ArgumentParser:
     analyze.add_argument("--output", required=True)
     analyze.add_argument("--bubblewrap", default="bwrap")
     analyze.add_argument("--python", default=sys.executable)
-    analyze.add_argument("--profile", choices=sorted(PROFILES), default=DFT_PLUGIN.name)
 
     analyze_result = commands.add_parser(
         "analyze-extraction", help="analyze an already-produced trusted local extractor result"
@@ -142,7 +118,6 @@ def parser() -> argparse.ArgumentParser:
     analyze_result.add_argument("result")
     analyze_result.add_argument("--constraints", required=True)
     analyze_result.add_argument("--output", required=True)
-    analyze_result.add_argument("--profile", choices=sorted(PROFILES), default=DFT_PLUGIN.name)
 
     draft = commands.add_parser("draft-description")
     draft.add_argument("--description", required=True)
@@ -183,7 +158,7 @@ def parser() -> argparse.ArgumentParser:
     return root
 
 
-def _from_extraction(result: dict[str, Any], constraints: dict[str, Any], profile: str) -> dict[str, Any]:
+def _from_extraction(result: dict[str, Any], constraints: dict[str, Any]) -> dict[str, Any]:
     artifact_hash = result.get("artifact_sha256")
     extractor_version = result.get("extractor_version")
     if not isinstance(artifact_hash, str) or not isinstance(extractor_version, str):
@@ -193,7 +168,6 @@ def _from_extraction(result: dict[str, Any], constraints: dict[str, Any], profil
         artifact_sha256=artifact_hash,
         extractor_version=extractor_version,
         input_constraints=constraints,
-        plugin=PROFILES[profile],
     )
 
 
@@ -204,11 +178,11 @@ def main(argv: list[str] | None = None) -> int:
             result = BubblewrapExtractor(
                 bubblewrap=options.bubblewrap, python=options.python
             ).extract(options.artifact)
-            ir = _from_extraction(result, _object(options.constraints), options.profile)
+            ir = _from_extraction(result, _object(options.constraints))
             _write(options.output, ir)
             output = {"status": "analyzed", "output": str(Path(options.output).resolve())}
         elif options.command == "analyze-extraction":
-            ir = _from_extraction(_object(options.result), _object(options.constraints), options.profile)
+            ir = _from_extraction(_object(options.result), _object(options.constraints))
             _write(options.output, ir)
             output = {"status": "analyzed", "output": str(Path(options.output).resolve())}
         elif options.command == "draft-description":
@@ -265,8 +239,7 @@ def main(argv: list[str] | None = None) -> int:
                 "output": str(Path(options.output).resolve()),
             }
         elif options.command == "generate":
-            ir = _ir(options.ir)
-            generated = generate_structural_obligations(ir, plugin=_resolve_plugin(ir))
+            generated = generate_structural_obligations(_ir(options.ir))
             if options.output:
                 _write(options.output, generated)
             if options.jsonl:
@@ -275,13 +248,11 @@ def main(argv: list[str] | None = None) -> int:
                 return 0
             output = generated
         elif options.command == "report":
-            ir = _ir(options.ir)
-            output = structural_report(ir, plugin=_resolve_plugin(ir))
+            output = structural_report(_ir(options.ir))
             _write(options.output, output)
         elif options.command == "assemble":
-            ir = _ir(options.ir)
             source, report = assemble_structural_certificate(
-                ir, load_proof_results(options.proof_results), plugin=_resolve_plugin(ir),
+                _ir(options.ir), load_proof_results(options.proof_results),
             )
             Path(options.source_output).write_text(source, encoding="utf-8")
             _write(options.report_output, report)

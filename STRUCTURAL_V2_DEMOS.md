@@ -100,33 +100,18 @@ export PROOF_SEARCH_DB="$PWD/build/certified-ring.db"
 ./noether review --run-dir build/runs/certified-ring
 ```
 
-## Structural V3: locality claim verified against the candidate's own values
+## Pre-training structural capability certification
 
-See `STRUCTURAL_V3.md` for the design. There is no coupling list and no
-reference-operator file anymore: `structural-v3-input-constraints.json`
-declares a single `expected_locality` claim (`"local"` or `"non_local"`),
-and VISTA checks it against the candidate's own extracted operator values.
+See `STRUCTURAL_CAPABILITY_CHECKS.md` for the design. VISTA no longer reads
+a candidate's trained weights at all: `structural-capability-input-
+constraints.json` declares a single `expected_locality` claim (`"local"`
+or `"non_local"`), and VISTA checks whether the candidate's *architecture*
+is capable of it -- purely from graph shape and construction classification,
+before a single weight is trained.
 
 ```bash
 PYTHONPATH=. python examples/dft/models/analyze_structural_gnns.py \
-  build/structural-v3-models \
-  --constraints examples/dft/structural-v3-input-constraints.json \
-  --output-dir build/structural-v3-analysis
-```
-
-Compare against `examples/dft/structural-v3-evaluation.json` (real, observed
-results from a fixed-seed export -- not guessed). Unlike V2's depth-dependent
-coupling check, `certified-ring` and `too-shallow-ring` are now identical:
-locality depends only on the operator's own extracted values, never on
-message-passing depth. `identity-operator-ring` and `zero-operator-ring`
-correctly do NOT match the shared `non_local` claim, because their real
-extracted operator genuinely is diagonal -- a real, computed mismatch, not a
-labeling error.
-
-The full frozen V3 evaluation condition (locality-verification corpus + fresh
-held-out adversarial cases) lives in `evaluation/structural_v3/`, run the
-same way as `evaluation/structural_v2/`:
-
-```bash
-python evaluation/structural_v3/run.py --generate
+  build/structural-capability-models \
+  --constraints examples/dft/structural-capability-input-constraints.json \
+  --output-dir build/structural-capability-analysis
 ```

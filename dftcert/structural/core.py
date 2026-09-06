@@ -4,9 +4,9 @@ Extraction plumbing, hashing, translation-validation re-derivation,
 certificate assembly/binding, and Lean invocation live here and know nothing
 about any one verification domain. Everything domain-specific is behind the
 `StructuralPlugin` interface (`dftcert.structural.plugin`); every public
-function below takes a `plugin` argument defaulting to `DFT_PLUGIN`
-(`dftcert.structural.dft_plugin`), VISTA's first plugin, so existing callers
-keep working unchanged. See `VISTA_GENERALIZATION.md`.
+function below takes a `plugin` argument defaulting to `DFT_CAPABILITY_PLUGIN`
+(`dftcert.structural.dft_capability_plugin`), the project's only plugin, so
+existing callers keep working unchanged. See `VISTA_GENERALIZATION.md`.
 """
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ from typing import Any
 
 from ..certificate import project_fingerprint
 from ..manifest import ManifestError, proof_result_map, sha256_value
-from .dft_plugin import DFT_PLUGIN
+from .dft_capability_plugin import DFT_CAPABILITY_PLUGIN
 from .plugin import StructuralPlugin
 
 _FORBIDDEN = re.compile(r"\b(sorry|admit|axiom|unsafe)\b")
@@ -35,7 +35,7 @@ def _lean_string(value: str) -> str:
 
 def structural_ir_from_inventory(
     *, inventory: dict[str, Any], artifact_sha256: str, extractor_version: str,
-    input_constraints: dict[str, Any], plugin: StructuralPlugin = DFT_PLUGIN,
+    input_constraints: dict[str, Any], plugin: StructuralPlugin = DFT_CAPABILITY_PLUGIN,
 ) -> dict[str, Any]:
     nodes = inventory.get("nodes")
     if not isinstance(nodes, list) or any(not isinstance(node, dict) for node in nodes):
@@ -81,7 +81,7 @@ def structural_ir_from_inventory(
     return value
 
 
-def validate_structural_ir(value: dict[str, Any], *, plugin: StructuralPlugin = DFT_PLUGIN) -> None:
+def validate_structural_ir(value: dict[str, Any], *, plugin: StructuralPlugin = DFT_CAPABILITY_PLUGIN) -> None:
     if not isinstance(value, dict) or value.get("ir_schema_version") != plugin.ir_schema_version:
         raise ManifestError(f"structural IR must use schema version {plugin.ir_schema_version}")
     source = value.get("source")
@@ -98,7 +98,7 @@ def validate_structural_ir(value: dict[str, Any], *, plugin: StructuralPlugin = 
 
 def validate_translation(
     *, inventory: dict[str, Any], value: dict[str, Any], input_constraints: dict[str, Any],
-    artifact_sha256: str | None = None, plugin: StructuralPlugin = DFT_PLUGIN,
+    artifact_sha256: str | None = None, plugin: StructuralPlugin = DFT_CAPABILITY_PLUGIN,
 ) -> dict[str, Any]:
     """Independently recheck an artifact IR's derivation against raw graph inventory."""
     validate_structural_ir(value, plugin=plugin)
@@ -128,7 +128,7 @@ def validate_translation(
     }
 
 
-def assess_structural_ir(value: dict[str, Any], *, plugin: StructuralPlugin = DFT_PLUGIN) -> dict[str, Any]:
+def assess_structural_ir(value: dict[str, Any], *, plugin: StructuralPlugin = DFT_CAPABILITY_PLUGIN) -> dict[str, Any]:
     validate_structural_ir(value, plugin=plugin)
     checks = plugin.checks(value)
     supported = plugin.supported(value)
@@ -146,7 +146,7 @@ def assess_structural_ir(value: dict[str, Any], *, plugin: StructuralPlugin = DF
 
 
 def structural_failure_witnesses(
-    value: dict[str, Any], *, plugin: StructuralPlugin = DFT_PLUGIN,
+    value: dict[str, Any], *, plugin: StructuralPlugin = DFT_CAPABILITY_PLUGIN,
 ) -> list[dict[str, Any]]:
     assessment = assess_structural_ir(value, plugin=plugin)
     return [
@@ -156,7 +156,7 @@ def structural_failure_witnesses(
     ]
 
 
-def structural_report(value: dict[str, Any], *, plugin: StructuralPlugin = DFT_PLUGIN) -> dict[str, Any]:
+def structural_report(value: dict[str, Any], *, plugin: StructuralPlugin = DFT_CAPABILITY_PLUGIN) -> dict[str, Any]:
     """Human-facing evidence report; it does not upgrade any trust boundary."""
     assessment = assess_structural_ir(value, plugin=plugin)
     source = value["source"]
@@ -190,7 +190,7 @@ def structural_report(value: dict[str, Any], *, plugin: StructuralPlugin = DFT_P
 
 
 def structural_model_description(
-    value: dict[str, Any], *, plugin: StructuralPlugin = DFT_PLUGIN,
+    value: dict[str, Any], *, plugin: StructuralPlugin = DFT_CAPABILITY_PLUGIN,
 ) -> str:
     """Readable, deterministic context for local proof agents and reports."""
     validate_structural_ir(value, plugin=plugin)
@@ -216,7 +216,7 @@ def structural_model_description(
 
 
 def generate_structural_obligations(
-    value: dict[str, Any], *, plugin: StructuralPlugin = DFT_PLUGIN,
+    value: dict[str, Any], *, plugin: StructuralPlugin = DFT_CAPABILITY_PLUGIN,
 ) -> dict[str, Any]:
     assessment = assess_structural_ir(value, plugin=plugin)
     source = value["source"]
@@ -279,7 +279,7 @@ def generate_structural_obligations(
 
 
 def assemble_structural_certificate(
-    value: dict[str, Any], proof_results: Any, *, plugin: StructuralPlugin = DFT_PLUGIN,
+    value: dict[str, Any], proof_results: Any, *, plugin: StructuralPlugin = DFT_CAPABILITY_PLUGIN,
 ) -> tuple[str, dict[str, Any]]:
     generated = generate_structural_obligations(value, plugin=plugin)
     translation_validation = value.get("translation_validation")
@@ -334,7 +334,7 @@ def assemble_structural_certificate(
         "source": value["source"],
         "source_sha256": generated["source_sha256"],
         "ir_sha256": generated["ir_sha256"],
-        "locality": value.get("locality"),
+        "capabilities": value.get("capabilities"),
         "certificate_source_sha256": hashlib.sha256(source.encode()).hexdigest(),
         "structural_disposition": generated["disposition"],
         "failure_witnesses": generated["failure_witnesses"],
@@ -408,32 +408,42 @@ def confirmed_description_ir(
     *, description: str, topology: dict[str, Any], message_passing: dict[str, Any],
     xc: dict[str, Any], operator: dict[str, Any], locality: dict[str, Any],
     confirmed_claims: list[dict[str, Any]] | None = None,
-    plugin: StructuralPlugin = DFT_PLUGIN,
+    plugin: StructuralPlugin = DFT_CAPABILITY_PLUGIN,
 ) -> dict[str, Any]:
     """Human-confirmed (no artifact) specification path. Not yet routed
     through the plugin interface -- still DFT-shaped regardless of `plugin`.
-    See VISTA_GENERALIZATION.md open questions."""
+    See VISTA_GENERALIZATION.md open questions.
+
+    `locality` is the human's confirmed claim (`{"expected": "local" |
+    "non_local"}`) -- kept as the parameter/CLI name since that is the
+    property a human is actually attesting to, but it is lowered here into
+    the `capabilities` shape the (pre-training) plugin's IR actually uses,
+    not a real-weight `locality` observation (there are no extracted values
+    in this path at all)."""
     description_hash = hashlib.sha256(description.encode()).hexdigest()
-    if locality.get("expected") not in {"local", "non_local"}:
+    expected_locality = locality.get("expected")
+    if expected_locality not in {"local", "non_local"}:
         raise ManifestError("locality.expected must be 'local' or 'non_local'")
     # A human-confirmed specification has no real extracted tensor to declare
     # a grouped domain/codomain axis layout for; default to the plain n x n
     # matrix layout unless the confirmed claims say otherwise, so existing
     # confirmed-description operator claims (which never mentioned a layout)
     # keep working unchanged.
-    operator = {"layout": {"output_axes": [0], "input_axes": [1], "site_axis": 0}, **operator}
-    # A pure English-description specification has no real weights to
-    # extract: a human confirms both what is expected AND what holds, exactly
-    # as they already do for topology/xc/operator in this path. That is a
-    # different (weaker) trust level than the torch_export path's
-    # independently-computed observation, and the certificate_kind
-    # ("confirmed_specification") already communicates that distinction.
-    locality = {
-        "expected": locality["expected"],
-        "available": True,
-        "observed_local": locality["expected"] == "local",
-        "off_diagonal_nonzero": [],
-        "rule": {"name": "human_attested", "version": 1},
+    operator = {"layout": {"output_axes": [0], "input_axes": [1]}, **operator}
+    # A pure English-description specification has no message-passing graph
+    # to trace either: the coverage claim is vacuously true/not-applicable,
+    # exactly like every recipe this plugin currently recognizes from a real
+    # artifact. A human confirms non-local capacity directly, mirroring how
+    # they already confirm topology/xc/operator in this path -- a different
+    # (weaker) trust level than an artifact's derived facts, which the
+    # certificate_kind ("confirmed_specification") already communicates.
+    capabilities = {
+        "expected_locality": expected_locality,
+        "all_pairs_reachable": True,
+        "all_pairs_reachable_applicable": False,
+        "unreachable_pairs": None,
+        "operator_message_depth": None,
+        "non_local_capacity": expected_locality == "non_local",
     }
     value = {
         "ir_schema_version": plugin.ir_schema_version,
@@ -445,7 +455,7 @@ def confirmed_description_ir(
                 "message_passing": message_passing,
                 "xc": xc,
                 "operator": operator,
-                "locality": locality,
+                "capabilities": capabilities,
                 "confirmed_claims": confirmed_claims or [],
             }),
             "confirmed_claims": confirmed_claims or [],
@@ -454,7 +464,7 @@ def confirmed_description_ir(
         "message_passing": message_passing,
         "xc": xc,
         "operator": operator,
-        "locality": locality,
+        "capabilities": capabilities,
     }
     validate_structural_ir(value, plugin=plugin)
     return value

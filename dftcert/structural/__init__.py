@@ -1,6 +1,7 @@
-"""Primary Structural V3 certification architecture (domain-agnostic harness
-+ pluggable domains; see VISTA_GENERALIZATION.md). `dft_plugin.DFT_PLUGIN` is
-the default plugin every harness function uses unless another is passed."""
+"""VISTA pre-training structural capability certification (domain-agnostic
+harness + pluggable domains; see VISTA_GENERALIZATION.md).
+`dft_capability_plugin.DFT_CAPABILITY_PLUGIN` is the default plugin every
+harness function uses unless another is passed."""
 
 from .core import (
     assemble_structural_certificate,
@@ -13,7 +14,7 @@ from .core import (
     validate_translation,
     verify_structural_certificate,
 )
-from .dft_plugin import DFT_PLUGIN, DFTPlugin
+from .dft_capability_plugin import DFT_CAPABILITY_PLUGIN, DFTCapabilityPlugin
 from .plugin import StructuralPlugin
 
 __all__ = [
@@ -26,7 +27,7 @@ __all__ = [
     "structural_report",
     "validate_translation",
     "verify_structural_certificate",
-    "DFT_PLUGIN",
-    "DFTPlugin",
+    "DFT_CAPABILITY_PLUGIN",
+    "DFTCapabilityPlugin",
     "StructuralPlugin",
 ]

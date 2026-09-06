@@ -33,32 +33,19 @@ def reachableWithin (edges : List (Nat × Nat)) : Nat → Nat → Nat → Bool
       source == target || edges.any fun edge =>
         edge.1 == source && reachableWithin edges depth edge.2 target
 
-/-- Historical (legacy V2) checker: `requirements` was a finite list of
-    `(source, target)` pairs, hand-authored in the candidate's own
-    constraints, that had to be reachable from the candidate's adjacency
-    (`edges`) within `depth` hops. Superseded by `localityMatches` below,
-    which checks a fact about the candidate's *own actual extracted values*
-    instead of coverage of externally-declared pairs. Kept only so frozen V2
-    evaluation certificates (`evaluation/structural_v2/`) remain
-    re-checkable; the live V3 pipeline no longer generates obligations
-    against this. -/
+/-- Historical: `requirements` was a finite list of `(source, target)` pairs,
+    hand-authored in the candidate's own constraints, that had to be
+    reachable from the candidate's adjacency (`edges`) within `depth` hops.
+    Superseded entirely by `allPairsReachable` below, which requires
+    coverage of every pair rather than an externally hand-picked list. Kept
+    only so frozen historical evaluation certificates remain re-checkable;
+    the live pipeline no longer generates obligations against this. -/
 def allCovered (edges : List (Nat × Nat)) (depth : Nat)
     (requirements : List (Nat × Nat)) : Bool :=
   requirements.all fun coupling =>
     reachableWithin edges depth coupling.1 coupling.2
 
-/-- V3: `observedNonzeroOffDiagonal` is the list of (source, target) pairs
-    where the candidate's *own* extracted learned-self-energy matrix
-    actually has a real off-diagonal entry exceeding the disclosed threshold
-    -- computed by the analyzer directly from the candidate's real values
-    (`dftcert.structural.core._operator_matrix`/`_observed_locality`), never
-    supplied by a candidate, an analyst, or any external reference. A claim
-    of `expectedLocal` is verified by checking whether that observed list is
-    empty (local) or not (non-local). -/
-def localityMatches (expectedLocal : Bool) (observedNonzeroOffDiagonal : List (Nat × Nat)) : Bool :=
-  expectedLocal == observedNonzeroOffDiagonal.isEmpty
-
-/-- V4: every ordered pair of distinct sites is reachable from every other
+/-- Every ordered pair of distinct sites is reachable from every other
     within the declared message-passing depth -- a fact about topology and
     depth alone (`edges`, `depth`, `siteCount`), never about extracted
     weights and never a hand-picked pair. -/
@@ -67,16 +54,16 @@ def allPairsReachable (edges : List (Nat × Nat)) (depth : Nat) (siteCount : Nat
     (List.range siteCount).all fun target =>
       source == target || reachableWithin edges depth source target
 
-/-- V4: does this operator construction admit *some* parameter assignment
-    with a nonzero off-diagonal entry? `.zero`/`.identity` never can, for any
+/-- Does this operator construction admit *some* parameter assignment with a
+    nonzero off-diagonal entry? `.zero`/`.identity` never can, for any
     assignment; an unconstrained `.parameter` and a symmetrized
     `.add p (.adjoint p)` (or its mirror) can, PROVIDED there are at least
     two sites for an off-diagonal entry to exist at all -- a 1x1 matrix has
     none, for any recipe, so `siteCount` is a real precondition of this
     claim, not a separate Python-only check layered on top of a Lean fact
     that doesn't mention it. A fact about the construction and site count
-    alone -- never about the values currently stored in it (see
-    `localityMatches` for that). -/
+    alone -- never about any extracted floating-point value, since there
+    are none before training. -/
 def canRepresentNonLocal (siteCount : Nat) : OperatorForm → Bool
   | .zero => false
   | .identity => false

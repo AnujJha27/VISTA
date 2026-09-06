@@ -1,11 +1,11 @@
 # VISTA generalization: domain-agnostic verification harness
 
 **Status: implemented, first pass.** `dftcert/structural/plugin.py` defines
-`StructuralPlugin` (a Python ABC); `dftcert/structural/dft_plugin.py` is
-`DFTPlugin`, VISTA's first plugin (everything that used to be hardcoded in
-`core.py`), exposed as the module-level singleton `DFT_PLUGIN`;
+`StructuralPlugin` (a Python ABC); `dftcert/structural/dft_capability_plugin.py` is
+`DFTCapabilityPlugin`, VISTA's only plugin (everything that used to be hardcoded in
+`core.py`), exposed as the module-level singleton `DFT_CAPABILITY_PLUGIN`;
 `dftcert/structural/core.py` is now the domain-agnostic harness -- every
-public function takes `plugin: StructuralPlugin = DFT_PLUGIN`, so every
+public function takes `plugin: StructuralPlugin = DFT_CAPABILITY_PLUGIN`, so every
 existing caller (CLI, tests, eval corpora) keeps working unchanged while a
 different plugin is now a real, pluggable option.
 
@@ -77,7 +77,7 @@ Looking at the current pipeline with this split in mind:
    `structural_failure_witnesses`, `structural_report`,
    `structural_model_description`, `generate_structural_obligations`,
    `assemble_structural_certificate`) takes `plugin: StructuralPlugin =
-   DFT_PLUGIN` as a keyword-only argument.
+   DFT_CAPABILITY_PLUGIN` as a keyword-only argument.
 2. **`plugin.py`**: the `StructuralPlugin` ABC. `role_roots` (output-contract
    resolution) is a concrete, generic method on the base class -- any plugin
    gets it for free from `role_requirements()`. Everything else is abstract:
@@ -89,11 +89,11 @@ Looking at the current pipeline with this split in mind:
    observation (for DFT: the locality fact) once; every other method reads
    back what `derive()` already computed rather than recomputing anything,
    so two code paths can never silently disagree.
-3. **`dft_plugin.py`**: `DFTPlugin`, moving essentially all of the old
-   `core.py` DFT-specific logic (topology/message-passing/XC
-   form/operator-construction/locality) behind that interface, plus
-   `DFT_PLUGIN = DFTPlugin()`, the module-level default instance. Its
-   `lean_import = "Testv2.StructuralV2"`.
+3. **`dft_capability_plugin.py`**: `DFTCapabilityPlugin`, moving essentially
+   all of the old `core.py` DFT-specific logic (topology/message-passing/XC
+   form/operator-construction/pre-training capability) behind that
+   interface, plus `DFT_CAPABILITY_PLUGIN = DFTCapabilityPlugin()`, the
+   module-level default instance. Its `lean_import = "Testv2.StructuralV2"`.
 
 The harness produces byte-for-byte the same IR/certificate shape DFT always
 produced (`ir_sections`/`translation_sections` are merged straight into the
@@ -138,14 +138,16 @@ translation validation, and certificate assembly unchanged.
    `structural_model_description`'s "Adjacency evidence" line, are still
    DFT-flavored prose hardcoded in the harness (`core.py`), not sourced from
    the plugin -- true generic report language across domains is unsolved.
-3. Backward compatibility check for V1/V2/V3 frozen evaluation results
-   (`evaluation/structural_v2/`, `evaluation/structural_v3/`): not yet done
-   as a formal audit. What *is* confirmed: the full existing unit test
-   suite and a fresh real Lean re-verification pass unchanged post-split,
-   and DFT's IR/certificate output shape is unchanged (a pure reorganization
-   for the one plugin that exists). No second plugin exists yet to prove the
-   interface actually generalizes in practice -- treat it as a sound first
-   pass, not a proven-general one.
+3. Backward compatibility check for V1/V2 frozen evaluation results
+   (`evaluation/structural_v2/`): not yet done as a formal audit. The
+   post-training V3 plugin and its `evaluation/structural_v3/` corpus
+   were removed entirely (this project's claim is pre-training only, and
+   keeping a post-training plugin alongside it made that ambiguous). What
+   *is* confirmed: the full existing unit test suite and a fresh real Lean
+   re-verification pass unchanged post-split, and the one remaining
+   plugin's IR/certificate output shape is unchanged (a pure reorganization).
+   No second plugin exists yet to prove the interface actually generalizes
+   in practice -- treat it as a sound first pass, not a proven-general one.
 
 This document will be updated (not silently replaced) as the design evolves
 further, e.g. when a second plugin is actually written.

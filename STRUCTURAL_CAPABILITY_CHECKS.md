@@ -1,39 +1,18 @@
 # Pre-training architectural capability checks
 
-`dftcert/structural/dft_plugin.py` (`DFTPlugin`) certifies a real fact about
-a candidate's own *extracted trained floats*: is the learned self-energy
-operator actually diagonal, or does it actually have a nonzero off-diagonal
-entry (see `STRUCTURAL_V3.md`). That fact cannot exist before training --
-there are no weights yet.
+`dftcert/structural/dft_capability_plugin.py` (`DFTCapabilityPlugin`) is
+this project's only structural plugin. It certifies architectural
+*capability* before a single weight is trained, and never reads an
+extracted parameter's floating-point content anywhere in its derivation,
+IR, or checks -- that is the whole claim this project makes. An earlier
+version of this codebase also had a second, post-training plugin that read
+real trained weights to check numeric locality; it has been removed
+entirely, so that claim can't be ambiguous.
 
-`dftcert/structural/dft_capability_plugin.py` (`DFTCapabilityPlugin`) checks
-what *can* be established before training, from the architecture alone.
-Reachable end-to-end from the CLI too: `analyze-pt2`/`analyze-extraction`
-take `--profile dft-capability` (default `dft`); `generate`/`report`/
-`assemble` resolve the plugin from the loaded IR's own `ir_schema_version`
-(`3` -> `DFT_PLUGIN`, `4` -> `DFT_CAPABILITY_PLUGIN`) rather than a separate
-flag, so the choice is certificate-bound (covered by `ir_sha256`) and
-cannot be pointed at the wrong plugin after the fact. From Python, pass
-`plugin=DFT_CAPABILITY_PLUGIN` to the functions in
-`dftcert/structural/core.py` instead of the default `DFT_PLUGIN`.
-
-## `derive()` is split so the capability path truly never reads a float
-
-`DFTPlugin.derive()` used to compute topology/message-passing/XC/operator
-classification *and* the real-weight locality observation in one method.
-It is now `derive_structure()` (topology, message-passing chains, XC form,
-operator-construction recipe -- no float ever read) plus `derive()`
-(`derive_structure()` + `_locality_from_recipe`, the only place that reads
-an extracted parameter's floating-point content).
-`DFTCapabilityPlugin.derive()` calls `derive_structure()` only -- never
-`derive()` -- so its derivation, IR, and checks never contain a `locality`
-field or anything computed from one. This is enforced structurally, not
-just by convention: `ir_sections()`/`validate_ir_sections()`/`revalidate()`
-for this plugin never reference `value["locality"]` at all (previously an
-earlier draft still inherited `locality` from `derive()` and only left it
-out of the *gating* checks -- that made the "no floating-point value" claim
-true only of the check outcome, not of the pipeline that produced it; fixed
-here by never computing it in the first place).
+It is the harness's default: every function in `dftcert/structural/core.py`
+uses it unless a different `plugin=` is passed explicitly, and the CLI
+(`dftcert/structural/cli.py`) has no plugin-selection flag at all, since
+there is nothing to select between.
 
 ## What it checks
 
@@ -55,40 +34,105 @@ here by never computing it in the first place).
   `zero`/`identity` never can; `symmetrized` (`B + B^T`) and
   `unconstrained_parameter` (a free matrix) can, provided a second site
   exists for an off-diagonal entry to live at -- a 1x1 matrix has none,
-  for any recipe. This reuses `DFTPlugin`'s existing construction
-  classification -- a fact about the recipe and site count, never about
-  the values currently stored in it.
-- **`self_adjoint`**: unchanged from `DFTPlugin` -- already recipe-only.
-- **`xc_discontinuity_compatible`**: unchanged from `DFTPlugin`.
+  for any recipe. A fact about the recipe and site count, never about the
+  values currently stored in it.
+- **`self_adjoint`**: the declared operator output is structurally zero,
+  identity, or a parameter plus its transpose -- recipe-only, no floats.
+- **`xc_discontinuity_compatible`**: the declared XC output path contains a
+  supported hinge construction.
 
 `supported()` does not require any extracted floats -- a `.pt2` with only
 small bool/int adjacency buffers and no captured numeric weights is fully
 certifiable by these checks.
 
-`non_local_capacity`'s "off-diagonal entry" is layout-agnostic by
-construction: it only asks whether the recipe kind and site count admit
-*some* assignment with a cross-site coupling, never inspecting a concrete
-shape. So `input_constraints.operator_layout` (see `STRUCTURAL_V3.md` for
-the full design -- a self-energy with orbital/spin axes, e.g. shape
-`[N, m, N, m]`, rather than a plain `[N, N]` matrix) needs no special
-handling here; `derive_structure()` resolves and echoes it in
-`operator.layout` for every plugin built on this module, and the adjoint
-recognition it gates (rejecting `numpy_T`/`.t()` for a grouped layout,
-requiring an exact permutation match) is shared, symbolic, structural code
--- never a reason this plugin would need to touch a float.
+## `derive()` never reads a float, structurally, not just by convention
+
+`derive_structure()` computes topology, message-passing chains, XC form,
+and operator-construction *classification* -- all from graph shape alone.
+`derive()` calls `derive_structure()` and adds only the `capabilities`
+dict computed from that same structural derivation (message-passing
+reachability, non-local capacity) -- nothing in that path ever opens a
+parameter's actual stored values. `ir_sections()`/`validate_ir_sections()`/
+`revalidate()` never reference anything resembling a real-weight
+observation. There is no `locality`-shaped field anywhere in this plugin's
+IR to accidentally leak a float through.
+
+## Operator layout: beyond a literal n x n matrix
+
+The self-energy is not necessarily stored as a plain `[N, N]` tensor. With
+`m` orbitals (or spins) per site, a natural export shape is `[N, m, N, m]`
+(site and orbital axes each split into a domain group and a codomain
+group). Flattening `(site, orbital)` into one combined index still gives an
+ordinary linear operator on the `N*m`-dimensional space -- so this plugin
+does not hard-code "operator = rank-2 tensor."
+`input_constraints.operator_layout` (optional; defaults to
+`{"output_axes": [0], "input_axes": [1]}`, i.e. the plain matrix) declares
+which axes form the codomain group and which form the domain group. Only
+the canonical contiguous grouping (`output_axes=[0..r-1]`,
+`input_axes=[r..2r-1]`) is supported; a reordered or interleaved grouping
+is rejected outright, not guessed at.
+
+This only matters for correctly recognizing the adjoint construction (and
+therefore `self_adjoint`/`non_local_capacity`) for a grouped operator --
+there is no float-reading anywhere in this plugin that would need to know
+which axis is a "site" versus an "orbital", so the layout carries no
+`site_axis`/locality-projection concept at all. For a plain matrix, any
+reviewed transpose op is the (unique, if it actually swaps the two axes)
+adjoint; `.t()`/`numpy_T` (no axis arguments, unambiguous for a two-axis
+tensor) are accepted only there. `transpose.int(x, dim0, dim1)` and
+`permute.default(x, dims)` are checked against their REAL arguments at
+every rank -- a no-op call (`transpose.int(x, 0, 0)`, or
+`permute(x, [0, 1])`) is not a transpose at all and is never accepted just
+because its op name is on the reviewed list. For a grouped layout, only
+`permute` can express the required swap of the whole domain group with the
+whole codomain group, and its literal permutation argument must equal that
+exact swap -- `numpy_T`/`.t()`/`transpose.int` are rejected outright once
+there is more than one axis per side, because none of them can realize a
+multi-axis block swap in one node.
+
+Deliberately out of scope for now (a batch/frequency axis like `Σ(ω)` is
+not itself an operator axis, and treating every extra tensor dimension as
+part of the Hilbert-space operator would be wrong): axes outside the
+declared `output_axes`/`input_axes` groups, complex/conjugate scalars
+(this repo only ever extracts real floats), and non-contiguous or
+reordered axis groupings.
+
+## An `unconstrained_parameter` must actually be a parameter
+
+`_operator_construction` checks the extractor's own `state_kind`
+classification (from `torch.export`'s `graph_signature.input_specs`) and
+rejects an explicit user-input classification, so `non_local_capacity`
+(which claims a free, trainable matrix) can never be satisfied by a node
+that's actually a plain runtime activation input. Permissive when no
+classification is available at all (older extractor, hand-authored
+specification), since that metadata is optional -- fails closed only on an
+explicit signal, never a guess. This never applies to the `symmetrized`
+recipe's own add/adjoint pair: `B + B^dagger` is self-adjoint for ANY `B`,
+trained or not, so `self_adjoint` never needed this check.
+
+## Adjacency selection is either declared or a labeled heuristic
+
+`input_constraints.adjacency_state_name` is optional; when omitted, the
+adjacency buffer is found by a name-match heuristic (any state entry whose
+name contains `"adjacency"`). `semantic_derivations.topology.metadata.
+selection_provenance` records `"declared"` or `"heuristic_name_match"`, so
+a reader can tell which happened without re-deriving it.
 
 ## Lean
 
-`examples/dft/lean/Testv2/StructuralV2.lean` gains two defs, reusing the
-existing `reachableWithin`/`OperatorForm` machinery:
+`examples/dft/lean/Testv2/StructuralV2.lean`:
 
 - `allPairsReachable edges depth siteCount` -- `∀ x y, x = y ∨
   reachableWithin edges depth x y`.
-- `canRepresentNonLocal : OperatorForm → Bool` -- `true` for `.parameter _`
-  and `.add _ (.adjoint _)` / `.add (.adjoint _) _`, `false` for
-  `.zero`/`.identity`/anything else.
+- `canRepresentNonLocal siteCount : OperatorForm → Bool` -- `true` for
+  `.parameter _` and `.add _ (.adjoint _)` / `.add (.adjoint _) _` only
+  when `siteCount >= 2` (a 1x1 matrix has no off-diagonal entry for any
+  recipe -- this is a real precondition of the claim, not a Python-only
+  check layered on top of a Lean fact that doesn't mention it), `false`
+  otherwise.
+- `guaranteedSelfAdjoint`/`xcSupportsDiscontinuity`: unchanged, recipe-only.
 
-`examples/dft/lean/Testv2/StructuralCapabilityMatrix.lean` (new, imports
+`examples/dft/lean/Testv2/StructuralCapabilityMatrix.lean` (imports
 Mathlib) states the actual real-matrix facts that `canRepresentNonLocal`/
 `guaranteedSelfAdjoint` stand in for as computable `Bool` functions over the
 finite `OperatorForm` grammar the analyzer emits. It is deliberately **not**
@@ -121,29 +165,35 @@ source against the pinned `v4.31.0` toolchain then fails outright --
 (`Invalid field notation ... cannot resolve field 'find?'`,
 `failed to synthesize instance for 'for_in%' notation`). The vendored
 Mathlib commit in `lake-manifest.json` is simply too new for this
-project's pinned Lean toolchain. This is a repo-wide inconsistency
-predating this change (every other file here is Mathlib-free specifically
-because of it) and fixing it -- re-pinning the toolchain or the Mathlib
-`rev`, then re-vendoring -- is a separate, riskier maintenance task well
-beyond this plugin. Until that happens, treat
-`symmetrized_is_symm`/`symmetrized_can_be_nonlocal` as **hand-checked
-against the real Mathlib API, not machine-verified anywhere in this repo**.
+project's pinned Lean toolchain. This is a repo-wide inconsistency (every
+other file here is Mathlib-free specifically because of it) and fixing it
+-- re-pinning the toolchain or the Mathlib `rev`, then re-vendoring -- is a
+separate, riskier maintenance task well beyond this plugin. Until that
+happens, treat `symmetrized_is_symm`/`symmetrized_can_be_nonlocal` as
+**hand-checked against the real Mathlib API, not machine-verified anywhere
+in this repo**.
 
 ## Known limitations
 
 - `confirmed_description_ir` (the human-attested, no-artifact path) is not
-  routed through the plugin interface at all -- passing
-  `plugin=DFT_CAPABILITY_PLUGIN` to it will fail IR validation because it
-  never fills in `capabilities`. Fixing this is a `confirmed_description_ir`
-  change that would apply to every plugin, not specific to this one.
-- No frozen evaluation corpus exists for this plugin yet
-  (`evaluation/structural_v3/` has no capability-plugin counterpart) --
-  the CLI and Python API are wired up, but there is no corpus of
-  positive/near-miss/unsupported/malformed cases pinned the way
-  `evaluation/structural_v3/corpus_manifest.json` pins `DFTPlugin`'s.
+  routed through the plugin interface at all -- it always builds a
+  `capabilities`-shaped IR by hand, so a future second plugin would need
+  its own lowering here rather than reusing this one automatically.
+- No frozen evaluation corpus exists for this plugin yet -- the CLI and
+  Python API are wired up, but there is no pinned corpus of
+  positive/near-miss/unsupported/malformed cases the way the (now removed)
+  post-training plugin's `evaluation/structural_v3/` had.
 - No structural-fingerprint hash (a hash of everything except mutable
   trainable numeric values) exists yet. `source.parameter_structure_sha256`
   already hashes only shape/dtype/sha256/state_kind/aliases per parameter,
   which is close but still changes when a parameter's *content* hash changes
   post-training; a true training-invariant fingerprint would be a `core.py`
-  change applying to every plugin, out of scope here.
+  change, out of scope here.
+- `adjacency_convention` and `operator_layout` still silently default
+  (`target_source` and the plain n x n matrix respectively) rather than
+  being required. A stricter mode could reject a missing declaration
+  outright instead of defaulting -- deliberately not done here, since it
+  would break every existing certificate that relied on the default.
+- The original `constraints.json`/specification file's own hash is not
+  separately bound anywhere; only its normalized, resolved meaning (via
+  `translation`/the IR) is hashed.
