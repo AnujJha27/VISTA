@@ -27,6 +27,10 @@ NODE_STATUSES = frozenset({
     "specified_assumption",
     "ambiguous_binding",
     "unresolved",
+    # Lean's own typeclass synthesis or transitive unification resolved an
+    # instance-implicit/implicit binder -- not artifact evidence, not a
+    # user interpretation (spec/theorem-centric-gaps issue 6).
+    "lean_resolved",
 })
 
 NODE_KINDS = frozenset({"data", "premise"})
@@ -78,9 +82,12 @@ def validate_package(value: dict[str, Any]) -> None:
     if value.get("schema_version") != PACKAGE_SCHEMA_VERSION:
         raise ManifestError(f"verification package must use schema version {PACKAGE_SCHEMA_VERSION}")
     adapter = value.get("adapter")
-    if not isinstance(adapter, dict) or not isinstance(adapter.get("profile"), str) \
-            or not isinstance(adapter.get("adapter_version"), str):
-        raise ManifestError("verification package adapter binding is invalid")
+    if not isinstance(adapter, dict) or set(adapter) != {"profile", "semantic_version", "implementation_sha256"} \
+            or not all(isinstance(adapter[key], str) and adapter[key] for key in adapter):
+        raise ManifestError(
+            "verification package adapter binding must be exactly "
+            "{profile, semantic_version, implementation_sha256}, sourced from the adapter itself"
+        )
     theory = value.get("lean_theory")
     if not isinstance(theory, dict):
         raise ManifestError("verification package lean_theory is invalid")
@@ -93,6 +100,10 @@ def validate_package(value: dict[str, Any]) -> None:
             raise ManifestError(f"verification package lean_theory.{key} must be a non-empty string array")
     if not isinstance(value.get("interface_contract"), dict):
         raise ManifestError("verification package interface_contract must be an object")
+    axiom_policy = value.get("axiom_policy")
+    if not isinstance(axiom_policy, dict) or not isinstance(axiom_policy.get("additional_allowed"), list) \
+            or any(not isinstance(item, str) or not item for item in axiom_policy["additional_allowed"]):
+        raise ManifestError("verification package axiom_policy.additional_allowed must be a string array")
     bindings = value.get("binding_choices")
     if not isinstance(bindings, list):
         raise ManifestError("verification package binding_choices must be an array")
@@ -107,8 +118,15 @@ def validate_package(value: dict[str, Any]) -> None:
     if not isinstance(assumptions, list):
         raise ManifestError("verification package external_assumptions must be an array")
     for assumption in assumptions:
-        if not isinstance(assumption, dict) or not isinstance(assumption.get("premise_id"), str):
-            raise ManifestError("each external assumption needs a string premise_id")
+        if not isinstance(assumption, dict) or not all(
+            isinstance(assumption.get(key), str) and assumption[key]
+            for key in ("premise_id", "proposition_fingerprint", "rationale")
+        ):
+            raise ManifestError(
+                "each external assumption needs string premise_id/proposition_fingerprint/rationale "
+                "-- a bare premise_id is not enough to identify which exact proposition was accepted "
+                "(spec/theorem-centric-gaps issue 7)"
+            )
         if not any(
             assumption["premise_id"] == entrypoint or assumption["premise_id"].startswith(entrypoint + "#")
             for entrypoint in theory["entrypoints"]

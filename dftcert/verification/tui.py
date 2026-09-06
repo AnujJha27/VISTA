@@ -9,21 +9,19 @@ semantics of its own.
 independent of `curses`, so they're testable without a real screen -- the
 same split `dftcert.tui` already uses (`render_plain` vs `curses.wrapper`).
 
-Known scope gap: section 15's `[b] choose artifact binding` action for an
-`ambiguous_binding` node is not wired here yet. Resolving an ambiguity is
-a `binding_choices` entry in the *package*, not session-local state, so
-doing it live would mean this TUI writing to the package file and
-re-invoking `start_session` (which re-runs Lean) rather than just calling
-a `VerificationSession` method. Today that path works end to end through
-`VerificationPackageBuilder(binding_choices=...)` + `vista verify start`
-(see `tests/test_verification_session.py`); it is just not yet reachable
-from inside `interact` without leaving it. A weaker-but-sound gap, not a
-guess -- nothing here silently picks among ambiguous candidates.
+The `[b] choose binding` action for an `ambiguous_binding` node writes the
+choice into the package file itself via `package.add_binding_choice` (a
+binding choice is authored package state, not TUI-local/session-local
+state -- spec issues 7/9) and tells the user to re-run `vista verify
+start`, which re-checks the choice against Lean and produces a fresh
+session; it never flips a node's status in this process without Lean
+re-verifying it, and never silently picks among ambiguous candidates.
 """
 from __future__ import annotations
 
 from typing import Any
 
+from .package import add_binding_choice
 from .session import VerificationSession, resume_session
 
 _STATUS_TAG = {
@@ -77,7 +75,10 @@ def node_detail_lines(session: dict[str, Any], node_id: str) -> list[str]:
         f"  {node['pretty_type']}", "",
     ]
     if node["status"] == "ambiguous_binding":
-        lines += ["Candidates that typecheck:", *[f"  {key}" for key in node["candidate_keys"]], ""]
+        lines += [
+            "Candidates that typecheck:", *[f"  {key}" for key in node["candidate_keys"]], "",
+            "Actions:", "  [b] choose binding", "  [q] save and quit",
+        ]
     elif node["status"] == "unresolved":
         lines += [
             "Available resolution:", "  no artifact binding", "  no verified formal proof",
@@ -93,10 +94,13 @@ def node_detail_lines(session: dict[str, Any], node_id: str) -> list[str]:
     return lines
 
 
-def run_interactive(session_path: str) -> int:
-    """`vista verify interact --session ...`. Never provides "assume
-    everything" -- exactly one exact proposition at a time, saved
-    immediately (spec section 15)."""
+def run_interactive(session_path: str, *, package_path: str | None = None) -> int:
+    """`vista verify interact --session ... --package ...`. Never provides
+    "assume everything" -- exactly one exact proposition at a time, saved
+    immediately (spec section 15). `package_path` enables `[b] choose
+    binding` for an `ambiguous_binding` node; without it that action is
+    unavailable (the node can still be inspected, just not resolved from
+    inside `interact`)."""
     import curses
 
     session = resume_session(session_path)
@@ -150,6 +154,28 @@ def run_interactive(session_path: str) -> int:
                 curses.noecho()
                 session.accept_assumption(premise_id=current_id, rationale=rationale or "accepted via TUI")
                 message = f"accepted {current_id} as an explicit assumption"
+            elif key in ("b", "B"):
+                node = session.value["nodes"][current_id]
+                if node["kind"] != "data" or node["status"] != "ambiguous_binding":
+                    message = f"{current_id} is not an ambiguous binding"
+                    continue
+                if package_path is None:
+                    message = "no --package given; cannot record a binding choice"
+                    continue
+                curses.echo()
+                prompt = f"choose one of {node['candidate_keys']}: "
+                screen.addstr(detail_row + 21, 0, prompt)
+                screen.refresh()
+                chosen = screen.getstr(detail_row + 21, len(prompt), 200).decode("utf-8", errors="replace").strip()
+                curses.noecho()
+                if chosen not in node["candidate_keys"]:
+                    message = f"{chosen!r} is not one of the candidates that typecheck; not recorded"
+                    continue
+                add_binding_choice(
+                    package_path, entrypoint=node["entrypoint"],
+                    binder_path=node["binder_path"], candidate_key=chosen,
+                )
+                message = f"recorded {chosen!r} for {current_id} in the package -- re-run `vista verify start` to apply it"
 
     curses.wrapper(main)
     return 0
