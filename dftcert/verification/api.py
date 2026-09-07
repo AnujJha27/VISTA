@@ -17,8 +17,16 @@ from pathlib import Path
 from typing import Any
 
 from ..manifest import ManifestError, sha256_value
-from ..structural.dft_capability_plugin import DFT_CAPABILITY_PLUGIN
-from ..structural.plugin import StructuralPlugin
+# research-readiness audit issue 7: the verification harness looks up a
+# domain adapter only through the generic registry owned by the
+# structural/plugin boundary (`dftcert.structural.plugin`) -- it never
+# imports a concrete domain plugin module (e.g. `dft_capability_plugin`)
+# by name itself. Importing the `dftcert.structural` package (not any one
+# plugin inside it) is what causes built-in adapters to self-register;
+# this is a bootstrap side effect of that package's own `__init__`, not a
+# harness-side dependency on any one domain.
+from .. import structural as _structural_domains  # noqa: F401
+from ..structural.plugin import StructuralPlugin, get_adapter
 from .certificate import assemble_certificate_report, generate_certificate_source, parse_certificate_axiom_closure
 from .lean_inspect import inspect_declarations
 from .package import load_package, package_sha256
@@ -30,14 +38,10 @@ from .session import (
 
 DEFAULT_ALLOWED_AXIOMS = frozenset({"propext", "Classical.choice", "Quot.sound"})
 
-_ADAPTERS_BY_PROFILE: dict[str, StructuralPlugin] = {
-    DFT_CAPABILITY_PLUGIN.name: DFT_CAPABILITY_PLUGIN,
-}
-
 
 def _resolve_adapter(package: dict[str, Any]) -> StructuralPlugin:
     profile = package["adapter"]["profile"]
-    adapter = _ADAPTERS_BY_PROFILE.get(profile)
+    adapter = get_adapter(profile)
     if adapter is None:
         raise ManifestError(f"no known adapter for profile {profile!r}")
     return adapter
@@ -195,9 +199,52 @@ def resume_session(
     return resumed
 
 
+def _require_assumptions_are_package_normalized(
+    resumed: VerificationSession, package_value: dict[str, Any], targets: list[str],
+) -> None:
+    """research-readiness audit issue 2: every assumption a certified
+    target actually relies on must be represented exactly in the resolved
+    verification package whose hash the certificate is bound to -- never
+    merely present in the session (which `VerificationSession.
+    accept_assumption` can set without ever touching the package, e.g. a
+    quick session-local/exploratory decision). Certification never
+    silently copies a session-local decision into the package here (that
+    would mutate specification state as a side effect of certifying) --
+    it only ever refuses. The canonical, certifiable route for an
+    assumption is `dftcert.verification.package.add_external_assumption`
+    followed by re-deriving the session, exactly like a binding choice.
+
+    Matched by the `(proposition_fingerprint, rationale)` pair rather than
+    by `premise_id`: a premise's own companion Prop-sorted data binder
+    (`_apply_companion_conversions`) carries a *copy* of the premise's
+    `external_assumption` with `premise_id` rewritten to the companion's
+    own node id (for self-describing certificate reports) -- so the
+    companion's node id is never itself a key in the package's
+    `external_assumptions`, even though it legitimately shares the same
+    authored proposition/rationale as the premise it derives from."""
+    package_assumptions = {
+        (item["proposition_fingerprint"], item["rationale"])
+        for item in package_value.get("external_assumptions", [])
+    }
+    for node_id, node in resumed.value["nodes"].items():
+        if node["status"] != "specified_assumption" or node["entrypoint"] not in targets:
+            continue
+        session_assumption = node.get("external_assumption") or {}
+        key = (session_assumption.get("proposition_fingerprint"), session_assumption.get("rationale"))
+        if key not in package_assumptions:
+            raise ManifestError(
+                f"node {node_id!r} is a specified_assumption in the session but is not "
+                f"represented (or does not exactly match) in the resolved package's "
+                f"external_assumptions -- a session-local acceptance (`VerificationSession."
+                f"accept_assumption`) is exploratory only and can never certify on its own; "
+                f"author it into the package via `add_external_assumption(...)` and re-derive "
+                f"the session before certifying (research-readiness audit issue 2)"
+            )
+
+
 def certify_session(
     *, session: str | Path, package: str | Path, project: str | Path,
-    lean_import: str, output_dir: str | Path, entrypoints: list[str] | None = None,
+    output_dir: str | Path, entrypoints: list[str] | None = None,
     allow_subset_certificate: bool = False,
     namespace: str | None = None, lean_command=("lake", "env", "lean", "-j", "1"),
     timeout_s: int = 300, trusted_local: bool = False,
@@ -209,6 +256,23 @@ def certify_session(
     `ready_for_certificate`, if `package` doesn't match what the session
     was built from, or if the Lean project has drifted since the package
     was authored.
+
+    Also refuses if any certified target relies on a `specified_assumption`
+    node that is not represented exactly (same `proposition_fingerprint`
+    and `rationale`) in the resolved package's own `external_assumptions`
+    (research-readiness audit issue 2) -- a session-local-only
+    `VerificationSession.accept_assumption` is exploratory and can never
+    certify by itself; author the assumption into the package via
+    `dftcert.verification.package.add_external_assumption` and re-derive
+    the session first.
+
+    There is no separate `lean_import`/runtime import override (spec/
+    theorem-centric-gaps issue 1): every module imported while resolving
+    the selected theorem, generating the certificate, compiling it, and
+    inspecting its axiom closure is exactly `package["lean_theory"][
+    "entry_modules"]` -- the same package whose hash this bundle is bound
+    to. There is no second, caller-suppliable formal environment capable
+    of diverging from the one the package hash already commits to.
 
     By default certifies every entrypoint the package selected. Passing
     `entrypoints` as a strict subset of those produces a debug/partial
@@ -241,12 +305,14 @@ def certify_session(
             f"({targets} of {package_entrypoints}) -- pass allow_subset_certificate=True to "
             f"explicitly certify a non-package-complete debug bundle (spec/theorem-centric-gaps issue G)"
         )
+    _require_assumptions_are_package_normalized(resumed, package_value, targets)
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+    entry_modules = package_value["lean_theory"]["entry_modules"]
     per_target = [
         _certify_one(
             session=resumed, package=package_value, entrypoint=entrypoint, project_root=project,
-            lean_import=lean_import,
+            entry_modules=entry_modules,
             namespace=namespace or f"VISTA.Generated_{resumed.value['ir_sha256'][:12]}_{entrypoint.replace('.', '_')}",
             output_dir=out_dir, lean_command=lean_command, timeout_s=timeout_s, trusted_local=trusted_local,
         )
@@ -275,11 +341,11 @@ def certify_session(
 
 def _certify_one(
     *, session: VerificationSession, package: dict[str, Any], entrypoint: str,
-    project_root: str | Path, lean_import: str, namespace: str, output_dir: Path,
+    project_root: str | Path, entry_modules: list[str], namespace: str, output_dir: Path,
     lean_command, timeout_s: int, trusted_local: bool,
 ) -> dict[str, Any]:
     full_source = generate_certificate_source(
-        session=session.value, entrypoint=entrypoint, namespace=namespace, lean_import=lean_import,
+        session=session.value, entrypoint=entrypoint, namespace=namespace, entry_modules=entry_modules,
         project_root=project_root, lean_command=lean_command, timeout_s=timeout_s, trusted_local=trusted_local,
     )
     safe_name = entrypoint.replace(".", "_")
@@ -295,7 +361,7 @@ def _certify_one(
     # Recorded for audit only -- the selected entrypoint's own axiom
     # closure never gates certification (issue C).
     entrypoint_introspected = inspect_declarations(
-        project_root=project_root, imports=[lean_import], declarations=[entrypoint],
+        project_root=project_root, imports=entry_modules, declarations=[entrypoint],
         lean_command=lean_command, timeout_s=timeout_s, trusted_local=trusted_local,
     )[entrypoint]
     from ..structural.core import verify_structural_certificate
@@ -319,10 +385,44 @@ def _certify_one(
     report_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return {
         "entrypoint": entrypoint, "status": report["status"], "conditional": report["conditional"],
-        "source": str(source_path.resolve()), "report": str(report_path.resolve()),
+        # research-readiness audit issue 8: `manifest.json` records paths
+        # relative to the bundle root (`output_dir`), never absolute --
+        # an absolute path bakes in the exact machine/directory the bundle
+        # happened to be produced under, making the bundle non-portable
+        # (e.g. copied to another machine, or even just a different
+        # checkout path on the same machine). `posix_path` (forward
+        # slashes) keeps the recorded path identical across platforms, not
+        # merely relative -- `verify_certificate_bundle` resolves it back
+        # against its own `bundle_dir` root.
+        "source": source_path.relative_to(output_dir).as_posix(),
+        "report": report_path.relative_to(output_dir).as_posix(),
         "certificate_source_sha256": report["certificate_source_sha256"],
         "report_sha256": report["report_sha256"],
     }
+
+
+def _resolve_bundle_relative_path(bundle_root: Path, relative: str) -> Path:
+    """Safely resolve a `manifest.json`-recorded path (research-readiness
+    audit issue 8: always bundle-root-relative, never absolute) against
+    `bundle_root`. Fails closed (`ManifestError`) rather than reading
+    anything for: an absolute path (would ignore `bundle_root` entirely --
+    checked explicitly before ever joining, since joining a `Path` with an
+    absolute right-hand side silently discards the left side); a `..`
+    (or symlink) that resolves outside `bundle_root` once both sides are
+    fully resolved. A tampered/malicious manifest can therefore never make
+    this function read a file outside the bundle directory."""
+    candidate = Path(relative)
+    if candidate.is_absolute():
+        raise ManifestError(
+            f"certificate bundle path {relative!r} must be relative to the bundle root, not absolute"
+        )
+    root_resolved = bundle_root.resolve()
+    resolved = (bundle_root / candidate).resolve()
+    if not resolved.is_relative_to(root_resolved):
+        raise ManifestError(
+            f"certificate bundle path {relative!r} escapes the bundle root {bundle_root!r}"
+        )
+    return resolved
 
 
 def verify_certificate_bundle(
@@ -330,6 +430,7 @@ def verify_certificate_bundle(
     extraction_result: str | Path | None = None, package: str | Path | None = None,
     project: str | Path | None = None, bubblewrap: str = "bwrap",
     extractor_python: str = "/usr/bin/python3", trusted_local: bool = False,
+    full: bool = False, lean_command=("lake", "env", "lean", "-j", "1"), timeout_s: int = 300,
 ) -> dict[str, Any]:
     """Independently re-derive and check every hash/fingerprint a certified
     bundle (`certify_session`'s `output_dir`) claims about itself
@@ -345,7 +446,41 @@ def verify_certificate_bundle(
     the package's current hash, the live adapter identity, the live
     Lean-project fingerprint, and the artifact hash from a fresh
     extraction -- each against the manifest's own recorded binding.
-    Returns `{"consistent": bool, "checks": {name: {"ok": bool, ...}}}`."""
+
+    The manifest's per-target `source`/`report` paths are bundle-root-
+    relative (research-readiness audit issue 8), so a bundle directory can
+    be moved or copied elsewhere and still verify; they are resolved here
+    via `_resolve_bundle_relative_path`, which refuses (rather than
+    silently reading) an absolute path or one that resolves outside
+    `bundle_dir` (`..` traversal or a symlink escape).
+
+    `full=True` (research-readiness audit issue 9) is a strictly stronger,
+    explicitly separate mode from the lightweight self-consistency check
+    above: instead of only re-hashing bytes already on disk, it actually
+    invokes the live Lean toolchain again -- recompiling each certificate
+    `.lean` source file from scratch, recomputing the freshly-compiled
+    GENERATED certificate declaration's own axiom closure (never the
+    entrypoint's -- same distinction `certify_session` itself draws), and
+    reapplying the live package's `axiom_policy` to that fresh closure --
+    catching a drifted/reinstalled Lean toolchain or mathlib revision that
+    now silently accepts (or rejects) something the original certification
+    run did not. Requires both `package` and `project` (there is nothing to
+    recompile against without a live Lean project). Still explicitly does
+    NOT re-derive a fresh session from the artifact/inventory end to end
+    (that would mean re-running the entire resolution pipeline, not just
+    re-checking the bundle) -- documented as a known remaining gap, never
+    silently implied by `full=True`. Neither mode is, or claims to be,
+    cryptographic tamper-evidence (no signature, no tamper-evident log) --
+    both only prove internal/live consistency, stated explicitly here and
+    in `docs/verification/TRUST_CHAIN_AUDIT.md`.
+
+    Returns `{"consistent": bool, "mode": "full" | "lightweight",
+    "checks": {name: {"ok": bool, ...}}}`."""
+    if full and (package is None or project is None):
+        raise ManifestError(
+            "verify_certificate_bundle(full=True) requires both package and project -- "
+            "recompiling each certificate needs a live Lean project to compile it against"
+        )
     bundle = Path(bundle_dir)
     manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
     checks: dict[str, Any] = {}
@@ -371,8 +506,8 @@ def verify_certificate_bundle(
 
     for item in manifest.get("per_target", []):
         entrypoint = item["entrypoint"]
-        source_path = Path(item["source"])
-        report_path = Path(item["report"])
+        source_path = _resolve_bundle_relative_path(bundle, item["source"])
+        report_path = _resolve_bundle_relative_path(bundle, item["report"])
         source_hash = hashlib.sha256(source_path.read_bytes()).hexdigest()
         checks[f"{entrypoint}:certificate_source_hash"] = {
             "ok": source_hash == item.get("certificate_source_sha256"),
@@ -422,5 +557,45 @@ def verify_certificate_bundle(
             "recorded": manifest["artifact_binding"]["artifact_sha256"], "recomputed": result["artifact_sha256"],
         }
 
+    if full:
+        # research-readiness audit issue 9: package is already loaded above
+        # (full=True requires it) -- reused here rather than reloaded.
+        from ..structural.core import verify_structural_certificate
+        allowed = DEFAULT_ALLOWED_AXIOMS | frozenset(package_value.get("axiom_policy", {}).get("additional_allowed", []))
+        for item in manifest.get("per_target", []):
+            entrypoint = item["entrypoint"]
+            source_path = _resolve_bundle_relative_path(bundle, item["source"])
+            compiled = verify_structural_certificate(
+                project_root=project, certificate_source=source_path,
+                lean_command=lean_command, timeout_s=timeout_s, trusted_local=trusted_local,
+            )
+            checks[f"{entrypoint}:full_recompile"] = {
+                "ok": compiled["status"] == "verified",
+                **({"diagnostics": compiled["diagnostics"]} if compiled["status"] != "verified" else {}),
+            }
+            if compiled["status"] != "verified":
+                continue
+            fresh_closure = parse_certificate_axiom_closure(compiled["diagnostics"])
+            blocking = sorted(set(fresh_closure) - allowed)
+            checks[f"{entrypoint}:full_axiom_policy_reapplied"] = {
+                "ok": "sorryAx" not in fresh_closure and not blocking,
+                "recomputed_axiom_closure": sorted(fresh_closure), "allowed_axioms": sorted(allowed),
+                "blocking_axioms": blocking,
+            }
+        # Step 10 (re-deriving a fresh session from the artifact/inventory
+        # end to end, not merely recompiling the already-generated
+        # certificate sources) is a known, documented gap -- deliberately
+        # not attempted here, and never silently implied by `full=True`.
+        checks["full_reverification_scope_note"] = {
+            "ok": True,
+            "note": (
+                "full=True recompiles each certificate and reapplies the live axiom "
+                "policy; it does NOT re-derive a fresh session from the artifact/"
+                "inventory end to end (that would re-run the entire resolution "
+                "pipeline, not just re-check this bundle) -- documented remaining gap, "
+                "research-readiness audit issue 9"
+            ),
+        }
+
     consistent = all(check.get("ok", False) for check in checks.values())
-    return {"consistent": consistent, "checks": checks}
+    return {"consistent": consistent, "mode": "full" if full else "lightweight", "checks": checks}

@@ -155,7 +155,7 @@ make orchestrator-test
 ```
 
 For artifact reproduction, run the top-level sequence in
-[REPRODUCIBILITY.md](REPRODUCIBILITY.md).
+[REPRODUCIBILITY.md](../REPRODUCIBILITY.md).
 
 ## Task protocol
 

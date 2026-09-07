@@ -13,6 +13,7 @@ verify`'s CLI calls these same functions, never a second implementation:
     from dftcert.verification import (
         VerificationPackageBuilder, start_session, resume_session, certify_session,
     )
+    from dftcert.verification.package import add_external_assumption
 
     package = VerificationPackageBuilder(
         lean_project="examples/dft/lean", entrypoints=[...],
@@ -24,12 +25,26 @@ verify`'s CLI calls these same functions, never a second implementation:
         artifact="model.pt2", package="vista-package.json",
         session="session.json", project="examples/dft/lean", trusted_local=True,
     )
+
+    # An explicit external assumption is authored into the PACKAGE, not the
+    # session (research-readiness audit issue 2: `VerificationSession.
+    # accept_assumption` is a session-local/exploratory decision only --
+    # it can never by itself make a target certifiable). Re-deriving the
+    # session from the now-changed package is what actually applies it,
+    # exactly like a binding choice.
     for premise in session.unresolved_premises:
-        session.accept_assumption(premise_id=premise["id"], rationale="...")
+        add_external_assumption(
+            "vista-package.json", premise_id=premise["id"],
+            proposition_fingerprint=premise["type_fingerprint"], rationale="...",
+        )
+    session = start_session(
+        artifact="model.pt2", package="vista-package.json",
+        session="session.json", project="examples/dft/lean", trusted_local=True,
+    )
 
     certify_session(
         session="session.json", package="vista-package.json", project="examples/dft/lean",
-        lean_import="Testv2.Requirements", output_dir="build/vista/certificate", trusted_local=True,
+        output_dir="build/vista/certificate", trusted_local=True,
     )
 
 The defensible claim this package establishes: VISTA checks whether
@@ -43,7 +58,17 @@ Trust boundary, by node/fact provenance:
 
     EXTRACTED           exact artifact hash, graph/state facts directly
                         from safe extraction (`dftcert.sandbox`/
-                        `extractors.torch_export_worker`).
+                        `extractors.torch_export_worker`) -- unless the
+                        caller passed `trusted_local=True` with an
+                        already-produced extraction result (no Bubblewrap
+                        sandbox, no real artifact bytes read for this
+                        session at all), in which case these facts are
+                        only as trustworthy as that JSON file the caller
+                        supplied; VISTA re-derives the IR *from* it but has
+                        no way to independently confirm the file itself
+                        came from genuine artifact bytes (see
+                        `docs/verification/TRUST_CHAIN_AUDIT.md` section 2's
+                        trusted-local row).
     INFERRED / DERIVED  adapter semantic classifications (`artifact_
                         grounded` nodes) recomputed from extracted
                         evidence, independently revalidated against it.

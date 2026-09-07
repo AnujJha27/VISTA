@@ -52,10 +52,20 @@ def _inventory(*, adjacency, stages, symmetrized=True):
         "args": [[_ref("relu"), _ref(operator_root), _ref(current)]], "kwargs": {},
     })
     # No numeric `structural_values` anywhere -- the capability plugin needs none.
-    state = {"adjacency": {
-        "structural_values": adjacency, "graph_inputs": ["b_adjacency"],
-        "shape": [site_count, site_count], "dtype": "torch.bool", "sha256": "a",
-    }}
+    state = {
+        "adjacency": {
+            "structural_values": adjacency, "graph_inputs": ["b_adjacency"],
+            "shape": [site_count, site_count], "dtype": "torch.bool", "sha256": "a",
+        },
+        # research-readiness audit issue 5: `unconstrained_parameter`
+        # capacity now requires POSITIVE evidence of trainability -- this
+        # fixture's own intent (a genuine trainable weight, as its every
+        # caller's assertions confirm) needs a real `state_kind` marker,
+        # matching torch.export's own `InputKind.PARAMETER`, not the old
+        # fail-open default that let a bare placeholder with no
+        # classification at all pass silently.
+        "p_base": {"graph_inputs": ["p_base"], "shape": [site_count, site_count], "state_kind": "InputKind.PARAMETER"},
+    }
     return {"nodes": nodes, "state": state}
 
 
@@ -166,7 +176,13 @@ class NonLocalCapacityTests(unittest.TestCase):
 
     def test_certifiable_without_any_extracted_floats(self):
         inventory = _inventory(adjacency=_RING3, stages=1, symmetrized=True)
-        self.assertEqual(set(inventory["state"]), {"adjacency"})  # no numeric weights at all
+        # No numeric weight values anywhere -- `p_base`'s own state entry
+        # (added for issue 5's positive-parameter-classification
+        # requirement) carries only graph_inputs/shape/state_kind
+        # metadata, never a `structural_values` payload (`adjacency`'s own
+        # boolean structural buffer is the one legitimate exception --
+        # architecture shape, never a trained weight).
+        self.assertNotIn("structural_values", inventory["state"]["p_base"])
         ir = structural_ir_from_inventory(
             inventory=inventory, artifact_sha256="a", extractor_version="t",
             input_constraints=_constraints("non_local"), plugin=DFT_CAPABILITY_PLUGIN,

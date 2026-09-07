@@ -33,6 +33,28 @@ A single Lean invocation per entrypoint does the whole walk: capture raw
 (pre-assignment) binder types and dependency edges, resolve left to right,
 then report final status per binder -- never two separate probes redoing
 the same telescope (the previous `bindings.py`/`resolver.py` split).
+
+Research-readiness audit issue 11 -- an important scope distinction, worth
+stating plainly rather than leaving implicit: what this module does is
+theorem-driven binder/obligation SELECTION. The full structural IR
+(`dftcert.structural.core.structural_ir_from_inventory`) is always derived
+first, unconditionally, from the raw artifact inventory alone -- topology,
+message-passing depth, XC form, operator construction, capabilities -- with
+no awareness of which Lean entrypoint(s) a package even selected. This
+module then walks the SELECTED theorem's own binder telescope and asks,
+per binder, whether one of those already-computed, already-derived facts
+happens to fill it. What is explicitly NOT implemented anywhere in this
+codebase is theorem-driven MINIMAL IR CONSTRUCTION -- an architecture where
+the selected theorem's requirements would instead drive *which* structural
+facts get derived from the artifact in the first place, deriving only what
+that theorem's binders actually need and skipping the rest. VISTA always
+computes the full, fixed set of structural facts a plugin's `derive` knows
+how to compute, regardless of theorem selection; selection only chooses
+among facts that already exist. This is a real architectural scope
+boundary, not a bug -- it does not affect soundness (a resolved binder is
+still checked candidate-by-candidate against real evidence) -- and is
+recorded here as a documented distinction, not as a redesign in progress:
+no lazy/on-demand IR construction is planned or implied.
 """
 from __future__ import annotations
 

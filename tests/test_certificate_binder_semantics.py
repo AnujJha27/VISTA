@@ -65,7 +65,7 @@ def _session_for(
 
 def _certify(session: VerificationSession, entrypoint: str, module: str, namespace: str):
     source = generate_certificate_source(
-        session=session.value, entrypoint=entrypoint, namespace=namespace, lean_import=module,
+        session=session.value, entrypoint=entrypoint, namespace=namespace, entry_modules=[module],
         project_root=PROJECT, trusted_local=True, timeout_s=120,
     )
     import subprocess
@@ -149,7 +149,7 @@ class ImplicitInstanceCertificateTests(unittest.TestCase):
         with self.assertRaises(ManifestError):
             generate_certificate_source(
                 session=session.value, entrypoint="Testv2.InspectionFixtures.implicitBinderExample",
-                namespace="VISTA.TestBlocked", lean_import="Testv2.InspectionFixtures",
+                namespace="VISTA.TestBlocked", entry_modules=["Testv2.InspectionFixtures"],
                 project_root=PROJECT, trusted_local=True, timeout_s=120,
             )
 
@@ -210,7 +210,7 @@ class ExternalAssumptionTypingTests(unittest.TestCase):
         with self.assertRaises(ManifestError):
             generate_certificate_source(
                 session=session.value, entrypoint="Testv2.InspectionFixtures.natDependentPredicate",
-                namespace="VISTA.TestCase3", lean_import="Testv2.InspectionFixtures",
+                namespace="VISTA.TestCase3", entry_modules=["Testv2.InspectionFixtures"],
                 project_root=PROJECT, trusted_local=True, timeout_s=120,
             )
 

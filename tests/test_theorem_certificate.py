@@ -60,7 +60,7 @@ def _ready_session(entrypoint, tmp, **package_overrides):
 
 def _generate(session, entrypoint, namespace):
     return generate_certificate_source(
-        session=session.value, entrypoint=entrypoint, namespace=namespace, lean_import="Testv2.Requirements",
+        session=session.value, entrypoint=entrypoint, namespace=namespace, entry_modules=["Testv2.Requirements"],
         project_root=PROJECT, trusted_local=True, timeout_s=180,
     )
 
@@ -111,6 +111,14 @@ class UnconditionalCertificateTests(unittest.TestCase):
             self.assertEqual(report["external_assumptions"], [])
             self.assertEqual(report["status"], "certified")
             self.assertTrue(report["used_facts"], "used_facts should list the IR evidence nodes actually relied on")
+            # research-readiness audit issue 10: adjacency selection
+            # provenance is surfaced directly on the report -- `_constraints()`
+            # declares `adjacency_state_name: "adjacency"`, which matches the
+            # fixture's own state entry name exactly, so selection is
+            # `declared`, not a `heuristic_name_match` fallback.
+            self.assertEqual(report["adjacency_selection"], {
+                "selected_state_name": "adjacency", "selection_provenance": "declared",
+            })
 
 
 @unittest.skipUnless(_HAS_LEAN, _SKIP_REASON)

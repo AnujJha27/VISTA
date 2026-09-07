@@ -1,4 +1,4 @@
-"""The domain-plugin interface. See VISTA_GENERALIZATION.md.
+"""The domain-plugin interface. See docs/structural-v2/VISTA_GENERALIZATION.md.
 
 VISTA's harness (`dftcert.structural.core`) -- extraction plumbing, hashing,
 translation-validation re-derivation, certificate assembly/binding, Lean
@@ -38,6 +38,31 @@ def _output_roots(nodes: list[dict[str, Any]]) -> list[str]:
     if len(outputs) != 1:
         raise ManifestError("structural inventory requires exactly one output node")
     return _refs(outputs[0].get("args"))
+
+
+_ADAPTER_REGISTRY: dict[str, "StructuralPlugin"] = {}
+
+
+def register_adapter(plugin: "StructuralPlugin") -> None:
+    """Called by each domain plugin module itself (e.g.
+    `dft_capability_plugin.py`, at the bottom of the file, right after
+    constructing its singleton instance) -- never by a generic caller on a
+    domain plugin's behalf. This is the one place a domain plugin becomes
+    knowable to `get_adapter`/the generic verification harness (research-
+    readiness audit issue 7): the harness (`dftcert.verification.api`)
+    looks adapters up here by profile name, and never imports a concrete
+    domain plugin module by name itself -- keeping the dependency
+    direction verification-harness -> generic-registry, never
+    verification-harness -> concrete-domain-plugin."""
+    _ADAPTER_REGISTRY[plugin.name] = plugin
+
+
+def get_adapter(profile: str) -> "StructuralPlugin | None":
+    """Look up a registered domain plugin by its declared `name`/`profile`.
+    Returns `None` (never raises) for an unknown profile -- the caller
+    (`dftcert.verification.api._resolve_adapter`) is responsible for
+    failing closed with its own `ManifestError`."""
+    return _ADAPTER_REGISTRY.get(profile)
 
 
 class StructuralPlugin(ABC):

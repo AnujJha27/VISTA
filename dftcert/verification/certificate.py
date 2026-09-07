@@ -183,17 +183,23 @@ def _lean_index_list(indices: list[int]) -> str:
 
 
 def generate_certificate_source(
-    *, session: dict[str, Any], entrypoint: str, namespace: str, lean_import: str,
-    project_root: str | Path, imports: list[str] | None = None,
+    *, session: dict[str, Any], entrypoint: str, namespace: str, entry_modules: list[str],
+    project_root: str | Path,
     lean_command=("lake", "env", "lean", "-j", "1"), timeout_s: int = 300, trusted_local: bool = False,
 ) -> str:
     """The generated wrapper theorem's full Lean source, ready to append
-    after `import {lean_import}`. Raises if any node this target's root
-    set depends on is not in a resolved/discharged/assumed state -- no
-    certificate may be assembled while a required premise is unresolved
-    (spec section 19) -- or if Lean itself refuses the constructed
-    application (spec/theorem-centric-gaps issue A: Lean, not Python
-    string assembly, determines the final application)."""
+    after `import`ing every module in `entry_modules`. `entry_modules` must
+    be exactly `package["lean_theory"]["entry_modules"]` -- the package,
+    not a separate caller-supplied runtime import set, is the sole source
+    of the formal environment a certificate is built and checked against
+    (spec/theorem-centric-gaps issue 1: resolution and certificate
+    generation must never be able to run under two different imported
+    environments). Raises if any node this target's root set depends on is
+    not in a resolved/discharged/assumed state -- no certificate may be
+    assembled while a required premise is unresolved (spec section 19) --
+    or if Lean itself refuses the constructed application (spec/theorem-
+    centric-gaps issue A: Lean, not Python string assembly, determines the
+    final application)."""
     nodes = _ordered_nodes(session, entrypoint)
     if not nodes:
         raise ManifestError(f"no nodes recorded for entrypoint {entrypoint!r}")
@@ -225,9 +231,8 @@ def generate_certificate_source(
             else:
                 raise ManifestError(f"cannot generate certificate: node {node_id!r} is {status!r}, not resolved")
 
-    modules = imports if imports is not None else [lean_import]
     source = _PROBE.format(
-        imports="\n".join(f"import {module}" for module in modules),
+        imports="\n".join(f"import {module}" for module in entry_modules),
         entrypoint=_lean_string_literal(entrypoint),
         artifact_assignments=_lean_pair_list(artifact_assignments),
         proof_assignments=_lean_pair_list(proof_assignments),
@@ -243,7 +248,7 @@ def generate_certificate_source(
         raise ManifestError(f"certificate construction failed: {payload.get('message')}")
 
     lines = [
-        *(f"import {module}" for module in ["Lean", *modules]),
+        *(f"import {module}" for module in ["Lean", *entry_modules]),
         "",
         f"namespace {namespace}",
         "",
@@ -339,6 +344,12 @@ def assemble_certificate_report(
         "adapter_binding": session["adapter_binding"],
         "formal_package_binding": session["formal_package_binding"],
         "ir_sha256": session["ir_sha256"],
+        # research-readiness audit issue 10: which state entry was selected
+        # as "the adjacency" and how (`declared` vs `heuristic_name_match`)
+        # -- already hash-bound into `ir_sha256`, now also directly visible
+        # in the report itself rather than only recoverable by re-deriving
+        # the full IR by hand.
+        "adjacency_selection": session.get("adjacency_selection", {}),
         "certificate_source_sha256": hashlib.sha256(certificate_source.encode()).hexdigest(),
     }
     report["report_sha256"] = sha256_value(report)

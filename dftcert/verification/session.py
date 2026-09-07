@@ -358,6 +358,22 @@ def start_session(
     session["nodes"] = all_nodes
     session["targets"] = targets
     session["status"] = _session_status(all_nodes)
+    # research-readiness audit issue 10: surface which state entry was
+    # selected as "the adjacency" and how (`declared` -- the analyst's own
+    # `adjacency_state_name` -- vs `heuristic_name_match`, a fallback the
+    # tool applied because they didn't) -- already hash-bound into
+    # `ir_sha256` via `translation`/`semantic_derivations`, but previously
+    # not retrievable from the theorem-centric certificate report at all.
+    # `.get(...)` throughout: generic to any plugin's IR shape (narrowly
+    # scoped to exposing this one existing fact, not a general provenance
+    # redesign) -- absent for a plugin whose IR has no such notion, never
+    # a crash.
+    translation = artifact_ir.get("translation", {})
+    selection_metadata = translation.get("semantic_derivations", {}).get("topology", {}).get("metadata", {})
+    session["adjacency_selection"] = {
+        "selected_state_name": translation.get("topology", {}).get("state_name"),
+        "selection_provenance": selection_metadata.get("selection_provenance"),
+    }
     result = VerificationSession(session, path=output_path)
     result.save()
     return result

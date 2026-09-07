@@ -1,5 +1,5 @@
 """VISTA pre-training structural capability certification (domain-agnostic
-harness + pluggable domains; see VISTA_GENERALIZATION.md).
+harness + pluggable domains; see docs/structural-v2/VISTA_GENERALIZATION.md).
 `dft_capability_plugin.DFT_CAPABILITY_PLUGIN` is the default plugin every
 harness function uses unless another is passed."""
 

@@ -80,6 +80,10 @@ def parser() -> argparse.ArgumentParser:
     resume.add_argument("--trusted-local", action="store_true")
 
     certify = commands.add_parser("certify", help="generate + verify the final certificate theorem")
+    # No --lean-import: the package's own hash-bound `lean_theory.
+    # entry_modules` is the sole formal environment certification runs
+    # under (spec/theorem-centric-gaps issue 1) -- there is no second,
+    # caller-suppliable import set that could diverge from it.
     certify.add_argument("--session", required=True)
     certify.add_argument("--package", required=True)
     certify.add_argument("--project", required=True)
@@ -91,7 +95,6 @@ def parser() -> argparse.ArgumentParser:
              "(spec/theorem-centric-gaps issue G): the resulting bundle is marked "
              "certificate_scope=selected_subset, never claimed as a full package certificate",
     )
-    certify.add_argument("--lean-import", required=True)
     certify.add_argument("--namespace", default=None)
     certify.add_argument("--output-dir", required=True, help="directory to write the certificate bundle into")
     certify.add_argument("--lean-command", default="lake env lean -j 1")
@@ -110,6 +113,16 @@ def parser() -> argparse.ArgumentParser:
     verify_bundle.add_argument("--bubblewrap", default="bwrap")
     verify_bundle.add_argument("--extractor-python", default="/usr/bin/python3")
     verify_bundle.add_argument("--trusted-local", action="store_true")
+    verify_bundle.add_argument(
+        "--full", action="store_true",
+        help="research-readiness audit issue 9: strictly stronger than the default lightweight "
+             "self-consistency check -- actually recompiles each certificate with the live Lean "
+             "toolchain and reapplies the live axiom policy to the freshly-recomputed axiom "
+             "closure. Requires --package and --project (nothing to recompile against without a "
+             "live Lean project). Never a substitute for --package/--project on their own.",
+    )
+    verify_bundle.add_argument("--lean-command", default="lake env lean -j 1")
+    verify_bundle.add_argument("--timeout-s", type=int, default=300)
     return root
 
 
@@ -141,7 +154,7 @@ def main(argv: list[str] | None = None) -> int:
         elif options.command == "certify":
             manifest = api.certify_session(
                 session=options.session, package=options.package, project=options.project,
-                lean_import=options.lean_import, output_dir=options.output_dir,
+                output_dir=options.output_dir,
                 entrypoints=options.entrypoints, allow_subset_certificate=options.allow_subset_certificate,
                 namespace=options.namespace,
                 lean_command=shlex.split(options.lean_command), timeout_s=options.timeout_s,
@@ -161,7 +174,8 @@ def main(argv: list[str] | None = None) -> int:
                 options.bundle_dir, package=options.package, project=options.project,
                 artifact=options.artifact, extraction_result=options.extraction_result,
                 bubblewrap=options.bubblewrap, extractor_python=options.extractor_python,
-                trusted_local=options.trusted_local,
+                trusted_local=options.trusted_local, full=options.full,
+                lean_command=shlex.split(options.lean_command), timeout_s=options.timeout_s,
             )
             print(json.dumps(output, sort_keys=True, default=str))
             return 0 if output["consistent"] else 1

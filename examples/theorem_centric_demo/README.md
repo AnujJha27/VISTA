@@ -99,7 +99,7 @@ Certify, then independently re-verify the resulting bundle's own hashes
 python vista verify certify \
   --session examples/theorem_centric_demo/session.json \
   --package examples/theorem_centric_demo/vista-package.json \
-  --project examples/dft/lean --lean-import Testv2.Requirements \
+  --project examples/dft/lean \
   --output-dir examples/theorem_centric_demo/certificate \
   --trusted-local --timeout-s 180
 

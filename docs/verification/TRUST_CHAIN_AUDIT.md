@@ -59,7 +59,8 @@ should not) treat as a hash-bound trust boundary in the first place.
 | Mutation | Detected before certification? | Detected during certification? | Changes certificate identity? | Old certificate still incorrectly applicable? | Evidence |
 |---|---|---|---|---|---|
 | `model.pt2` bytes | Yes (`start_session`/`resume_session` artifact hash check) | — | Yes (`artifact_sha256`) | No | `test_changed_artifact_hash_goes_stale`, `test_tampered_artifact_bytes_change_the_hash`, `test_resume_rejects_changed_artifact` |
-| Extraction inventory (edited post-extraction, same artifact hash) | Yes (`structural_ir_from_inventory` → `validate_translation` independently re-derives every claim) | — | Yes (`inventory_sha256`) | No | `test_tampered_semantic_fact_after_extraction_cannot_certify`, `test_edited_semantic_fact_is_rejected_even_with_the_correct_artifact_hash` |
+| Extraction inventory (edited post-extraction, same artifact hash) -- **real-extraction path only** (`extract` ran against actual `.pt2` bytes inside the Bubblewrap sandbox, then the resulting inventory file was subsequently edited by hand before being handed to `structural_ir_from_inventory`) | Yes (`validate_translation` independently re-derives every semantic claim from the *raw graph nodes/args* still present in the inventory and compares -- an edit that changes a semantic claim without also editing the underlying raw graph shape consistently is caught) | — | Yes (`inventory_sha256`) | No | `test_tampered_semantic_fact_after_extraction_cannot_certify`, `test_edited_semantic_fact_is_rejected_even_with_the_correct_artifact_hash` |
+| Extraction inventory supplied directly via `--extraction-result`/`extraction_result=` with `--trusted-local`/`trusted_local=True` (bypasses the Bubblewrap sandbox entirely -- no real `.pt2` bytes are ever read for this session) | **Not detected, by design -- corrected from a prior overclaim.** `validate_translation` only proves the derived IR is *consistent with the supplied inventory*; it has no artifact bytes to re-derive that inventory from in the first place, so a fully hand-fabricated inventory describing a fictional architecture (internally self-consistent raw-graph nodes/args, matching semantic claims) passes exactly as cleanly as a genuine one. `trusted_local=True` is an explicit, named opt-in to this exact trust reduction (documented for testing/CI without a working sandbox, per `dftcert/verification/__init__.py`'s trusted-computing-base note) -- it is never claimed, and must never be claimed, that an edited trusted-local inventory is "necessarily detected". The real-artifact path (artifact bytes -> Bubblewrap `extract` -> inventory, never trusted-local) is unaffected by this row and remains covered by the row above. | Yes (`inventory_sha256`, same as any other inventory) | No -- the certificate is bound to whatever `artifact_sha256`/`inventory_sha256` the trusted-local input hashed to, honestly recording that no independent artifact-bytes re-derivation ever occurred | code inspection: `dftcert/verification/api.py::_extraction_result` (`trusted_local` gate), `dftcert/verification/__init__.py` trusted-computing-base docstring |
 | Interface contract | Yes (different `interface_contract` → different derived IR → different `ir_sha256`; never silently merged) | — | Yes | No | `test_interface_contract_mismatch_is_not_silently_combined` |
 | Output role mapping (`output_contracts`) | N/A — this is a *specified interface* value, not derived; a wrong-but-valid mapping is a documented interpretation choice, reflected as `specified_interface` provenance, never silently upgraded to `artifact_grounded` | — | Yes (part of `interface_contract`, hashed into `package_sha256`) | No (a re-derivation under a different contract always produces a different `ir_sha256`) | design: `StructuralPlugin.role_roots`; `dftcert/verification/__init__.py`'s documented provenance classes |
 | Operator layout (`operator.layout`) | Partially: a non-canonical (reordered) `output_axes`/`input_axes` shape is rejected outright (`ManifestError`); a canonical-but-semantically-wrong layout fails closed (the real adjoint-permutation check in `_is_adjoint_of` just won't match, so the operator falls through to `unsupported` rather than false-positive `symmetrized`) | — | Yes | No | code inspection: `dft_capability_plugin.py` lines ~143-155, ~179 |
@@ -143,3 +144,30 @@ does work and is documented, but is not CLI-exposed. Left as-is per this
 pass's own scope ("do not add broad new functionality unless required to
 fix a demonstrated problem") since the workflow is not actually broken —
 just less convenient to script than the interactive path.
+
+## 5. Selection vs. minimal construction (research-readiness audit issue 11)
+
+A scope distinction worth stating plainly, not a bug and not a redesign in
+progress:
+
+- **Theorem-driven binder/obligation SELECTION -- implemented.** The full
+  structural IR (`dftcert.structural.core.structural_ir_from_inventory`) is
+  derived first, unconditionally, from the raw artifact inventory alone --
+  with no awareness of which Lean entrypoint(s) a package even selected.
+  `dftcert.verification.resolver.resolve_entrypoint` then walks the
+  *selected* theorem's own binder telescope in Lean and asks, per binder,
+  whether one of those already-derived facts happens to fill it.
+- **Theorem-driven MINIMAL IR CONSTRUCTION -- not implemented, not planned.**
+  An architecture where the selected theorem's requirements would instead
+  drive *which* structural facts get derived from the artifact in the first
+  place (deriving only what that theorem's binders actually need, skipping
+  everything else) does not exist anywhere in this codebase. VISTA always
+  computes the full, fixed set of structural facts a plugin's `derive`
+  method knows how to compute, regardless of theorem selection; selection
+  only ever chooses among facts that already exist.
+
+This does not affect soundness -- a resolved binder is still checked
+candidate-by-candidate against real evidence either way -- and no lazy/
+on-demand IR construction work is in progress or implied by this document.
+See `dftcert/verification/resolver.py`'s own module docstring for the same
+distinction stated at the code level.

@@ -96,7 +96,7 @@ class RealArtifactEndToEndTests(unittest.TestCase):
             output_dir = Path(tmp) / "certificate"
             manifest = certify_session(
                 session=str(session_path), package=str(package_path), project=str(PROJECT),
-                lean_import="Testv2.Requirements", output_dir=str(output_dir),
+                output_dir=str(output_dir),
                 trusted_local=True, timeout_s=180,
             )
             self.assertEqual(manifest["status"], "certified")
@@ -196,7 +196,7 @@ class BubblewrapSandboxEndToEndTests(unittest.TestCase):
             output_dir = Path(tmp) / "certificate"
             manifest = certify_session(
                 session=str(session_path), package=str(package_path), project=str(PROJECT),
-                lean_import="Testv2.Requirements", output_dir=str(output_dir), timeout_s=180,
+                output_dir=str(output_dir), timeout_s=180,
             )
             self.assertEqual(manifest["status"], "certified")
             self.assertEqual(manifest["artifact_binding"]["artifact_sha256"], result["artifact_sha256"])

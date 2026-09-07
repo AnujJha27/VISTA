@@ -2,8 +2,8 @@
 
 This document describes the retained V1 policy pipeline under
 `dftcert.legacy`. Structural V2 is the primary architecture; see
-[the Structural V2 workflow](examples/dft/STRUCTURAL_V2.md) and its
-[translation specification](STRUCTURAL_V2_TRANSLATION_SPEC.md).
+[the Structural V2 workflow](../../examples/dft/STRUCTURAL_V2.md) and its
+[translation specification](../structural-v2/STRUCTURAL_V2_TRANSLATION_SPEC.md).
 
 This implementation is the first executable slice of
 [DFT_INTEGRATION_PLAN.md](DFT_INTEGRATION_PLAN.md). It establishes the trust
@@ -44,7 +44,7 @@ certificate have been checked.
 
 ## Policy
 
-The initial policy is [policies/dft-architecture-v1.json](policies/dft-architecture-v1.json).
+The initial policy is [policies/dft-architecture-v1.json](../../policies/dft-architecture-v1.json).
 Its domain choices are data rather than branches in the verifier. It points to
 the `Testv2` Lean library and requires:
 
@@ -53,7 +53,7 @@ the `Testv2` Lean library and requires:
 - self-adjointness.
 
 The proof-bearing example is
-[policies/lean/DFTArchitectureV1Example.lean](policies/lean/DFTArchitectureV1Example.lean).
+[policies/lean/DFTArchitectureV1Example.lean](../../policies/lean/DFTArchitectureV1Example.lean).
 It constructs an actual `ArchitectureManifest`, proves the final approval
 theorem, and binds the canonical example-manifest hash.
 

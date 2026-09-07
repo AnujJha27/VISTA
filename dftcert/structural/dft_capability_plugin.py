@@ -7,7 +7,7 @@ IR, or checks. There used to be a second, post-training plugin that read
 real trained weights to check numeric locality (`operator_locality_verified`)
 -- it has been removed entirely: this project's claim is a pre-training
 check, and keeping a post-training plugin alongside it made that claim
-ambiguous. See `STRUCTURAL_CAPABILITY_CHECKS.md`.
+ambiguous. See `docs/structural-v2/STRUCTURAL_CAPABILITY_CHECKS.md`.
 
 Checks:
 
@@ -38,7 +38,7 @@ from typing import Any
 
 from ..manifest import ManifestError
 from ..verification.model import FormalBindingCandidate
-from .plugin import StructuralPlugin, _refs
+from .plugin import StructuralPlugin, _refs, register_adapter
 
 _ZERO_TARGETS = {
     "aten.zeros.default", "aten.zeros_like.default", "aten.zero.default",
@@ -62,7 +62,7 @@ _MESSAGE_TARGETS = {
     "aten.matmul.default", "aten.mm.default", "aten.bmm.default", "aten.mv.default",
 }
 _NON_LOCAL_CAPABLE_RECIPES = {"sum_transpose", "param"}
-_NON_PARAMETER_STATE_KIND_MARKERS = ("user_input",)
+_TRAINABLE_PARAMETER_STATE_KIND_MARKERS = ("parameter",)
 
 
 def _observed_ops(nodes: list[dict[str, Any]]) -> list[str]:
@@ -202,24 +202,28 @@ def _operator_state_name(inventory: dict[str, Any], node_name: str) -> str | Non
 
 
 def _is_plausible_parameter_node(inventory: dict[str, Any], node_name: str) -> bool:
-    """Whether `node_name` does NOT resolve to a state entry the extractor
-    classified as a plain runtime input -- so a "built from an unconstrained
-    parameter" claim (implying trainable freedom, used for `non_local_capacity`)
-    can never secretly be built from a raw activation input that was never a
-    trainable weight at all. Fails permissive (True) when no classification
-    is available at all (`state_kind` absent or unrecognized, since a
-    hand-authored specification or an older extractor version may not carry
-    it); fails closed only on an explicit user-input classification -- a
-    real signal, not a guess."""
+    """Whether `node_name` resolves to a state entry the extractor
+    POSITIVELY classified as a genuine trainable parameter (torch export's
+    own `InputKind.PARAMETER`) -- required for the `unconstrained_parameter`
+    capacity claim (implying trainable freedom, used for `non_local_capacity`)
+    to never secretly be built from a raw activation input, a registered
+    buffer, a constant, or anything else that was never a trainable weight
+    at all (research-readiness audit issue 5). Fails CLOSED (False) on a
+    missing/unrecognized classification, a buffer, a constant, or an
+    explicit user-input signal alike -- only an explicit positive
+    "parameter" marker is accepted; there is no permissive default. Self-
+    adjointness (`guaranteedSelfAdjoint`) is a separate, unaffected
+    property -- `B + B^dagger` is self-adjoint for *any* `B`, trainable or
+    not, so the `symmetrized` recipe never calls this function at all."""
     state = inventory.get("state", {})
     if not isinstance(state, dict):
-        return True
+        return False
     state_name = _operator_state_name(inventory, node_name)
     entry = state.get(state_name) if state_name else None
     if not isinstance(entry, dict):
-        return True
+        return False
     kind = str(entry.get("state_kind", "")).lower()
-    return not any(marker in kind for marker in _NON_PARAMETER_STATE_KIND_MARKERS)
+    return any(marker in kind for marker in _TRAINABLE_PARAMETER_STATE_KIND_MARKERS)
 
 
 def _operator_construction(
@@ -962,3 +966,8 @@ class DFTCapabilityPlugin(StructuralPlugin):
 
 
 DFT_CAPABILITY_PLUGIN = DFTCapabilityPlugin()
+# research-readiness audit issue 7: self-registers into the generic
+# structural/plugin-boundary registry so the theorem-centric verification
+# harness (`dftcert.verification.api`) can look this adapter up by profile
+# name without ever importing this concrete module itself.
+register_adapter(DFT_CAPABILITY_PLUGIN)

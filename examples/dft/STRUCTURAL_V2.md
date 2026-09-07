@@ -6,7 +6,7 @@ does not evaluate floating-point outputs or claim that trained weights are
 physically accurate.
 
 The exact supported Torch patterns and their assumptions are specified in
-[the Structural V2 translation specification](../../STRUCTURAL_V2_TRANSLATION_SPEC.md).
+[the Structural V2 translation specification](../../docs/structural-v2/STRUCTURAL_V2_TRANSLATION_SPEC.md).
 
 ```text
 model.py

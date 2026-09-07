@@ -91,6 +91,20 @@ class NoOpTransposeIsNotAnAdjointTests(unittest.TestCase):
     def test_permute_actually_swapping_the_two_axes_is_symmetrized(self):
         self.assertEqual(_construction(adjoint_target="aten.permute.default", adjoint_args=[_ref("p_base"), [1, 0]]), "symmetrized")
 
+    def test_symmetrized_recognition_does_not_depend_on_parameter_classification(self):
+        """research-readiness audit issue 5: the two properties are kept
+        separate -- `_inventory`'s own `state["base"]` entry (used by
+        every test above) never sets `state_kind` at all, and "symmetrized"
+        is still recognized regardless (self-adjointness holds for ANY
+        `base`, trainable or not, so this recipe never calls
+        `_is_plausible_parameter_node`). Restated explicitly here so a
+        future change that made self-adjointness fail-closed on missing
+        trainability evidence would break this test immediately."""
+        self.assertEqual(
+            _construction(adjoint_target="aten.transpose.int", adjoint_args=[_ref("p_base"), 0, 1]),
+            "symmetrized",
+        )
+
 
 class UserInputIsNotAnUnconstrainedParameterTests(unittest.TestCase):
     def test_a_bare_parameter_placeholder_is_recognized(self):
@@ -100,15 +114,17 @@ class UserInputIsNotAnUnconstrainedParameterTests(unittest.TestCase):
         )
         self.assertEqual(ir["operator"]["construction"], "unconstrained_parameter")
 
-    def test_missing_state_kind_metadata_is_still_recognized(self):
-        # Permissive when the classification itself isn't available (e.g. an
-        # older extractor, or a hand-authored fixture) -- fails closed only
-        # on an explicit user-input signal, never on missing metadata.
+    def test_missing_state_kind_metadata_fails_closed(self):
+        # research-readiness audit issue 5: an unconstrained_parameter
+        # capacity claim requires POSITIVE evidence of trainability --
+        # missing/unrecognized classification (e.g. an older extractor, or
+        # a hand-authored fixture that never set state_kind at all) must
+        # fail closed to "unsupported", never be treated as plausible.
         ir = structural_ir_from_inventory(
             inventory=_bare_param_inventory(state_kind=None),
             artifact_sha256="a", extractor_version="t", input_constraints=_constraints(),
         )
-        self.assertEqual(ir["operator"]["construction"], "unconstrained_parameter")
+        self.assertEqual(ir["operator"]["construction"], "unsupported")
 
     def test_a_plain_runtime_input_is_not_an_unconstrained_parameter(self):
         # A placeholder explicitly classified as a runtime user input (not a
@@ -117,6 +133,38 @@ class UserInputIsNotAnUnconstrainedParameterTests(unittest.TestCase):
         # activation data, not anything the model actually learns.
         ir = structural_ir_from_inventory(
             inventory=_bare_param_inventory(state_kind="InputKind.USER_INPUT"),
+            artifact_sha256="a", extractor_version="t", input_constraints=_constraints(),
+        )
+        self.assertEqual(ir["operator"]["construction"], "unsupported")
+
+    def test_an_explicit_buffer_is_not_an_unconstrained_parameter(self):
+        """research-readiness audit issue 5: a registered buffer (e.g.
+        running statistics) is not trainable and must fail closed exactly
+        like an explicit user input, not merely "not user input"."""
+        ir = structural_ir_from_inventory(
+            inventory=_bare_param_inventory(state_kind="InputKind.BUFFER"),
+            artifact_sha256="a", extractor_version="t", input_constraints=_constraints(),
+        )
+        self.assertEqual(ir["operator"]["construction"], "unsupported")
+
+    def test_an_explicit_constant_is_not_an_unconstrained_parameter(self):
+        """research-readiness audit issue 5: a baked-in constant tensor is
+        not trainable and must fail closed."""
+        ir = structural_ir_from_inventory(
+            inventory=_bare_param_inventory(state_kind="InputKind.CONSTANT_TENSOR"),
+            artifact_sha256="a", extractor_version="t", input_constraints=_constraints(),
+        )
+        self.assertEqual(ir["operator"]["construction"], "unsupported")
+
+    def test_an_unrecognized_state_kind_value_fails_closed(self):
+        """research-readiness audit issue 5: a `state_kind` string that is
+        neither an explicit "parameter" marker nor one of the known
+        non-trainable kinds (e.g. a future extractor's new/unrecognized
+        `InputKind` member) must still fail closed -- the allowlist is
+        positive (only "parameter" is accepted), not merely a blacklist of
+        the kinds currently known to be non-trainable."""
+        ir = structural_ir_from_inventory(
+            inventory=_bare_param_inventory(state_kind="InputKind.SOME_FUTURE_KIND_NOT_YET_KNOWN"),
             artifact_sha256="a", extractor_version="t", input_constraints=_constraints(),
         )
         self.assertEqual(ir["operator"]["construction"], "unsupported")

@@ -6,7 +6,7 @@ about any one verification domain. Everything domain-specific is behind the
 `StructuralPlugin` interface (`dftcert.structural.plugin`); every public
 function below takes a `plugin` argument defaulting to `DFT_CAPABILITY_PLUGIN`
 (`dftcert.structural.dft_capability_plugin`), the project's only plugin, so
-existing callers keep working unchanged. See `VISTA_GENERALIZATION.md`.
+existing callers keep working unchanged. See `docs/structural-v2/VISTA_GENERALIZATION.md`.
 """
 from __future__ import annotations
 
@@ -419,7 +419,7 @@ def confirmed_description_ir(
 ) -> dict[str, Any]:
     """Human-confirmed (no artifact) specification path. Not yet routed
     through the plugin interface -- still DFT-shaped regardless of `plugin`.
-    See VISTA_GENERALIZATION.md open questions.
+    See docs/structural-v2/VISTA_GENERALIZATION.md open questions.
 
     `locality` is the human's confirmed claim (`{"expected": "local" |
     "non_local"}`) -- kept as the parameter/CLI name since that is the

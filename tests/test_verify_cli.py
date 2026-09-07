@@ -56,7 +56,7 @@ class VerifyCliEndToEndTests(unittest.TestCase):
             certify_rc = main([
                 "certify", "--session", str(session_path), "--package", str(package_path),
                 "--project", str(PROJECT), "--entrypoint", ENTRYPOINT,
-                "--lean-import", "Testv2.Requirements", "--output-dir", str(output_dir),
+                "--output-dir", str(output_dir),
                 "--trusted-local", "--timeout-s", "180",
             ])
             self.assertEqual(certify_rc, 0)
@@ -86,7 +86,7 @@ class VerifyCliEndToEndTests(unittest.TestCase):
             rc = main([
                 "certify", "--session", str(session_path), "--package", str(package_path),
                 "--project", str(PROJECT), "--entrypoint", ENTRYPOINT,
-                "--lean-import", "Testv2.Requirements", "--output-dir", str(Path(tmp) / "certificate"),
+                "--output-dir", str(Path(tmp) / "certificate"),
                 "--trusted-local", "--timeout-s", "180",
             ])
             self.assertNotEqual(rc, 0)
