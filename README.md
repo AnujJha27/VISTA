@@ -2,13 +2,41 @@
 
 > Turn a structural belief about a model into a Lean-checked certificate.
 
-You have an exported model and believe it has a property: information can
-reach the sites that need to interact; an XC construction has the required
-hinge; an operator is self-adjoint by construction. A test can sample
-outputs, but it can't prove a structural property holds for the exact
-artifact you have. This project can: it turns the architectural claim into a
-theorem about the exact artifact, and has Lean's kernel check the proof —
-never an LLM, never a test suite, never a human's read of the code.
+## What this is
+
+Machine-learned models are increasingly used to replace hand-derived
+formulas in physics simulations — the running example throughout this
+codebase is a learned exchange-correlation (XC) functional for density
+functional theory (DFT), where a neural network stands in for a term that
+used to be a fixed mathematical expression. That's only trustworthy if the
+network's *architecture* actually respects the mathematical structure the
+physics demands: an operator has to be self-adjoint, it has to be able to
+represent interactions between sites that aren't neighbors, the XC term
+has to allow a real discontinuity where the physics requires one. These
+are properties of how the model is *built*, not of what it learns — they
+should hold before a single weight is trained, and they should hold
+regardless of what data it's later trained on.
+
+The normal way to gain confidence in a model — run it, check the outputs —
+can't establish this. Sampling outputs on some inputs never proves an
+architectural guarantee holds for every input, and it says nothing about
+*why* a property holds. What you actually want is closer to a compiler
+warning that's been upgraded to a mathematical proof: inspect the model's
+real computation graph, decide whether it's built the way a theorem
+requires, and have an independent, mechanical proof checker — not a human,
+not another neural network — confirm that judgment.
+
+That's what this project does. It takes a real exported model file, reads
+its computation graph directly (never the researcher's description of what
+the graph is supposed to do), derives specific structural facts from it,
+and generates a Lean theorem stating that the *exact artifact* has the
+property in question. Lean's kernel — the same trusted core that checks
+any formally verified mathematical proof — either accepts that theorem or
+it doesn't. If a fact needed to complete the proof can't be derived from
+the artifact or from the mathematics itself, the tool doesn't guess or
+paper over it: that fact is left as a visible, named, unproven assumption
+on the final certificate, so nobody mistakes "we assumed this" for "we
+proved this."
 
 ```text
 model.pt2 → artifact-grounded structural facts → generated Lean obligations → certificate
