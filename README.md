@@ -4,39 +4,29 @@
 
 ## What this is
 
-Machine-learned models are increasingly used to replace hand-derived
-formulas in physics simulations. The running example throughout this
-codebase is a learned exchange-correlation (XC) functional for density
-functional theory (DFT), where a neural network stands in for a term that
-used to be a fixed mathematical expression. That's only trustworthy if the
-network's *architecture* actually respects the mathematical structure the
-physics demands: an operator has to be self-adjoint, it has to be able to
-represent interactions between sites that aren't neighbors, the XC term
-has to allow a real discontinuity where the physics requires one. These
-are properties of how the model is *built*, not of what it learns; they
-should hold before a single weight is trained, and they should hold
-regardless of what data it's later trained on.
+You have an exported model and believe its architecture has some property:
+an operator is built a certain way, a computation is guaranteed to have a
+certain shape, some structural invariant holds by construction, regardless
+of what the model is later trained on. Running the model and checking
+outputs on some inputs can't establish this. Sampling never proves a
+structural guarantee holds for every input, and it says nothing about *why*
+a property holds.
 
-The normal way to gain confidence in a model, running it and checking the
-outputs, can't establish this. Sampling outputs on some inputs never proves
-an architectural guarantee holds for every input, and it says nothing about
-*why* a property holds. What you actually want is closer to a compiler
-warning that's been upgraded to a mathematical proof: inspect the model's
-real computation graph, decide whether it's built the way a theorem
-requires, and have an independent, mechanical proof checker, not a human
-and not another neural network, confirm that judgment.
+This project takes a different approach: it reads a model's real exported
+computation graph directly (never a description of what the graph is
+supposed to do), derives specific structural facts from it, and uses those
+facts to instantiate a formal statement in Lean. Lean's kernel, the same
+trusted core that checks any formally verified mathematical proof, either
+accepts that statement or it doesn't; nothing else gets a vote, not an LLM,
+not a test suite, not a human's read of the code. The resulting certificate
+hash-binds every derived fact back to the exact artifact bytes it came
+from, so it says something concrete: this specific file's computation graph
+yields facts that instantiate a proven theorem, and Lean checked the proof.
 
-That's what this project does. It takes a real exported model file, reads
-its computation graph directly (never the researcher's description of what
-the graph is supposed to do), derives specific structural facts from it,
-and generates a Lean theorem stating that the *exact artifact* has the
-property in question. Lean's kernel, the same trusted core that checks any
-formally verified mathematical proof, either accepts that theorem or it
-doesn't. If a fact needed to complete the proof can't be derived from the
-artifact or from the mathematics itself, the tool doesn't guess or paper
-over it: that fact is left as a visible, named, unproven assumption on the
-final certificate, so nobody mistakes "we assumed this" for "we proved
-this."
+If a fact needed to complete the proof can't be derived from the artifact
+or from the mathematics itself, the tool doesn't guess or paper over it:
+it's left as a visible, named, unproven assumption on the final
+certificate, so nobody mistakes "we assumed this" for "we proved this."
 
 ```text
 model.pt2 → artifact-grounded structural facts → generated Lean obligations → certificate
@@ -46,23 +36,21 @@ model.pt2 → artifact-grounded structural facts → generated Lean obligations 
 
 1. **Extract.** A model is exported to a `.pt2` file. A sandboxed extractor
    reads its computation graph and records the raw nodes, operations, and
-   any small integer/boolean buffers (e.g. an adjacency matrix), never a
-   trained parameter's floating-point values. The file's SHA-256 hash
-   identifies the exact artifact from here on.
+   any small integer/boolean buffers, never a trained parameter's
+   floating-point values. The file's SHA-256 hash identifies the exact
+   artifact from here on.
 2. **Derive structural facts.** Deterministic rules read that raw graph and
-   derive specific claims: how many sites there are, whether the operator
-   is built as `B + Bᵀ` (self-adjoint by construction), whether the
-   exchange-correlation term has the discontinuity a hinge activation
-   gives it, how many message-passing hops connect any two sites. Every
-   claim records exactly which graph nodes it came from, so it can be
-   traced back and independently re-checked.
+   derive specific claims about how it's built, e.g. how many distinct
+   components it has, whether a computation is constructed a certain way,
+   whether some declared invariant holds structurally. Every claim records
+   exactly which graph nodes it came from, so it can be traced back and
+   independently re-checked.
 3. **Match to a theorem's requirements.** A Lean theorem states the actual
-   requirement, e.g. "this operator is self-adjoint and can represent a
-   non-local coupling." The tool checks which of the theorem's premises
-   the derived facts can satisfy, which need a human-supplied
-   interpretation (e.g. "this output is the exchange-correlation energy"),
-   and which need an explicit assumption because nothing in the artifact
-   or the theory can establish them.
+   requirement. The tool checks which of the theorem's premises the derived
+   facts can satisfy, which need a human-supplied interpretation (e.g.
+   which exported output corresponds to which role), and which need an
+   explicit assumption because nothing in the artifact or the theory can
+   establish them.
 4. **Certify.** A Lean source file is generated that states the theorem
    applied to the concrete derived/assumed values, and Lean's kernel
    compiles and checks it. The resulting certificate is a JSON bundle
@@ -73,6 +61,16 @@ model.pt2 → artifact-grounded structural facts → generated Lean obligations 
 An assumption that can't be established from the artifact or the theory
 never gets silently proven. It stays a visible, unproven premise on the
 generated theorem, and the certificate says so explicitly.
+
+The harness itself (`dftcert/verification/`) is domain-agnostic: it knows
+about Lean theorems, artifacts, packages, and certificates, nothing about
+any specific field. A domain adapter (`dftcert/structural/`) plugs in the
+actual structural facts one domain cares about. The one adapter in this
+repo right now is for a density-functional-theory case study (a learned
+exchange-correlation functional, checked for properties like self-adjointness
+and long-range coupling capacity); see
+[examples/theorem_centric_demo/README.md](examples/theorem_centric_demo/README.md)
+for that specific worked example and what its certificate actually says.
 
 ## Quick start
 

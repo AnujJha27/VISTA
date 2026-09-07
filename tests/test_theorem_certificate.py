@@ -132,16 +132,16 @@ class ConditionalCertificateTests(unittest.TestCase):
             self.assertEqual(session.status, "ready_for_certificate")
             source = _generate(session, CONDITIONAL_ENTRYPOINT, "VISTA.TestConditional")
             self.assertNotRegex(source, _FORBIDDEN)
-            self.assertIn("TargetRequiresNonLocality : Prop", source)
-            # `hPhysical`'s premise type (`TargetRequiresNonLocality`) is
-            # non-dependent (nothing downstream mentions its value), so
+            self.assertIn("TargetRequiresLongRangeCoupling : Prop", source)
+            # `hPhysical`'s premise type (`TargetRequiresLongRangeCoupling`)
+            # is non-dependent (nothing downstream mentions its value), so
             # Lean's printer renders that binder in the TYPE as a plain
-            # arrow ("TargetRequiresNonLocality → ...") rather than a named
-            # "(hPhysical : ...)" -- still a genuine binder, not an axiom:
-            # `hPhysical` itself appears as a real lambda-bound parameter
-            # on the VALUE side.
-            self.assertIn("TargetRequiresNonLocality →", source)
-            self.assertIn("fun TargetRequiresNonLocality hPhysical =>", source)
+            # arrow ("TargetRequiresLongRangeCoupling → ...") rather than a
+            # named "(hPhysical : ...)" -- still a genuine binder, not an
+            # axiom: `hPhysical` itself appears as a real lambda-bound
+            # parameter on the VALUE side.
+            self.assertIn("TargetRequiresLongRangeCoupling →", source)
+            self.assertIn("fun TargetRequiresLongRangeCoupling hPhysical =>", source)
             compiled = _compile(source)
             self.assertEqual(compiled["status"], "verified", compiled["diagnostics"])
 

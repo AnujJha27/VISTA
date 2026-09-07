@@ -8,13 +8,14 @@ guarantee for `B + B` (not generally symmetric) as if it were `B + B^T`.
 import unittest
 
 from dftcert.structural.core import structural_ir_from_inventory
+from dftcert.structural.dft_capability_plugin import DFT_CAPABILITY_PLUGIN
 
 
 def _ref(name):
     return {"node": name}
 
 
-def _inventory(*, adjoint_target, adjoint_args):
+def _inventory(*, adjoint_target, adjoint_args, base_state_kind=None):
     nodes = [
         {"name": "b_adjacency", "op": "placeholder", "target": "b_adjacency", "args": [], "kwargs": {}},
         {"name": "p_base", "op": "placeholder", "target": "p_base", "args": [], "kwargs": {}},
@@ -30,6 +31,7 @@ def _inventory(*, adjoint_target, adjoint_args):
         "base": {
             "structural_values": [[0.0] * 3 for _ in range(3)], "structural_value_kind": "numeric",
             "graph_inputs": ["p_base"], "shape": [3, 3], "dtype": "torch.float32", "sha256": "b",
+            **({"state_kind": base_state_kind} if base_state_kind is not None else {}),
         },
     }
     return {"nodes": nodes, "state": state}
@@ -47,12 +49,15 @@ def _constraints():
     }
 
 
-def _construction(**inventory_kwargs):
-    ir = structural_ir_from_inventory(
+def _ir(**inventory_kwargs):
+    return structural_ir_from_inventory(
         inventory=_inventory(**inventory_kwargs), artifact_sha256="a", extractor_version="t",
         input_constraints=_constraints(),
     )
-    return ir["operator"]["construction"]
+
+
+def _construction(**inventory_kwargs):
+    return _ir(**inventory_kwargs)["operator"]["construction"]
 
 
 def _bare_param_inventory(*, state_kind):
@@ -104,6 +109,42 @@ class NoOpTransposeIsNotAnAdjointTests(unittest.TestCase):
             _construction(adjoint_target="aten.transpose.int", adjoint_args=[_ref("p_base"), 0, 1]),
             "symmetrized",
         )
+
+
+class SymmetrizedNonLocalCapacityRequiresConfirmedParameterTests(unittest.TestCase):
+    """A `symmetrized` (`base + adjoint(base)`) construction is self-adjoint
+    for ANY `base` -- that classification, and the self-adjoint guarantee it
+    implies, must never be weakened (see the class above). But a *separate*
+    claim, that the construction has non-local REPRESENTATIONAL CAPACITY
+    (can realize a nonzero off-diagonal entry via some parameter choice),
+    is only true if `base` is actually a free/trainable object -- a fixed
+    buffer or constant `base` (e.g. a zero matrix) is symmetrized and
+    self-adjoint, but has no parameter to choose at all, so it cannot
+    realize any off-diagonal entry. The prior implementation granted
+    capacity to every `symmetrized` construction unconditionally (and
+    lowered it to Lean as `.parameter "base"` regardless), incorrectly
+    proving a stronger claim than the artifact ever established."""
+
+    def test_symmetrized_without_confirmed_parameter_has_no_non_local_capacity(self):
+        ir = _ir(adjoint_target="aten.transpose.int", adjoint_args=[_ref("p_base"), 0, 1])
+        self.assertEqual(ir["operator"]["construction"], "symmetrized")  # self-adjointness unaffected
+        self.assertFalse(ir["capabilities"]["non_local_capacity"])
+
+    def test_symmetrized_without_confirmed_parameter_lowers_to_opaque_in_lean(self):
+        ir = _ir(adjoint_target="aten.transpose.int", adjoint_args=[_ref("p_base"), 0, 1])
+        candidates = {c.key: c for c in DFT_CAPABILITY_PLUGIN.formal_binding_candidates(ir)}
+        self.assertNotIn('.parameter "base"', candidates["operator_form"].lean_expr)
+        self.assertIn("opaque", candidates["operator_form"].lean_expr)
+
+    def test_symmetrized_with_confirmed_parameter_still_has_non_local_capacity(self):
+        ir = _ir(
+            adjoint_target="aten.transpose.int", adjoint_args=[_ref("p_base"), 0, 1],
+            base_state_kind="InputKind.PARAMETER",
+        )
+        self.assertEqual(ir["operator"]["construction"], "symmetrized")
+        self.assertTrue(ir["capabilities"]["non_local_capacity"])
+        candidates = {c.key: c for c in DFT_CAPABILITY_PLUGIN.formal_binding_candidates(ir)}
+        self.assertIn('.parameter "base"', candidates["operator_form"].lean_expr)
 
 
 class UserInputIsNotAnUnconstrainedParameterTests(unittest.TestCase):

@@ -69,7 +69,7 @@ def _inventory(*, adjacency, stages, symmetrized=True):
     return {"nodes": nodes, "state": state}
 
 
-def _constraints(expected_locality="non_local"):
+def _constraints(expected_locality="non_local", long_range_pairs=None):
     return {
         "adjacency_state_name": "adjacency", "adjacency_convention": "source_target",
         "output_contracts": [
@@ -78,6 +78,12 @@ def _constraints(expected_locality="non_local"):
             {"index": 2, "role": "message_state"},
         ],
         "expected_locality": expected_locality,
+        # research-soundness correction: SPECIFIED INTERFACE, never
+        # artifact-grounded -- which site pairs count as "long-range" for
+        # this 3-site fixture. [0, 2] is a real, in-bounds, distinct pair;
+        # pass long_range_pairs=[] to a caller that wants no long-range
+        # capacity to be representable at all.
+        "long_range_pairs": [[0, 2]] if long_range_pairs is None else long_range_pairs,
     }
 
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Accept the one explicit assumption this demo's conditional entrypoint
-needs -- `TargetRequiresNonLocality`, a genuine `Prop`-sorted binder that no
-artifact fact or formal theory could ever establish on its own (see the
-README). Writes the decision into the package file itself (spec/theorem-
+needs -- `TargetRequiresLongRangeCoupling`, a genuine `Prop`-sorted binder
+that no artifact fact or formal theory could ever establish on its own (see
+the README). Writes the decision into the package file itself (spec/theorem-
 centric-gaps issue E), the same normalized state a binding choice gets.
 
 Run from the repository root, after `vista verify start` reports
@@ -30,7 +30,7 @@ def main() -> None:
     add_external_assumption(
         HERE / "vista-package.json", premise_id=premise["id"],
         proposition_fingerprint=premise["type_fingerprint"],
-        rationale="the target architecture is understood to require non-local self-energy support",
+        rationale="the target architecture is understood to require long-range self-energy coupling",
     )
     print("recorded in vista-package.json -- re-run `vista verify start` to apply it")
 

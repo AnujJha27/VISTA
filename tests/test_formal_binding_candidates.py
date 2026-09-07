@@ -24,9 +24,16 @@ class FormalBindingCandidateTests(unittest.TestCase):
         )
         self.assertEqual(by_key["xc_form"].lean_expr, "Testv2.StructuralV2.XCForm.hinge")
 
-    def test_every_candidate_is_artifact_grounded_with_evidence(self):
+    def test_every_candidate_is_artifact_grounded_or_specified_interface_with_evidence(self):
+        # research-soundness correction: `long_range_pairs` is deliberately
+        # NOT artifact_grounded -- it is SPECIFIED INTERFACE data (which
+        # site pairs the domain considers long-range), and carries no
+        # artifact evidence_refs at all, unlike every other candidate here.
         value = _ir(adjacency=_CHAIN3, stages=0, symmetrized=True)
         for candidate in DFT_CAPABILITY_PLUGIN.formal_binding_candidates(value):
+            if candidate.key == "long_range_pairs":
+                self.assertEqual(candidate.provenance, "specified_interface")
+                continue
             self.assertEqual(candidate.provenance, "artifact_grounded")
             self.assertTrue(candidate.evidence_refs, f"{candidate.key} has no evidence_refs")
 

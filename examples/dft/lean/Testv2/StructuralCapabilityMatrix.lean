@@ -1,12 +1,20 @@
--- NOT MACHINE-VERIFIED IN THIS REPO: this project's `lean-toolchain`
--- (v4.31.0) is older than the vendored Mathlib checkout requires
--- (v4.33.0-rc1) -- a pre-existing mismatch, not introduced here. Neither
--- `lake exe cache get` (no matching prebuilt cache) nor a from-source
--- build (`Mathlib/Init.lean` itself fails to elaborate under v4.31.0)
--- currently succeeds. See STRUCTURAL_CAPABILITY_CHECKS.md. The theorems
--- below are hand-checked against the real Mathlib API (exact lemma/def
--- names confirmed against the vendored source) but not Lean-checked here
--- until the toolchain mismatch is fixed.
+-- NOT MACHINE-VERIFIED IN THIS REPO. A prior version of this comment
+-- claimed the blocker was a Lean/Mathlib version mismatch (`lean-toolchain`
+-- v4.31.0 vs. a vendored Mathlib requiring v4.33.0-rc1) -- that diagnosis
+-- was traced (research-readiness hardening pass) to a stale local
+-- `lake-manifest.json` that had drifted out of sync with `lakefile.toml`'s
+-- already-correct `rev = "v4.31.0"` pin, not a real incompatibility;
+-- `lake update` against the unchanged v4.31.0 toolchain fixes it, and the
+-- rest of this Lean project builds cleanly under it. The actual current
+-- blocker for THIS file is a parser error (`unexpected token 'namespace';
+-- expected 'lemma'` at the `namespace` line below) that appears only when
+-- an additional `import Mathlib.Data.Real.Basic` is added to resolve an
+-- unrelated `ℝ` instance-resolution gap this file's own imports leave
+-- open -- not yet root-caused. See docs/structural-v2/
+-- STRUCTURAL_CAPABILITY_CHECKS.md. The theorems below are hand-checked
+-- against the real Mathlib API (exact lemma/def names confirmed against
+-- the vendored source) but not Lean-checked here until that parser issue
+-- is fixed.
 import Mathlib.Data.Matrix.Basis
 import Mathlib.LinearAlgebra.Matrix.Symmetric
 

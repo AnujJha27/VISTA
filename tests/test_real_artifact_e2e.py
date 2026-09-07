@@ -62,6 +62,12 @@ CONSTRAINTS = {
         {"index": 1, "role": "learned_self_energy"},
         {"index": 2, "role": "message_state"},
     ],
+    # research-soundness correction: SPECIFIED INTERFACE, never
+    # artifact-grounded -- this real 6-site-ring fixture's domain
+    # specification declares sites 0 and 3 (furthest apart on the ring) as
+    # a long-range pair, matching examples/theorem_centric_demo's own
+    # interface_contract.json.
+    "long_range_pairs": [[0, 3]],
 }
 
 

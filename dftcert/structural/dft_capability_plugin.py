@@ -61,7 +61,7 @@ _ADJACENCY_ALIAS_TARGETS = {
 _MESSAGE_TARGETS = {
     "aten.matmul.default", "aten.mm.default", "aten.bmm.default", "aten.mv.default",
 }
-_NON_LOCAL_CAPABLE_RECIPES = {"sum_transpose", "param"}
+_NON_LOCAL_CAPABLE_RECIPES = {"param"}
 _TRAINABLE_PARAMETER_STATE_KIND_MARKERS = ("parameter",)
 
 
@@ -234,10 +234,20 @@ def _operator_construction(
 
     Self-adjointness (the `symmetrized` recipe, `add(base, adjoint(base))`)
     holds for *any* `base` -- B + B^dagger is self-adjoint regardless of
-    whether B is a trained weight, so that branch never needs a parameter
-    check. `unconstrained_parameter` is different: it claims `base` is a
-    free, trainable matrix, which does need `_is_plausible_parameter_node`.
-    """
+    whether B is a trained weight, so the CLASSIFICATION never needs a
+    parameter check and is never weakened here. `unconstrained_parameter`
+    is different: it claims `base` is a free, trainable matrix, which does
+    need `_is_plausible_parameter_node`.
+
+    But a `symmetrized` recipe's `non_local_capacity` claim (post-hardening-
+    pass review) is a separate matter: representational freedom to realize
+    a nonzero off-diagonal entry requires an actual free parameter to
+    choose, not merely SOME base value symmetrized with its own transpose
+    (a fixed zero buffer symmetrized with itself is still `zero + zero^T`,
+    incapable of any off-diagonal entry, for any site count). The recipe
+    therefore separately records `parameter_confirmed` -- `_non_local_
+    capacity`/`_lean_operator` gate the capacity claim and the Lean lowering
+    on it, without touching the `symmetrized` classification itself."""
     by_name = {node["name"]: node for node in nodes if isinstance(node.get("name"), str)}
     provenance = [node["name"] for node in _ancestors(nodes, root)]
     root_node = by_name.get(root, {})
@@ -256,6 +266,7 @@ def _operator_construction(
                     if transformed_base == base:
                         return "symmetrized", provenance, {
                             "kind": "sum_transpose", "base": base, "transposed_base": transformed_base,
+                            "parameter_confirmed": _is_plausible_parameter_node(inventory, base),
                         }
                     if (
                         transformed_base in by_name
@@ -266,6 +277,9 @@ def _operator_construction(
                     ):
                         return "unconstrained_parameter", provenance, {
                             "kind": "sum_transpose", "base": base, "transposed_base": transformed_base,
+                            # already required as a precondition to reach this branch (both
+                            # operands passed _is_plausible_parameter_node above).
+                            "parameter_confirmed": True,
                         }
     if root_node.get("op") in {"placeholder", "get_attr"} and _is_plausible_parameter_node(inventory, root):
         return "unconstrained_parameter", provenance, {"kind": "param", "node": root}
@@ -395,7 +409,47 @@ def _lean_xc(form: str) -> str:
     return {"hinge": ".hinge", "smooth": ".smooth", "unsupported": ".unsupported"}[form]
 
 
-def _lean_operator(construction: str) -> str:
+def _is_grouped_layout(layout: dict[str, Any]) -> bool:
+    """A plain `[N, N]` operator has exactly one axis per side
+    (`output_axes = [0]`); a grouped `[N, m, N, m]` layout (multiple
+    orbitals per site) has more than one. Long-range site-coupling
+    capacity (research-soundness correction, issue 5) is conservatively
+    unsupported for a grouped layout: there is no established
+    correspondence here between a flattened tensor axis and the physical
+    site index, so a flattened off-diagonal entry must never be read as
+    "coupling between two sites". This never affects self-adjoint
+    recognition, which is already layout-aware on its own terms."""
+    return len(layout.get("output_axes", [0])) != 1
+
+
+def _long_range_eligible(recipe: dict[str, Any], layout: dict[str, Any]) -> bool:
+    """Whether this recipe's base may be treated as a genuine free
+    parameter for LONG-RANGE CAPACITY specifically (research-soundness
+    correction, issues 4-5): requires BOTH positive trainability evidence
+    (`parameter_confirmed`) AND a plain, non-grouped operator layout.
+    Self-adjointness is NEVER gated on this -- `guaranteedSelfAdjoint`
+    holds for `.opaque` exactly as it does for `.parameter`; only the
+    stronger long-range-capacity claim needs a confirmed parameter AND a
+    layout where the site correspondence is actually known."""
+    kind = recipe.get("kind")
+    confirmed = bool(recipe.get("parameter_confirmed")) if kind == "sum_transpose" else kind == "param"
+    return confirmed and not _is_grouped_layout(layout)
+
+
+def _lean_operator(construction: str, recipe: dict[str, Any] | None = None, layout: dict[str, Any] | None = None) -> str:
+    """`recipe`/`layout` (research-soundness corrections) distinguish a
+    `symmetrized`/`unconstrained_parameter` base the artifact positively
+    confirms is a free, plain-layout parameter (lowered as `.parameter
+    "base"`, so `canRepresentLongRangeCoupling` can grant it capacity)
+    from one it doesn't (lowered as `.opaque "base"` -- still self-adjoint
+    via `guaranteedSelfAdjoint`, since that holds for ANY base, but never
+    granted long-range capacity, since there is no confirmed, plain-layout
+    parameter to choose)."""
+    eligible = _long_range_eligible(recipe or {}, layout or {})
+    if construction == "symmetrized" and not eligible:
+        return '.add (.opaque "base") (.adjoint (.opaque "base"))'
+    if construction == "unconstrained_parameter" and not eligible:
+        return '.opaque "unconstrained"'
     return {
         "zero": ".zero",
         "identity": ".identity",
@@ -405,8 +459,89 @@ def _lean_operator(construction: str) -> str:
     }[construction]
 
 
+def _long_range_pairs_syntax(input_constraints: dict[str, Any]) -> list[list[int]]:
+    """Syntax-only validation of the DFT interface contract's optional
+    `long_range_pairs` field (research-soundness correction: an explicitly
+    SPECIFIED-INTERFACE fact -- which site pairs the domain considers
+    long-range -- never derived from the artifact). Bounds validation
+    against the artifact's own derived `site_count` deliberately happens
+    later, inside `Testv2.StructuralV2.validLongRangePair` itself, once the
+    artifact is known -- a package may be authored before the artifact is,
+    so only shape can be checked here. Defaults to `[]` (no long-range
+    pairs specified -- capacity can then never be granted, which is the
+    correct fail-closed default, not an error)."""
+    pairs = input_constraints.get("long_range_pairs", [])
+    if not isinstance(pairs, list):
+        raise ManifestError("interface_contract.long_range_pairs must be an array")
+    result: list[list[int]] = []
+    for item in pairs:
+        if (
+            not isinstance(item, list) or len(item) != 2
+            or any(isinstance(index, bool) or not isinstance(index, int) or index < 0 for index in item)
+        ):
+            raise ManifestError(
+                f"interface_contract.long_range_pairs entry {item!r} must be a pair of non-negative integers"
+            )
+        result.append([item[0], item[1]])
+    return result
+
+
+def _valid_long_range_pairs(site_count: int, long_range_pairs: list[list[int]]) -> list[list[int]]:
+    """Pairs that are actually usable for `site_count` -- both indices in
+    bounds and naming two distinct sites. Mirrors `Testv2.StructuralV2.
+    validLongRangePair` exactly (kept as two independent implementations,
+    Python and Lean, deliberately: the Lean side is the one that actually
+    gates certification; this one is for the IR's own `long_range_capacity`
+    capability, used only by the legacy pre-training report)."""
+    return [
+        pair for pair in long_range_pairs
+        if pair[0] < site_count and pair[1] < site_count and pair[0] != pair[1]
+    ]
+
+
+def _lean_long_range_pairs(long_range_pairs: list[list[int]]) -> str:
+    """The anonymous-constructor form `⟨[...]⟩` of `Testv2.StructuralV2.
+    LongRangePairs` -- a genuine wrapper `structure`, not a bare `List
+    (Nat × Nat)` type alias, specifically so the theorem-centric resolver's
+    purely-type-based candidate matching (`dftcert.verification.resolver`)
+    can never confuse this SPECIFIED-INTERFACE candidate with the
+    unrelated, artifact-grounded `edges` candidate (`ValidMessagePassingCoverage`'s
+    own `List (Nat × Nat)`-typed adjacency binder) -- anonymous-constructor
+    notation is type-directed and needs no namespace qualification."""
+    pairs = "[" + ", ".join(f"({left}, {right})" for left, right in long_range_pairs) + "]"
+    return f"⟨{pairs}⟩"
+
+
+def _long_range_capacity(
+    recipe: dict[str, Any], site_count: int, layout: dict[str, Any], long_range_pairs: list[list[int]],
+) -> bool | None:
+    """`None` means unsupported/unresolved (issue 5: a grouped operator
+    layout with no established site-axis correspondence), never a
+    confident `False`. Otherwise: does the construction actually contain a
+    confirmed free parameter (`_long_range_eligible`, plain layout only)
+    AND does at least one of the SPECIFIED (never artifact-derived)
+    `long_range_pairs` fall within bounds for `site_count`?"""
+    if _is_grouped_layout(layout):
+        return None
+    if not _long_range_eligible(recipe, layout):
+        return False
+    return bool(_valid_long_range_pairs(site_count, long_range_pairs))
+
+
 def _non_local_capacity(recipe: dict[str, Any], site_count: int) -> bool:
-    return site_count >= 2 and recipe.get("kind") in _NON_LOCAL_CAPABLE_RECIPES
+    if site_count < 2:
+        return False
+    kind = recipe.get("kind")
+    if kind == "sum_transpose":
+        # research-readiness audit (post-hardening-pass review): a
+        # symmetrized `base + base^T` only has non-local representational
+        # capacity if `base` is actually a confirmed free parameter --
+        # `unconstrained_parameter`'s own `sum_transpose` kind already
+        # requires this at classification time (see `_operator_
+        # construction`), but `symmetrized`'s `sum_transpose` does not,
+        # since self-adjointness itself never requires it.
+        return bool(recipe.get("parameter_confirmed"))
+    return kind in _NON_LOCAL_CAPABLE_RECIPES
 
 
 def _unreachable_pairs(
@@ -549,7 +684,7 @@ def _revalidate_structure(
         raise ManifestError("translation operator derivation is invalid")
     if value["operator"] != {
         "construction": derivation["operator"], "provenance_nodes": derivation["operator_nodes"],
-        "layout": derivation["operator_layout"],
+        "layout": derivation["operator_layout"], "recipe": derivation["operator_recipe"],
     }:
         raise ManifestError("IR operator claim does not match its derivation")
 
@@ -584,6 +719,7 @@ class DFTCapabilityPlugin(StructuralPlugin):
         if expected_locality not in {"local", "non_local", None}:
             raise ManifestError("input_constraints.expected_locality must be 'local' or 'non_local'")
         layout = _resolve_operator_layout(input_constraints)
+        long_range_pairs = _long_range_pairs_syntax(input_constraints)
         count, edges, graph_inputs, state_name, adjacency_selection_provenance = _topology(inventory, input_constraints)
         aliases = _adjacency_aliases(nodes, graph_inputs)
         stages, message_recognized = _message_chain(nodes, roles["message_state"], graph_inputs)
@@ -647,6 +783,7 @@ class DFTCapabilityPlugin(StructuralPlugin):
             "operator": operator, "operator_nodes": operator_nodes, "operator_recipe": operator_recipe,
             "operator_layout": layout,
             "expected_locality": expected_locality,
+            "long_range_pairs": long_range_pairs,
         }
 
     def derive(
@@ -668,6 +805,16 @@ class DFTCapabilityPlugin(StructuralPlugin):
             "unreachable_pairs": reachability["unreachable_pairs"],
             "operator_message_depth": reachability["depth"],
             "non_local_capacity": _non_local_capacity(derivation["operator_recipe"], derivation["site_count"]),
+            # research-soundness correction: the provisional, theorem-
+            # centric-authoritative replacement for `non_local_capacity`
+            # above (kept only as a deprecated/historical value -- see
+            # `Testv2.StructuralV2.canRepresentNonLocal`'s own docstring).
+            # `None` means unsupported/unresolved (a grouped operator
+            # layout), never a confident `False`.
+            "long_range_capacity": _long_range_capacity(
+                derivation["operator_recipe"], derivation["site_count"],
+                derivation["operator_layout"], derivation["long_range_pairs"],
+            ),
         }
         return derivation
 
@@ -686,7 +833,24 @@ class DFTCapabilityPlugin(StructuralPlugin):
             "operator": {
                 "construction": derivation["operator"], "provenance_nodes": derivation["operator_nodes"],
                 "layout": derivation["operator_layout"],
+                # research-readiness audit (post-hardening-pass review): the
+                # recipe's `parameter_confirmed` flag is what `_lean_operator`
+                # needs to correctly lower a `symmetrized` construction --
+                # exposed here (already present, for audit only, deep inside
+                # `translation.semantic_derivations.operator.metadata.recipe`)
+                # so callers that only see this shallow `operator` dict (e.g.
+                # `formal_binding_candidates`) don't have to reach into
+                # internal derivation bookkeeping to get it.
+                "recipe": derivation["operator_recipe"],
             },
+            # research-soundness correction: SPECIFIED INTERFACE, never
+            # artifact-grounded -- which site pairs the domain considers
+            # long-range is supplied by the verification specification's
+            # interface contract, not derived from the exported graph.
+            # Syntax-validated only (`_long_range_pairs_syntax`); bounds
+            # against `site_count` are checked later, by
+            # `Testv2.StructuralV2.validLongRangePair` itself.
+            "long_range_pairs": derivation["long_range_pairs"],
             "capabilities": derivation["capabilities"],
         }
 
@@ -717,6 +881,13 @@ class DFTCapabilityPlugin(StructuralPlugin):
     def validate_ir_sections(self, value: dict[str, Any]) -> None:
         _validate_structure_sections(value)
         count = value["topology"]["site_count"]
+        long_range_pairs = value.get("long_range_pairs")
+        if not isinstance(long_range_pairs, list) or any(
+            not isinstance(pair, list) or len(pair) != 2
+            or any(isinstance(index, bool) or not isinstance(index, int) or index < 0 for index in pair)
+            for pair in long_range_pairs
+        ):
+            raise ManifestError("long_range_pairs must be an array of [non-negative int, non-negative int] pairs")
         capabilities = value.get("capabilities")
         if not isinstance(capabilities, dict):
             raise ManifestError("structural IR is missing capabilities")
@@ -728,6 +899,9 @@ class DFTCapabilityPlugin(StructuralPlugin):
             raise ManifestError("capabilities.all_pairs_reachable_applicable must be boolean")
         if not isinstance(capabilities.get("non_local_capacity"), bool):
             raise ManifestError("capabilities.non_local_capacity must be boolean")
+        long_range_capacity = capabilities.get("long_range_capacity")
+        if long_range_capacity is not None and not isinstance(long_range_capacity, bool):
+            raise ManifestError("capabilities.long_range_capacity must be boolean or null (unsupported)")
         capability_depth = capabilities.get("operator_message_depth")
         unreachable = capabilities.get("unreachable_pairs")
         if capabilities["all_pairs_reachable_applicable"]:
@@ -753,9 +927,11 @@ class DFTCapabilityPlugin(StructuralPlugin):
         _revalidate_structure(value=value, input_constraints=input_constraints, derivation=derivation, roles=roles)
         if value["capabilities"] != derivation["capabilities"]:
             raise ManifestError("capabilities claim does not match its derivation")
+        if value.get("long_range_pairs") != derivation["long_range_pairs"]:
+            raise ManifestError("long_range_pairs claim does not match the interface contract")
 
     def checked_claim_names(self) -> list[str]:
-        return ["topology", "message_passing", "xc", "operator", "semantic_derivations", "capabilities"]
+        return ["topology", "message_passing", "xc", "operator", "semantic_derivations", "capabilities", "long_range_pairs"]
 
     def checks(self, value: dict[str, Any]) -> dict[str, dict[str, Any]]:
         capabilities = value["capabilities"]
@@ -880,7 +1056,8 @@ class DFTCapabilityPlugin(StructuralPlugin):
             f"def operatorMessageDepth : Nat := {depth}\n"
             f"def expectedLocal : Bool := {str(capabilities['expected_locality'] == 'local').lower()}\n"
             f"def xcForm : {self.lean_import}.XCForm := {_lean_xc(value['xc']['form'])}\n"
-            f"def operatorForm : {self.lean_import}.OperatorForm := {_lean_operator(value['operator']['construction'])}"
+            f"def operatorForm : {self.lean_import}.OperatorForm := "
+            f"{_lean_operator(value['operator']['construction'], value['operator'].get('recipe'))}"
         )
 
     def lean_statements(
@@ -928,10 +1105,27 @@ class DFTCapabilityPlugin(StructuralPlugin):
             ),
             FormalBindingCandidate(
                 key="operator_form",
-                lean_expr=_lean_operator(operator["construction"]).replace(".", f"{self.lean_import}.OperatorForm.", 1),
+                lean_expr=_lean_operator(
+                    operator["construction"], operator.get("recipe"), operator.get("layout"),
+                ).replace(".", f"{self.lean_import}.OperatorForm.", 1),
                 provenance="artifact_grounded",
                 evidence_refs=tuple(operator.get("provenance_nodes", [])),
                 display_label=f"operator = {operator['construction']}",
+            ),
+            FormalBindingCandidate(
+                key="long_range_pairs",
+                lean_expr=_lean_long_range_pairs(value.get("long_range_pairs", [])),
+                # research-soundness correction: this is SPECIFIED INTERFACE
+                # data -- which site pairs the domain considers long-range
+                # -- supplied by the verification package's interface
+                # contract, never derived from the artifact. Lean itself
+                # (`validLongRangePair`) is what actually rejects an
+                # out-of-bounds or self-pair entry once `siteCount` is
+                # bound; this candidate carries the raw specified list
+                # through unfiltered.
+                provenance="specified_interface",
+                evidence_refs=(),
+                display_label=f"longRangePairs = {value.get('long_range_pairs', [])}",
             ),
             FormalBindingCandidate(
                 key="xc_form",

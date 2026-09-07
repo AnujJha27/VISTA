@@ -239,13 +239,13 @@ class AssumptionMechanicsTests(unittest.TestCase):
                 CONDITIONAL_ENTRYPOINT,
                 binding_choices=[{"entrypoint": CONDITIONAL_ENTRYPOINT, "binder_path": "0", "candidate_key": "site_count"}],
                 external_assumptions=[{
-                    "premise_id": f"{CONDITIONAL_ENTRYPOINT}#7",
+                    "premise_id": f"{CONDITIONAL_ENTRYPOINT}#8",
                     "proposition_fingerprint": "0" * 64,  # wrong on purpose
                     "rationale": "stale claim from a previous theorem version",
                 }],
             )
             session = _start(package=package, output=Path(tmp) / "session.json")
-            node = session.value["nodes"][f"{CONDITIONAL_ENTRYPOINT}#7"]
+            node = session.value["nodes"][f"{CONDITIONAL_ENTRYPOINT}#8"]
             self.assertEqual(node["status"], "unresolved")
 
     def test_add_external_assumption_persists_into_package_and_applies_on_restart(self):

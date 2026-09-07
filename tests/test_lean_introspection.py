@@ -123,23 +123,24 @@ class DftRequirementsIntrospectionTests(unittest.TestCase):
     def test_fully_resolvable_entrypoint_binders(self):
         entry = self.results["Testv2.Requirements.ValidPretrainingArchitecture"]
         names = [b["name"] for b in entry["binders"]]
-        self.assertEqual(names, ["siteCount", "op", "xc", "hSA", "hNL", "hXC"])
+        self.assertEqual(names, ["siteCount", "longRangePairs", "op", "xc", "hSA", "hLR", "hXC"])
         is_prop = {b["name"]: b["is_prop"] for b in entry["binders"]}
         self.assertEqual(
-            {name: is_prop[name] for name in ("siteCount", "op", "xc")},
-            {"siteCount": False, "op": False, "xc": False},
+            {name: is_prop[name] for name in ("siteCount", "longRangePairs", "op", "xc")},
+            {"siteCount": False, "longRangePairs": False, "op": False, "xc": False},
         )
-        self.assertTrue(all(is_prop[name] for name in ("hSA", "hNL", "hXC")))
+        self.assertTrue(all(is_prop[name] for name in ("hSA", "hLR", "hXC")))
 
     def test_external_assumption_prop_binder_is_a_data_binder_not_a_premise(self):
         entry = self.results["Testv2.Requirements.ValidPretrainingArchitectureConditional"]
         by_name = {b["name"]: b for b in entry["binders"]}
-        # `TargetRequiresNonLocality : Prop` -- a Sort-valued data binder (its
-        # own type, `Prop`, is not itself a Prop) -- distinct from `hPhysical`,
-        # the actual proof premise selecting it (spec section 5/13).
-        self.assertFalse(by_name["TargetRequiresNonLocality"]["is_prop"])
+        # `TargetRequiresLongRangeCoupling : Prop` -- a Sort-valued data
+        # binder (its own type, `Prop`, is not itself a Prop) -- distinct
+        # from `hPhysical`, the actual proof premise selecting it (spec
+        # section 5/13).
+        self.assertFalse(by_name["TargetRequiresLongRangeCoupling"]["is_prop"])
         self.assertTrue(by_name["hPhysical"]["is_prop"])
-        self.assertEqual(by_name["hPhysical"]["type_display"], "TargetRequiresNonLocality")
+        self.assertEqual(by_name["hPhysical"]["type_display"], "TargetRequiresLongRangeCoupling")
 
     def test_message_passing_coverage_is_a_separate_entrypoint(self):
         entry = self.results["Testv2.Requirements.ValidMessagePassingCoverage"]

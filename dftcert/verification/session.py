@@ -179,7 +179,7 @@ def _build_nodes_for_entrypoint(
 
 
 def _apply_companion_conversions(nodes: dict[str, dict[str, Any]], premise_node: dict[str, Any]) -> None:
-    """A premise like `hPhysical : TargetRequiresNonLocality` (spec section
+    """A premise like `hPhysical : TargetRequiresLongRangeCoupling` (spec section
     13) is preceded by its own bare `Prop`-sorted DATA binder -- no adapter
     candidate can ever ground an arbitrary proposition, and none should
     try to. Accepting the proof premise as an explicit assumption resolves

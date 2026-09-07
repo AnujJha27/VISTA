@@ -20,6 +20,74 @@ entry registered today -- kept as a registry rather than hardcoded to one
 plugin specifically so a future second plugin (a different verification
 domain, or a second DFT variant) is "add an entry," not "redesign the CLI."
 
+## Provisional long-range-coupling correction (theorem-centric path)
+
+**This section documents a further research-soundness correction. It does
+not present a final physical definition of locality; the exact physical
+notion of "long-range" for this domain is provisional pending domain-expert
+confirmation.**
+
+`non_local_capacity` (below) treats "the operator's construction recipe
+admits *some* nonzero off-diagonal entry" as the notion of non-locality.
+That itself was already a correction from an earlier, unsound version that
+granted capacity to any `symmetrized` construction regardless of parameter
+confirmation (see the `symmetrized` bullet below). But even the corrected
+`non_local_capacity` still has a deeper issue for the THEOREM-CENTRIC path
+specifically: an arbitrary off-diagonal entry does not, by itself,
+establish that the coupling it represents is between sites the domain
+actually considers physically far apart ("long-range"). Treating `i ≠ j`
+alone as sufficient was itself an unverified physical assumption smuggled
+into a structural check.
+
+The theorem-centric requirement (`Testv2.Requirements.
+ValidPretrainingArchitecture`/`...Conditional`) has been corrected to use a
+provisional, explicitly weaker and more honest notion instead:
+**representational capacity to couple at least one EXPLICITLY SPECIFIED
+long-range site pair**, never an inferred one. `non_local_capacity`/
+`canRepresentNonLocal` (Lean) remain in this codebase only as deprecated,
+historical values -- kept so any already-generated certificate that
+references them stays re-checkable, never used as the live theorem-centric
+capacity premise.
+
+The corrected design:
+
+- **`long_range_pairs`** (interface_contract field, e.g. `[[0, 3]]`): which
+  site pairs the domain specification declares to be outside the
+  local/short-range region. This is **SPECIFIED INTERFACE**, never
+  artifact-grounded -- the artifact establishes site count and operator
+  construction, never which physical distances count as "long-range."
+  Syntax-validated at package-authoring time (`_long_range_pairs_syntax`:
+  each entry must be a pair of non-negative integers); bounds against the
+  artifact's own derived `site_count` are validated later, by
+  `Testv2.StructuralV2.validLongRangePair` itself, once the artifact is
+  known (a package may be authored before the artifact is). An
+  out-of-range pair or a self-pair (`i = i`) is never counted as valid --
+  fails closed, never raises.
+- **`long_range_capacity`** (capability, theorem-centric-authoritative):
+  `None` means unsupported/unresolved (a grouped `[N, m, N, m]` operator
+  layout, where there is no established correspondence between a flattened
+  tensor axis and the physical site index -- see "Grouped operator
+  layouts" below); otherwise `True`/`False` depending on whether the
+  construction contains a confirmed free parameter (never a fixed buffer,
+  constant, or unknown classification) AND at least one of the specified
+  `long_range_pairs` is valid for the derived `site_count`. Message-passing
+  depth never enters this computation at all -- GNN receptive field and
+  operator long-range capacity are unrelated statements, deliberately kept
+  separate (`ValidMessagePassingCoverage` stays its own entrypoint).
+- Self-adjointness is **never** weakened by any of this: `guaranteedSelfAdjoint`
+  holds for `B + Bᵀ` regardless of whether `B` is a confirmed parameter or a
+  grouped layout -- only the stronger long-range-capacity claim needs the
+  extra evidence.
+
+**Paper-safe claim after this correction:** given an explicit specification
+of which site pairs count as long-range, VISTA checks whether the exported
+architecture contains sufficient structural freedom to represent coupling
+on at least one such pair, while independently checking structural
+self-adjointness and other selected Lean requirements. It does **not**
+claim to have proven the self-energy is physically non-local, and it does
+**not** claim that the supplied long-range classification is itself
+physically correct -- that interpretation is specified, not verified.
+
 ## What it checks
 
 - **`all_pairs_reachable`**: every ordered pair of sites is reachable from
@@ -37,11 +105,18 @@ domain, or a second DFT variant) is "add an entry," not "redesign the CLI."
 - **`non_local_capacity`**: when `expected_locality == "non_local"` and
   there are at least two sites, does the operator's construction *recipe*
   admit some parameter assignment with a nonzero off-diagonal entry?
-  `zero`/`identity` never can; `symmetrized` (`B + B^T`) and
-  `unconstrained_parameter` (a free matrix) can, provided a second site
-  exists for an off-diagonal entry to live at -- a 1x1 matrix has none,
-  for any recipe. A fact about the recipe and site count, never about the
-  values currently stored in it.
+  `zero`/`identity` never can. `unconstrained_parameter` (a free matrix)
+  can, and always requires a confirmed trainable parameter to even reach
+  that classification. `symmetrized` (`B + B^T`) can too, but only when
+  `B` is confirmed a free/trainable parameter -- a `B` the artifact gives
+  no positive trainability evidence for (a fixed buffer, a constant, or
+  simply missing classification metadata) is still self-adjoint by
+  construction, but has no parameter to choose and therefore no capacity
+  to realize an off-diagonal entry, exactly like `zero`/`identity`. A
+  second site must also exist for an off-diagonal entry to live at -- a
+  1x1 matrix has none, for any recipe. A fact about the recipe, the
+  parameter-confirmation evidence, and site count, never about the values
+  currently stored in it.
 - **`self_adjoint`**: the declared operator output is structurally zero,
   identity, or a parameter plus its transpose -- recipe-only, no floats.
 - **`xc_discontinuity_compatible`**: the declared XC output path contains a
@@ -103,18 +178,28 @@ declared `output_axes`/`input_axes` groups, complex/conjugate scalars
 (this repo only ever extracts real floats), and non-contiguous or
 reordered axis groupings.
 
-## An `unconstrained_parameter` must actually be a parameter
+## A claim of trainable freedom must actually be positively confirmed
 
-`_operator_construction` checks the extractor's own `state_kind`
-classification (from `torch.export`'s `graph_signature.input_specs`) and
-rejects an explicit user-input classification, so `non_local_capacity`
-(which claims a free, trainable matrix) can never be satisfied by a node
-that's actually a plain runtime activation input. Permissive when no
-classification is available at all (older extractor, hand-authored
-specification), since that metadata is optional -- fails closed only on an
-explicit signal, never a guess. This never applies to the `symmetrized`
-recipe's own add/adjoint pair: `B + B^dagger` is self-adjoint for ANY `B`,
-trained or not, so `self_adjoint` never needed this check.
+`_operator_construction`/`_is_plausible_parameter_node` check the
+extractor's own `state_kind` classification (from `torch.export`'s
+`graph_signature.input_specs`) and require an explicit, positive
+`InputKind.PARAMETER` marker before treating a node as a free, trainable
+matrix. This is a fail-closed allowlist, not a blacklist of known-bad
+kinds: an explicit user-input, buffer, or constant classification is
+rejected, and so is a MISSING or unrecognized classification (e.g. an
+older extractor, or a hand-authored specification that never set
+`state_kind` at all) -- there is no permissive default for "we don't
+know."
+
+This positive-evidence requirement gates `unconstrained_parameter`
+unconditionally (that classification literally cannot be reached without
+it) and, separately, gates the `symmetrized` recipe's `non_local_capacity`
+claim specifically. It never gates `symmetrized`'s own CLASSIFICATION or
+its `self_adjoint` claim: `B + B^dagger` is self-adjoint for ANY `B`,
+trained or not, so recognizing the construction and its self-adjointness
+never needed this check and never will. Only the stronger claim, that the
+construction additionally has non-local representational capacity, needs
+a confirmed parameter to choose -- see `non_local_capacity` above.
 
 ## Adjacency selection is either declared or a labeled heuristic
 
@@ -130,12 +215,37 @@ a reader can tell which happened without re-deriving it.
 
 - `allPairsReachable edges depth siteCount` -- `∀ x y, x = y ∨
   reachableWithin edges depth x y`.
-- `canRepresentNonLocal siteCount : OperatorForm → Bool` -- `true` for
-  `.parameter _` and `.add _ (.adjoint _)` / `.add (.adjoint _) _` only
-  when `siteCount >= 2` (a 1x1 matrix has no off-diagonal entry for any
-  recipe -- this is a real precondition of the claim, not a Python-only
-  check layered on top of a Lean fact that doesn't mention it), `false`
-  otherwise.
+- `canRepresentNonLocal siteCount : OperatorForm → Bool` -- **DEPRECATED /
+  HISTORICAL ALIAS**, kept only so an already-generated certificate that
+  references it stays re-checkable; no longer the theorem-centric-
+  authoritative capacity premise (see "Provisional long-range-coupling
+  correction" above). `true` for a bare `.parameter _`, or
+  `.add (.parameter _) (.adjoint (.parameter _))` / `.add (.adjoint
+  (.parameter _)) (.parameter _)`, only when `siteCount >= 2`; `false`
+  otherwise, including for the exact same `add`/`adjoint` shape built from
+  `.opaque` instead of `.parameter`.
+- `validLongRangePair siteCount pair : Bool` -- both indices `< siteCount`
+  and distinct; fails closed (false) on an out-of-bounds index or a
+  self-pair, never raises.
+- `LongRangePairs` -- a genuine wrapper `structure` around `List (Nat ×
+  Nat)`, not a bare type alias: the theorem-centric resolver matches a
+  candidate to a binder purely by Lean TYPE, and a plain alias would still
+  be definitionally equal to `List (Nat × Nat)`, risking silent
+  cross-matching with `ValidMessagePassingCoverage`'s own, unrelated
+  `edges : List (Nat × Nat)` binder.
+- `canRepresentLongRangeCoupling siteCount longRangePairs : OperatorForm →
+  Bool` -- the live, theorem-centric-authoritative capacity premise.
+  `true` for a bare `.parameter _`, or the same `add`/`adjoint` `.parameter`
+  shapes as `canRepresentNonLocal`, but only when `longRangePairs` contains
+  at least one pair valid for `siteCount` (`hasValidLongRangePair`) --
+  never merely `siteCount >= 2`. `false` otherwise, including for `.opaque`.
+- `OperatorForm` also has an `.opaque (name : String)` constructor,
+  distinct from `.parameter`: a base term that is self-adjoint when
+  symmetrized with its own adjoint (`guaranteedSelfAdjoint` holds for it
+  exactly as it does for `.parameter`, since that only ever compares the
+  two sides for equality) but never contributes long-range representational
+  capacity, since `canRepresentLongRangeCoupling` only grants capacity to
+  an actual `.parameter`.
 - `guaranteedSelfAdjoint`/`xcSupportsDiscontinuity`: unchanged, recipe-only.
 
 `examples/dft/lean/Testv2/StructuralCapabilityMatrix.lean` (imports
@@ -161,23 +271,32 @@ Both cite exact, source-verified Mathlib lemma/def names
 (no Mathlib dependency) is confirmed to build under `lake env lean` in this
 environment.
 
-**`Testv2/StructuralCapabilityMatrix.lean` could NOT be machine-verified in
-this environment, and this is a real, pre-existing repo problem, not a
-transient one**: `lake exe cache get` reports this project's
-`lean-toolchain` (`v4.31.0`) does not match the vendored Mathlib checkout's
-own (`v4.33.0-rc1`), so no prebuilt cache applies; building Mathlib from
-source against the pinned `v4.31.0` toolchain then fails outright --
-`Mathlib/Init.lean` itself does not elaborate under that Lean version
-(`Invalid field notation ... cannot resolve field 'find?'`,
-`failed to synthesize instance for 'for_in%' notation`). The vendored
-Mathlib commit in `lake-manifest.json` is simply too new for this
-project's pinned Lean toolchain. This is a repo-wide inconsistency (every
-other file here is Mathlib-free specifically because of it) and fixing it
--- re-pinning the toolchain or the Mathlib `rev`, then re-vendoring -- is a
-separate, riskier maintenance task well beyond this plugin. Until that
-happens, treat `symmetrized_is_symm`/`symmetrized_can_be_nonlocal` as
-**hand-checked against the real Mathlib API, not machine-verified anywhere
-in this repo**.
+**`Testv2/StructuralCapabilityMatrix.lean` still could NOT be
+machine-verified in this environment, but the previous diagnosis of why
+was wrong and has been corrected (research-readiness hardening pass).**
+The earlier claim here was that this project's `lean-toolchain` (`v4.31.0`)
+was older than the vendored Mathlib checkout required (`v4.33.0-rc1`), and
+that neither a prebuilt cache nor a from-source build could succeed as a
+result. That was traced to a stale LOCAL `lake-manifest.json` that had
+drifted out of sync with `lakefile.toml`'s already-correct `rev =
+"v4.31.0"` pin (never regenerated after that pin was set) -- not a real
+incompatibility. `lake update`, run against the unchanged `v4.31.0`
+toolchain (never an upgrade), regenerates a correct manifest, and the rest
+of this Lean project (including files that import Mathlib, like this one's
+neighbors would if they needed to) builds and passes `lake exe cache get`
+cleanly under it. `lake-manifest.json` itself is gitignored, so every
+fresh checkout (including CI) already resolves correctly from
+`lakefile.toml`'s pin and was never actually affected by this local
+staleness.
+
+The actual remaining blocker for this specific file is different: adding
+`import Mathlib.Data.Real.Basic` (needed to resolve an `ℝ` instance-
+resolution gap this file's own two imports leave open) triggers a parser
+error, `unexpected token 'namespace'; expected 'lemma'`, at the
+`namespace Testv2.StructuralCapabilityMatrix` line above. Not yet
+root-caused. Until it is fixed, treat `symmetrized_is_symm`/
+`symmetrized_can_be_nonlocal` as **hand-checked against the real Mathlib
+API, not machine-verified anywhere in this repo**.
 
 ## Known limitations
 
