@@ -64,7 +64,9 @@ dftcert-test:
 # than failing). Deliberately a separate target, not folded into `test`,
 # so a plain local `make test` stays fast and dependency-light.
 verification-test:
-	cd examples/dft/lean && $(LAKE) exe cache get && $(LAKE) build
+	cd examples/dft/lean && $(LAKE) exe cache get && $(LAKE) build \
+	  Testv2 Testv2.AltModule Testv2.AxiomAdversarial \
+	  Testv2.InspectionFixtures Testv2.InspectionFixturesSorry
 	python3 -m pip install --quiet pytest -r requirements-repro.txt
 	python3 -m pytest tests/ -q --ignore=tests/test_dftcert.py --ignore=tests/test_orchestrator.py
 
