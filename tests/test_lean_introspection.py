@@ -158,12 +158,18 @@ class IntrospectionFailureModeTests(unittest.TestCase):
             )
 
     def test_timeout_raises_introspection_error_not_a_crash(self):
+        # A real, tiny timeout -- not mocked -- but small enough (Lean must
+        # still start its process, load Mathlib-derived imports, and
+        # elaborate) that it always fires regardless of how fast or
+        # cache-warm the host is; `timeout_s=5` used to assume a slow
+        # environment and went flaky once CI got fast enough to finish
+        # inside 5s.
         with self.assertRaises(LeanIntrospectionError):
             inspect_declarations(
                 project_root=PROJECT, imports=["Testv2.StructuralV2"],
                 declarations=["Testv2.StructuralV2.guaranteedSelfAdjoint"],
                 lean_command=("lake", "env", "lean", "-j", "1"),
-                trusted_local=True, timeout_s=5,
+                trusted_local=True, timeout_s=0.01,
             )
 
 

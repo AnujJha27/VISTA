@@ -50,6 +50,19 @@ _SANDBOX_PYTHON = os.environ.get("VISTA_SANDBOX_PYTHON", "/usr/bin/python3")
 def _bubblewrap_skip_reason() -> str | None:
     if shutil.which("bwrap") is None:
         return "bwrap is not installed in this environment"
+    # Some CI runners (e.g. Ubuntu 24.04's AppArmor default) install bwrap
+    # but block unprivileged user namespace creation outright -- the same
+    # failure `dftcert.sandbox.BubblewrapExtractor` already fails closed on
+    # (`SandboxUnavailable`). Detect it here too so this test skips instead
+    # of failing, consistent with its own "skipped explicitly when bwrap is
+    # unavailable" doc comment.
+    namespace_probe = subprocess.run(
+        ["bwrap", "--ro-bind", "/", "/", "--unshare-all", "--die-with-parent", "true"],
+        capture_output=True, timeout=10,
+    )
+    if namespace_probe.returncode != 0:
+        detail = namespace_probe.stderr.decode("utf-8", "replace").strip()
+        return f"bwrap cannot create namespaces in this environment: {detail}"
     probe = subprocess.run(
         [_SANDBOX_PYTHON, "-c", "import torch"], capture_output=True, timeout=30,
     )
