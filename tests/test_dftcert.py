@@ -474,6 +474,13 @@ class Pt2Tests(unittest.TestCase):
 
 
 class ExtractorSandboxTests(unittest.TestCase):
+    def setUp(self):
+        # Several tests below invoke tests/fake_bwrap.py as a stand-in
+        # bubblewrap binary; git doesn't track its executable bit, and
+        # relying on one test method to chmod it (as before) made
+        # every other test order-dependent on that one running first.
+        (ROOT / "tests/fake_bwrap.py").chmod(0o755)
+
     def artifact(self, directory):
         path = pathlib.Path(directory) / "model.pt2"
         with zipfile.ZipFile(path, "w") as archive:
@@ -489,7 +496,6 @@ class ExtractorSandboxTests(unittest.TestCase):
 
     def test_controller_requires_namespaces_and_binds_result_to_artifact(self):
         fake = ROOT / "tests/fake_bwrap.py"
-        fake.chmod(0o755)
         with tempfile.TemporaryDirectory() as directory:
             artifact = self.artifact(directory)
             extractor = BubblewrapExtractor(bubblewrap=str(fake), app_root=ROOT)
