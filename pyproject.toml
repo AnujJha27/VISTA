@@ -1,14 +1,14 @@
 [project]
 name = "vista"
 version = "0.1.0"
-description = "VISTA Lean proof-search verifier and DFT architecture certification research prototype"
+description = "Artifact-grounded structural verification of exported ML models with Lean"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
 authors = [
   { name = "Anuj" }
 ]
-keywords = ["lean", "proof-search", "formal-methods", "dft", "research-prototype"]
+keywords = ["lean", "formal-methods", "formal-verification", "machine-learning", "research-prototype"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Science/Research",
@@ -19,6 +19,11 @@ classifiers = [
 ]
 
 [project.scripts]
+# `vista` is the canonical, documented command (README.md). The
+# `noether*` aliases below are kept only for compatibility with existing
+# scripts/muscle memory from this project's earlier name -- never
+# advertised in README, never the documented entrypoint.
+vista = "dftcert.local_cli:main"
 noether = "dftcert.local_cli:main"
 noether-structural = "dftcert.structural.cli:main"
 noether-dftcert = "dftcert.legacy.cli:main"

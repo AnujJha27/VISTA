@@ -42,12 +42,17 @@ def _resolve(candidates, **kwargs):
 @unittest.skipUnless(_HAS_LEAN, _SKIP_REASON)
 class BindingResolutionTests(unittest.TestCase):
     def test_exactly_one_typechecking_candidate_resolves_automatically(self):
+        # `ValidPretrainingArchitecture`'s real signature is (siteCount,
+        # longRangePairs, op, xc, hSA, hLR, hXC) -- the research-soundness
+        # correction that added `longRangePairs` (Testv2/StructuralV2.lean's
+        # `canRepresentLongRangeCoupling`) shifted every later binder's
+        # index by one; `op`/`xc` are indices 2/3, not 1/2.
         result = _resolve([_OPERATOR, _XC])
         by_index = {entry["index"]: entry for entry in result["data_binders"]}
-        self.assertEqual(by_index[1]["status"], "resolved")
-        self.assertEqual(by_index[1]["chosen_candidate_key"], "operator_form")
         self.assertEqual(by_index[2]["status"], "resolved")
-        self.assertEqual(by_index[2]["chosen_candidate_key"], "xc_form")
+        self.assertEqual(by_index[2]["chosen_candidate_key"], "operator_form")
+        self.assertEqual(by_index[3]["status"], "resolved")
+        self.assertEqual(by_index[3]["chosen_candidate_key"], "xc_form")
 
     def test_zero_candidates_is_unresolved(self):
         result = _resolve([_XC])
@@ -76,9 +81,11 @@ class BindingResolutionTests(unittest.TestCase):
         self.assertEqual(site_count_entry["status"], "unresolved")
 
     def test_prop_binders_are_reported_as_premises_not_data(self):
+        # hSA/hLR/hXC -- indices 4/5/6, shifted by the `longRangePairs`
+        # binder inserted at index 1 (see comment above).
         result = _resolve([_OPERATOR, _XC])
         premise_indices = {entry["index"] for entry in result["premises"]}
-        self.assertEqual(premise_indices, {3, 4, 5})
+        self.assertEqual(premise_indices, {4, 5, 6})
 
     def test_all_data_binders_are_explicit_and_carry_no_dependencies(self):
         """The real DFT entrypoints have no implicit/instance binders --

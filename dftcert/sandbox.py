@@ -61,13 +61,29 @@ class BubblewrapExtractor:
                 arguments.extend(["--ro-bind", directory, directory])
         return arguments
 
-    def _sandbox_python(self) -> tuple[list[str], str]:
+    def _sandbox_python(self) -> tuple[list[str], str, str]:
+        """Returns (bind arguments, the interpreter path to exec inside the
+        sandbox, the runtime root to put on PATH/LD_LIBRARY_PATH).
+
+        A non-system interpreter's own environment directory (e.g. a venv
+        or conda env) is bound at its OWN original absolute path, never
+        remapped to a synthetic path like `/runtime` -- many such
+        environments (conda in particular) bake absolute paths into their
+        own config/sysconfig data (`pyvenv.cfg`, `_sysconfigdata_*.py`,
+        etc.) at creation time. Remapping the directory to a different
+        path inside the sandbox leaves those baked-in paths dangling,
+        which doesn't fail loudly -- the interpreter still starts, but
+        silently degrades (observed: `from __future__ import annotations`
+        raising `SyntaxError`, as if running a pre-3.7 Python, despite the
+        real interpreter being 3.11). Binding at the identical path avoids
+        this entirely: everything the interpreter's own install expects to
+        find at its real absolute path is still there."""
         python = Path(self.python).resolve()
         system_roots = tuple(Path(path) for path in ("/usr", "/usr/local", "/lib", "/lib64", "/bin"))
         if any(python.is_relative_to(root) for root in system_roots):
-            return [], str(python)
+            return [], str(python), ""
         runtime = python.parent.parent
-        return ["--ro-bind", str(runtime), "/runtime"], "/runtime/bin/python3"
+        return ["--ro-bind", str(runtime), str(runtime)], str(python), str(runtime)
 
     def command(self, artifact: str | Path) -> list[str]:
         artifact_path = Path(artifact).resolve()
@@ -76,7 +92,9 @@ class BubblewrapExtractor:
             raise SandboxUnavailable(
                 "bubblewrap is unavailable; refusing to deserialize an uploaded PT2 artifact"
             )
-        python_bind, sandbox_python = self._sandbox_python()
+        python_bind, sandbox_python, runtime_root = self._sandbox_python()
+        runtime_bin = f"{runtime_root}/bin:" if runtime_root else ""
+        runtime_lib = f"{runtime_root}/lib:{runtime_root}/lib64" if runtime_root else ""
         return [
             executable,
             "--unshare-all",
@@ -91,8 +109,8 @@ class BubblewrapExtractor:
             "--proc", "/proc",
             "--dev", "/dev",
             "--chdir", "/app",
-            "--setenv", "PATH", "/runtime/bin:/usr/local/bin:/usr/bin:/bin",
-            "--setenv", "LD_LIBRARY_PATH", "/runtime/lib:/runtime/lib64",
+            "--setenv", "PATH", f"{runtime_bin}/usr/local/bin:/usr/bin:/bin",
+            "--setenv", "LD_LIBRARY_PATH", runtime_lib,
             "--setenv", "OPENBLAS_NUM_THREADS", "1",
             "--setenv", "PYTHONPATH", "/app",
             sandbox_python,

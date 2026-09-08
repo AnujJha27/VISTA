@@ -6,8 +6,4 @@ import Testv2.Spatial
 import Testv2.Verifier
 import Testv2.StructuralV2
 import Testv2.Requirements
--- Testv2.StructuralCapabilityMatrix is deliberately NOT imported here: it
--- needs Mathlib, which this project's pinned lean-toolchain cannot
--- currently build (see that file's own header comment and
--- STRUCTURAL_CAPABILITY_CHECKS.md). Importing it here would break the
--- default `Testv2` build target for everything else in this library.
+import Testv2.StructuralCapabilityMatrix

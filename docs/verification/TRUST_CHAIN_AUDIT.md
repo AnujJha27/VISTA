@@ -146,6 +146,112 @@ pass's own scope ("do not add broad new functionality unless required to
 fix a demonstrated problem") since the workflow is not actually broken —
 just less convenient to script than the interactive path.
 
+## 6. Persisted-session trust gap -- found and fixed (final engineering pass)
+
+**The gap.** Before this fix, `certify_session` (`dftcert/verification/
+api.py`) built the final certificate from `nodes` (`lean_expr`, resolved
+binder/premise status) read out of whatever was already on disk at
+`session`, via a raw, non-revalidating `load_session` -- never re-deriving
+them from a live artifact. `nodes` is not covered by any hash `certify_
+session` checked (`artifact_sha256`, `formal_package_binding.package_sha256`):
+an attacker (or an accidental hand-edit) could take a genuine session built
+from a real artifact whose recognized operator construction is `unconstrained`
+(a bare parameter -- `guaranteedSelfAdjoint = false`, premise stays
+`unresolved`), edit its persisted `session.json` to claim the operator was
+the `symmetrized` (self-adjoint) form and that the self-adjointness premise
+was `formally_discharged`, and `certify_session` would generate and Lean-check
+a certificate for that forged, well-typed term -- Lean correctly verifies the
+*application*, but the relationship "this term came from this artifact" was
+never established. The tamper matrix in section 2 above has no row for this
+exact case (every existing row's "Detected before certification?" answer is
+about tampering the *pre-persistence* derivation path, e.g. an inventory
+edited between extraction and `structural_ir_from_inventory`, or the package/
+project/toolchain -- never a `session.json` edited *after* `start_session`
+wrote it and *before* `certify_session` read it back).
+
+**The fix.** `certify_session` now requires `artifact` or `extraction_result`
+(exactly one, same semantics as `start_session`) and always freshly re-derives
+the certification-relevant session -- via the same trusted `start_session`
+backend, now with a new `force_fresh=True` flag that skips its existing
+"reuse the file at `output` unchanged" shortcut (that shortcut only compares
+`artifact_sha256`/`package_sha256`/`adapter_binding`/`ir_sha256`, none of
+which cover `nodes` either -- so without `force_fresh` it has the same latent
+gap; see the note in `dftcert/verification/session.py::start_session`'s
+docstring). The freshly-derived session unconditionally overwrites `session`
+on disk. `session`'s role is therefore now purely a trusted-OUTPUT
+convenience (inspection/comparison after the fact) -- nothing `certify_
+session` reads back from that path ever influences what gets certified.
+This is the design principle the spec states directly: persisted sessions
+are workspace/cache/UI state, not trusted certificate-issuance evidence; all
+certification-relevant authored decisions already belong in the package
+(`binding_choices`, `external_assumptions`, `interface_contract`, selected
+entrypoints), which `start_session` re-reads and re-applies fresh every time
+regardless.
+
+**Regression test:** `tests/test_self_adjoint_demo.py::
+ForgedSessionCannotCertifyTests::
+test_forged_session_with_real_artifact_hash_does_not_certify` -- starts a
+genuine session from the real, committed negative artifact
+(`tests/fixtures/unconstrained_operator.pt2`, `examples/dft/models/
+structural_gnns.UnconstrainedOperatorGNN`, operator = bare `base_operator`),
+confirms it is `blocked_on_premise`, hand-edits the persisted `session.json`
+to claim the symmetrized operator (exact string a genuine artifact would
+produce) and a `formally_discharged` self-adjointness premise while leaving
+`artifact_binding`/`formal_package_binding` untouched, confirms via a raw
+`load_session` that the forgery really is schema-valid and really does claim
+`ready_for_certificate` (not a strawman), then asserts `certify_session`
+given the real artifact raises `ManifestError` -- and that it overwrites the
+forged file on disk with the honest, freshly-derived (`blocked_on_premise`)
+session rather than merely ignoring the forgery in memory.
+
+**Known residual, explicitly not fixed by this pass:** `start_session`'s own
+`output`-reuse shortcut (used by the ordinary interactive/workspace flow, not
+by `certify_session` after this fix) still only compares the four bindings
+above, not `nodes`. A caller who edits a persisted `session.json`'s `nodes`
+by hand and then calls plain `start_session` again against the same
+`output` path, with `force_fresh` left `False` (its default), would get that
+edited `nodes` content back unchanged -- but this can no longer, by itself,
+produce a certificate: `certify_session` never trusts it. Left as a
+documented latent characteristic of the interactive-resume shortcut, not a
+certificate-issuance vulnerability, and out of this pass's scope (it is a
+performance-motivated cache-reuse check for the workspace/display path only).
+
+## 7. Pre-training-scope fix: per-tensor content hash removed from the raw inventory (final engineering pass)
+
+**The gap.** `extractors/torch_export_worker.py::state_inventory` computed
+and stored `"sha256": hashlib.sha256(raw).hexdigest()` (a content hash of
+the tensor's actual raw bytes) for *every* tensor in `program.state_dict`,
+including trainable float `PARAMETER`s -- a content-derived commitment to a
+parameter's actual initialized/trained values, even though nothing in this
+codebase ever read that field (confirmed by inspection: no other file
+references `entry["sha256"]`/`state[...]["sha256"]`). `dftcert/structural/
+core.py::structural_ir_from_inventory` already deliberately excluded this
+field when building `parameter_structure` (the actual verification
+evidence) -- so it never became a formal binding candidate or theorem
+premise -- but it was still present in the raw inventory JSON persisted
+alongside every session/extraction-result, an unused violation of this
+project's own pre-training-scope rule ("do not compute/store a raw-value
+content hash in the structural extraction inventory... unless some existing
+non-semantic artifact-integrity mechanism demonstrably requires it" -- none
+does).
+
+**The fix.** Removed the per-tensor `sha256` field entirely. `state_
+inventory` now records only `shape`/`dtype`/`graph_inputs`/`state_kind`/
+`aliases` (plus bounded literal `structural_values` for small bool/int
+structural buffers, unchanged) for every tensor. The whole-file
+`artifact_sha256` (`sha256_file`, unchanged) remains the sole
+artifact-identity commitment.
+
+**Regression test:** `tests/test_pretraining_scope.py` -- two artifacts
+exported from the same architecture (`CertifiedRingGNN`) with different
+`torch.manual_seed` calls have different `artifact_sha256`, but (after this
+fix) a byte-identical raw `inventory` and structural IR/formal binding
+candidates, and certify the same result. Before this fix, `inventory`
+differed too (each trainable parameter's `sha256` sub-field differed),
+though it never affected `parameter_structure_sha256`/candidates/the
+verification result -- this fix removes that harmless-but-unused
+divergence, not a soundness gap on its own.
+
 ## 5. Selection vs. minimal construction (research-readiness audit issue 11)
 
 A scope distinction worth stating plainly, not a bug and not a redesign in

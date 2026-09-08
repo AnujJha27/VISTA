@@ -105,7 +105,8 @@ class TrustedLocalDoesNotAuthenticateTheInventoryTests(unittest.TestCase):
             self.assertEqual(session.status, "ready_for_certificate")
             manifest = certify_session(
                 session=str(session_path), package=str(package_path), project=str(PROJECT),
-                output_dir=str(Path(tmp) / "certificate"), trusted_local=True, timeout_s=180,
+                output_dir=str(Path(tmp) / "certificate"),
+                extraction_result=str(extraction_path), trusted_local=True, timeout_s=180,
             )
             # Certifies cleanly -- no real .pt2 bytes were ever read for this
             # session, by design (research-readiness audit issue 6).
@@ -140,7 +141,7 @@ class PublicApiTests(unittest.TestCase):
             manifest = certify_session(
                 session=str(session_path), package=str(package_path), project=str(PROJECT),
                 output_dir=str(Path(tmp) / "certificate"),
-                trusted_local=True, timeout_s=180,
+                extraction_result=str(extraction_path), trusted_local=True, timeout_s=180,
             )
             self.assertEqual(manifest["status"], "certified")
 
@@ -282,7 +283,8 @@ class CertificateBundleSelfConsistencyTests(unittest.TestCase):
         output_dir = Path(tmp) / "certificate"
         certify_session(
             session=str(session_path), package=str(package_path), project=str(PROJECT),
-            output_dir=str(output_dir), trusted_local=True, timeout_s=180,
+            output_dir=str(output_dir),
+            extraction_result=str(extraction_path), trusted_local=True, timeout_s=180,
         )
         return package_path, output_dir
 
@@ -471,7 +473,8 @@ class PackageOwnedLeanEnvironmentTests(unittest.TestCase):
             output_dir = Path(tmp) / "certificate"
             manifest = certify_session(
                 session=str(session_path), package=str(package_path), project=str(PROJECT),
-                output_dir=str(output_dir), trusted_local=True, timeout_s=180,
+                output_dir=str(output_dir),
+                extraction_result=str(extraction_path), trusted_local=True, timeout_s=180,
             )
             self.assertEqual(manifest["status"], "certified")
             self.assertEqual(set(manifest["targets"]), {ENTRYPOINT, self.ALT_ENTRYPOINT})
@@ -521,11 +524,11 @@ class SessionLocalAssumptionCannotCertifyTests(unittest.TestCase):
             extraction_result=str(extraction_path), package=str(package_path),
             session=str(session_path), project=str(PROJECT), trusted_local=True, timeout_s=180,
         )
-        return package_path, session_path, session
+        return package_path, session_path, session, extraction_path
 
     def test_session_local_assumption_alone_cannot_certify(self):
         with TemporaryDirectory() as tmp:
-            package_path, session_path, session = self._package_and_session(tmp)
+            package_path, session_path, session, extraction_path = self._package_and_session(tmp)
             premise = session.unresolved_premises[0]
             session.accept_assumption(premise_id=premise["id"], rationale="physical target requires non-locality")
             self.assertEqual(session.status, "ready_for_certificate")  # session itself looks ready...
@@ -535,7 +538,8 @@ class SessionLocalAssumptionCannotCertifyTests(unittest.TestCase):
             with self.assertRaises(ManifestError):
                 certify_session(
                     session=str(session_path), package=str(package_path), project=str(PROJECT),
-                    output_dir=str(Path(tmp) / "certificate"), trusted_local=True, timeout_s=180,
+                    output_dir=str(Path(tmp) / "certificate"),
+                    extraction_result=str(extraction_path), trusted_local=True, timeout_s=180,
                 )
 
     def test_package_normalized_assumption_can_certify(self):
@@ -543,14 +547,13 @@ class SessionLocalAssumptionCannotCertifyTests(unittest.TestCase):
         certifies cleanly -- proving the block above is about WHERE the
         decision lives, not a blanket ban on conditional certificates."""
         with TemporaryDirectory() as tmp:
-            package_path, session_path, session = self._package_and_session(tmp)
+            package_path, session_path, session, extraction_path = self._package_and_session(tmp)
             premise = session.unresolved_premises[0]
             add_external_assumption(
                 package_path, premise_id=premise["id"],
                 proposition_fingerprint=premise["type_fingerprint"],
                 rationale="physical target requires non-locality",
             )
-            extraction_path = Path(tmp) / "extraction.json"
             session = start_session(
                 extraction_result=str(extraction_path), package=str(package_path),
                 session=str(session_path), project=str(PROJECT), trusted_local=True, timeout_s=180,
@@ -558,7 +561,8 @@ class SessionLocalAssumptionCannotCertifyTests(unittest.TestCase):
             self.assertEqual(session.status, "ready_for_certificate")
             manifest = certify_session(
                 session=str(session_path), package=str(package_path), project=str(PROJECT),
-                output_dir=str(Path(tmp) / "certificate"), trusted_local=True, timeout_s=180,
+                output_dir=str(Path(tmp) / "certificate"),
+                extraction_result=str(extraction_path), trusted_local=True, timeout_s=180,
             )
             self.assertEqual(manifest["status"], "certified")
             self.assertTrue(manifest["conditional"])
@@ -613,7 +617,7 @@ class MultiTargetCertificationTests(unittest.TestCase):
             manifest = certify_session(
                 session=str(session_path), package=str(package_path), project=str(PROJECT),
                 output_dir=str(output_dir),
-                trusted_local=True, timeout_s=180,
+                extraction_result=str(extraction_path), trusted_local=True, timeout_s=180,
             )
             self.assertEqual(manifest["status"], "certified")
             self.assertEqual(manifest["certificate_scope"], "full_package")
@@ -642,6 +646,7 @@ class MultiTargetCertificationTests(unittest.TestCase):
                 certify_session(
                     session=str(session_path), package=str(package_path), project=str(PROJECT),
                     output_dir=str(Path(tmp) / "certificate"),
+                    extraction_result=str(extraction_path),
                     entrypoints=[ENTRYPOINT], trusted_local=True, timeout_s=180,
                 )
 
@@ -658,6 +663,7 @@ class MultiTargetCertificationTests(unittest.TestCase):
             manifest = certify_session(
                 session=str(session_path), package=str(package_path), project=str(PROJECT),
                 output_dir=str(Path(tmp) / "certificate"),
+                extraction_result=str(extraction_path),
                 entrypoints=[ENTRYPOINT], allow_subset_certificate=True, trusted_local=True, timeout_s=180,
             )
             self.assertEqual(manifest["certificate_scope"], "selected_subset")
@@ -683,7 +689,7 @@ class MultiTargetCertificationTests(unittest.TestCase):
                 certify_session(
                     session=str(session_path), package=str(package_path), project=str(PROJECT),
                     output_dir=str(Path(tmp) / "certificate"),
-                    trusted_local=True, timeout_s=180,
+                    extraction_result=str(extraction_path), trusted_local=True, timeout_s=180,
                 )
 
 

@@ -244,7 +244,10 @@ def _require_assumptions_are_package_normalized(
 
 def certify_session(
     *, session: str | Path, package: str | Path, project: str | Path,
-    output_dir: str | Path, entrypoints: list[str] | None = None,
+    output_dir: str | Path, artifact: str | Path | None = None,
+    extraction_result: str | Path | None = None,
+    bubblewrap: str = "bwrap", extractor_python: str = "/usr/bin/python3",
+    entrypoints: list[str] | None = None,
     allow_subset_certificate: bool = False,
     namespace: str | None = None, lean_command=("lake", "env", "lean", "-j", "1"),
     timeout_s: int = 300, trusted_local: bool = False,
@@ -252,10 +255,44 @@ def certify_session(
     """Generate + Lean-check the final certificate theorem for every
     selected target and assemble the hash-bound certificate bundle (spec
     section 11): `manifest.json` plus one `.lean`/`-report.json` pair per
-    target in `output_dir`. Refuses if the session isn't
-    `ready_for_certificate`, if `package` doesn't match what the session
-    was built from, or if the Lean project has drifted since the package
-    was authored.
+    target in `output_dir`.
+
+    Trust-chain fix (`docs/verification/TRUST_CHAIN_AUDIT.md`, "persisted-
+    session trust gap"): `artifact` or `extraction_result` (exactly one,
+    same semantics as `start_session`) is now REQUIRED. The certification-
+    relevant nodes (`lean_expr`, resolved binder/premise status) are always
+    freshly re-derived from that live artifact/extraction result plus
+    `package` -- via the same trusted `start_session` backend, with
+    `force_fresh=True` -- and it is this freshly-derived, in-memory session
+    that gets certified, never whatever was already sitting in the
+    `session` file on disk. `session` is still a required path, but its
+    role is now purely a trusted-output convenience: this freshly-derived
+    session unconditionally overwrites it, so a caller can inspect/compare
+    it afterward, but nothing this function reads back from that path ever
+    influences what gets certified. This closes a real gap: previously,
+    hand-editing a persisted `session.json`'s `nodes` (e.g. claiming a
+    premise was `formally_discharged` or an `artifact_grounded` node's
+    `lean_expr` was some other, well-typed term) while keeping the original
+    `artifact_sha256`/`package_sha256` intact would certify a formal term
+    Lean genuinely type-checks -- but one no longer actually grounded in
+    the real artifact.
+
+    Refuses if `package` doesn't match what the freshly-derived session was
+    built from (this can only happen if `package` changed between the call
+    site preparing it and this call), or if the Lean project has drifted
+    since the package was authored.
+
+    Refuses if any node belonging to a certified target (`entrypoints`, or
+    every package-selected entrypoint by default) is `unresolved`/
+    `ambiguous_binding` in the FRESH derivation -- scoped to the targets
+    actually being certified, never the whole session: an unrelated,
+    unresolved entrypoint elsewhere in the same package must never block
+    certifying a different entrypoint that is genuinely, freshly resolved
+    on its own (this is the whole point of `allow_subset_certificate`). A
+    session-local `VerificationSession.accept_assumption` recorded against
+    the old, no-longer-trusted `session` file cannot satisfy this either --
+    since the fresh derivation never reads it -- only a package-normalized
+    assumption (below) can.
 
     Also refuses if any certified target relies on a `specified_assumption`
     node that is not represented exactly (same `proposition_fingerprint`
@@ -283,19 +320,18 @@ def certify_session(
     (`"full_package"` vs `"selected_subset"`) plus the full
     `package_entrypoints` list so a subset bundle can never be mistaken
     for a complete package certificate."""
-    resumed = _load_session(session)
     package_value = load_package(package)
-    if package_sha256(package_value) != resumed.value["formal_package_binding"]["package_sha256"]:
-        raise ManifestError(
-            "certify package does not match the package this session was built from "
-            "(formal_package_binding.package_sha256 mismatch)"
-        )
-    check_package_freshness(package_value, project)
-    if resumed.status != "ready_for_certificate":
-        raise ManifestError(
-            f"session is {resumed.status!r}, not ready_for_certificate -- refusing to certify "
-            f"while nodes remain unresolved: {[item['id'] for item in resumed.unresolved_premises]}"
-        )
+    adapter = _resolve_adapter(package_value)
+    extraction = _extraction_result(
+        artifact=artifact, extraction_result=extraction_result,
+        bubblewrap=bubblewrap, extractor_python=extractor_python, trusted_local=trusted_local,
+    )
+    resumed = _start_session_from_inventory(
+        artifact_sha256=extraction["artifact_sha256"], inventory=extraction["inventory"],
+        extractor_version=extraction["extractor_version"], package=package_value, adapter=adapter,
+        project_root=project, output=session, lean_command=lean_command,
+        timeout_s=timeout_s, trusted_local=trusted_local, force_fresh=True,
+    )
     package_entrypoints = sorted(target["entrypoint"] for target in resumed.value["targets"])
     targets = sorted(entrypoints) if entrypoints else package_entrypoints
     certificate_scope = "full_package" if targets == package_entrypoints else "selected_subset"
@@ -304,6 +340,25 @@ def certify_session(
             f"certify_session was given a subset of the package's selected entrypoints "
             f"({targets} of {package_entrypoints}) -- pass allow_subset_certificate=True to "
             f"explicitly certify a non-package-complete debug bundle (spec/theorem-centric-gaps issue G)"
+        )
+    # Scoped to `targets`, never the whole session: subset certification
+    # exists precisely so an unrelated, unresolved (or only ever
+    # session-locally accepted -- see `_require_assumptions_are_package_
+    # normalized` below) entrypoint elsewhere in the same package never
+    # blocks certifying entrypoints that are genuinely, freshly resolved on
+    # their own. A session-local `VerificationSession.accept_assumption`
+    # can no longer paper over an unresolved node here (trust-chain fix:
+    # `resumed` is always freshly re-derived, never loaded from a
+    # persisted, possibly session-local-decorated file) -- only a
+    # package-normalized assumption (checked next) can.
+    unresolved_in_scope = [
+        f"{node_id}" for node_id, node in resumed.value["nodes"].items()
+        if node["entrypoint"] in targets and node["status"] in {"unresolved", "ambiguous_binding"}
+    ]
+    if unresolved_in_scope:
+        raise ManifestError(
+            f"refusing to certify while nodes remain unresolved for the selected targets "
+            f"{targets}: {sorted(unresolved_in_scope)}"
         )
     _require_assumptions_are_package_normalized(resumed, package_value, targets)
     out_dir = Path(output_dir)

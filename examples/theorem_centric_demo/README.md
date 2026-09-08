@@ -134,6 +134,7 @@ python vista verify certify \
   --package examples/theorem_centric_demo/vista-package.json \
   --project examples/dft/lean \
   --output-dir examples/theorem_centric_demo/certificate \
+  --extraction-result examples/theorem_centric_demo/extraction-result.json \
   --trusted-local --timeout-s 180
 
 python vista verify verify-bundle \

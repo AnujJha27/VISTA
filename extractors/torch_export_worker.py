@@ -80,11 +80,9 @@ def state_inventory(program: Any) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for name, tensor in program.state_dict.items():
         detached = tensor.detach().cpu().contiguous()
-        raw = detached.numpy().tobytes()
         entry = {
             "shape": [int(item) for item in detached.shape],
             "dtype": str(detached.dtype),
-            "sha256": hashlib.sha256(raw).hexdigest(),
             "graph_inputs": graph_inputs.get(name, []),
             "state_kind": state_kinds.get(name, "unknown"),
             "aliases": sorted(aliases[tensor.untyped_storage().data_ptr()]),
@@ -92,11 +90,18 @@ def state_inventory(program: Any) -> dict[str, Any]:
         # Only small exact integer/boolean state (adjacency buffers, masks --
         # architecture-shape evidence) is captured by literal value. VISTA
         # is a pre-training architectural-capability pipeline: it never uses
-        # a trained parameter's actual floating-point content as evidence,
-        # so this extractor never captures one, structurally, not merely by
-        # policy. `shape`/`dtype`/`sha256`/`state_kind` above are recorded
-        # for every tensor regardless -- exposing nothing about the trained
-        # values, only the architecture.
+        # a trained parameter's actual floating-point content as evidence.
+        # Deliberately no per-tensor content hash of the raw bytes either --
+        # for a trainable float parameter that would be a content-derived
+        # commitment to its actual trained/initialized values, exactly the
+        # kind of evidence this project's scope excludes (research-
+        # readiness/pre-training-scope pass); nothing in this codebase ever
+        # read such a hash (confirmed by inspection), and the whole-file
+        # `artifact_sha256` already binds the certificate to the exact
+        # artifact bytes, so no separate per-tensor commitment is needed for
+        # that purpose either. `shape`/`dtype`/`state_kind`/`aliases` above
+        # are recorded for every tensor regardless -- exposing nothing about
+        # the trained values, only the architecture.
         if detached.dtype in {
             torch.bool, torch.int8, torch.int16, torch.int32, torch.int64,
         } and detached.numel() <= 4096:

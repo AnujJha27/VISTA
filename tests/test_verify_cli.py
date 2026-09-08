@@ -57,6 +57,7 @@ class VerifyCliEndToEndTests(unittest.TestCase):
                 "certify", "--session", str(session_path), "--package", str(package_path),
                 "--project", str(PROJECT), "--entrypoint", ENTRYPOINT,
                 "--output-dir", str(output_dir),
+                "--extraction-result", str(extraction_path),
                 "--trusted-local", "--timeout-s", "180",
             ])
             self.assertEqual(certify_rc, 0)
@@ -87,6 +88,7 @@ class VerifyCliEndToEndTests(unittest.TestCase):
                 "certify", "--session", str(session_path), "--package", str(package_path),
                 "--project", str(PROJECT), "--entrypoint", ENTRYPOINT,
                 "--output-dir", str(Path(tmp) / "certificate"),
+                "--extraction-result", str(extraction_path),
                 "--trusted-local", "--timeout-s", "180",
             ])
             self.assertNotEqual(rc, 0)

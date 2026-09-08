@@ -84,9 +84,21 @@ def parser() -> argparse.ArgumentParser:
     # entry_modules` is the sole formal environment certification runs
     # under (spec/theorem-centric-gaps issue 1) -- there is no second,
     # caller-suppliable import set that could diverge from it.
-    certify.add_argument("--session", required=True)
+    certify.add_argument("--session", required=True, help="overwritten with a freshly re-derived session before certifying")
     certify.add_argument("--package", required=True)
     certify.add_argument("--project", required=True)
+    certify.add_argument(
+        "--artifact",
+        help="path to the .pt2 artifact; extracted via the bubblewrap sandbox and used to freshly "
+             "re-derive the certification-relevant session state (never trusted from --session on disk)",
+    )
+    certify.add_argument(
+        "--extraction-result",
+        help="path to an already-produced trusted-local extraction result JSON "
+             "(bypasses the sandbox; requires --trusted-local)",
+    )
+    certify.add_argument("--bubblewrap", default="bwrap")
+    certify.add_argument("--extractor-python", default="/usr/bin/python3")
     certify.add_argument("--entrypoint", action="append", dest="entrypoints",
                           help="repeatable; omit to certify every selected target (spec section 11)")
     certify.add_argument(
@@ -155,6 +167,8 @@ def main(argv: list[str] | None = None) -> int:
             manifest = api.certify_session(
                 session=options.session, package=options.package, project=options.project,
                 output_dir=options.output_dir,
+                artifact=options.artifact, extraction_result=options.extraction_result,
+                bubblewrap=options.bubblewrap, extractor_python=options.extractor_python,
                 entrypoints=options.entrypoints, allow_subset_certificate=options.allow_subset_certificate,
                 namespace=options.namespace,
                 lean_command=shlex.split(options.lean_command), timeout_s=options.timeout_s,

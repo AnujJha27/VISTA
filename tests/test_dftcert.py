@@ -502,18 +502,31 @@ class ExtractorSandboxTests(unittest.TestCase):
             self.assertEqual(result["sandbox_attestation"]["network"], "unshared")
             self.assertEqual(result["facts"], {})
 
-    def test_conda_python_is_mounted_read_only_as_runtime(self):
+    def test_conda_python_is_mounted_read_only_at_its_own_real_path(self):
+        """A non-system interpreter's environment directory (venv/conda)
+        must be bound at its OWN original absolute path, never remapped to
+        a synthetic path -- such an environment's own config/sysconfig
+        data often bakes in absolute paths at creation time (conda in
+        particular), and remapping leaves those dangling, silently
+        degrading the interpreter (observed: `from __future__ import
+        annotations` raising `SyntaxError` as if running a pre-3.7
+        Python)."""
         fake = ROOT / "tests/fake_bwrap.py"
         with tempfile.TemporaryDirectory() as directory:
             artifact = self.artifact(directory)
             python = pathlib.Path(directory) / "env" / "bin" / "python3"
             python.parent.mkdir(parents=True)
             python.touch()
+            runtime = python.resolve().parent.parent
             command = BubblewrapExtractor(
                 bubblewrap=str(fake), python=str(python), app_root=ROOT
             ).command(artifact)
-            self.assertIn("/runtime", command)
-            self.assertIn("/runtime/bin/python3", command)
+            self.assertIn("--ro-bind", command)
+            bind_index = command.index(str(runtime))
+            # Bound at the SAME path on both sides of --ro-bind (source ==
+            # destination), never remapped to e.g. "/runtime".
+            self.assertEqual(command[bind_index + 1], str(runtime))
+            self.assertIn(str(python.resolve()), command)
 
     def test_inventory_normalizes_graph_nodes_without_torch(self):
         class Node:

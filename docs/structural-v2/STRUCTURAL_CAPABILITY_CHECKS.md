@@ -251,13 +251,15 @@ a reader can tell which happened without re-deriving it.
 `examples/dft/lean/Testv2/StructuralCapabilityMatrix.lean` (imports
 Mathlib) states the actual real-matrix facts that `canRepresentNonLocal`/
 `guaranteedSelfAdjoint` stand in for as computable `Bool` functions over the
-finite `OperatorForm` grammar the analyzer emits. It is deliberately **not**
-imported by `Testv2.lean` (the library's aggregator/default build target) --
-doing so would make Mathlib a hard dependency of every other file in this
-library, which the project's pinned toolchain cannot currently build (see
-below). It is standalone, invoked directly (`lake env lean
-Testv2/StructuralCapabilityMatrix.lean`), and nothing in the certificate
-pipeline (`lean_import = "Testv2.StructuralV2"`) references it:
+finite `OperatorForm` grammar the analyzer emits. It **is** imported by
+`Testv2.lean` (the library's aggregator/default build target) and is
+machine-checked by a plain `lake build`, under the same pinned Lean v4.31.0 /
+Mathlib v4.31.0 toolchain as the rest of this library -- Mathlib was already
+a dependency of other files in this library (e.g. `StructuralV2.lean`), so
+importing it here adds no new toolchain requirement. Nothing in the
+certificate pipeline (`lean_import = "Testv2.StructuralV2"`) references it;
+it exists to justify, over actual Mathlib matrices, the two `OperatorForm`
+recipe guarantees the certificate pipeline's `Bool` functions assert:
 
 - `symmetrized_is_symm`: for every real matrix `B`, `B + Bᵀ` is symmetric
   (restates Mathlib's own `Matrix.isSymm_add_transpose_self` under this
@@ -266,37 +268,33 @@ pipeline (`lean_import = "Testv2.StructuralV2"`) references it:
   `B + Bᵀ` non-local, witnessed by `Matrix.single 0 1 1`.
 
 Both cite exact, source-verified Mathlib lemma/def names
-(`Matrix.isSymm_add_transpose_self`, `Matrix.single`,
+(`Matrix.isSymm_add_transpose_self`, `Matrix.single`, `Matrix.single_apply`,
 `Matrix.transpose_apply`), and neither uses `sorry`. `Testv2/StructuralV2.lean`
-(no Mathlib dependency) is confirmed to build under `lake env lean` in this
-environment.
+and `Testv2/StructuralCapabilityMatrix.lean` both build cleanly under
+`lake build` in this environment.
 
-**`Testv2/StructuralCapabilityMatrix.lean` still could NOT be
-machine-verified in this environment, but the previous diagnosis of why
-was wrong and has been corrected (research-readiness hardening pass).**
-The earlier claim here was that this project's `lean-toolchain` (`v4.31.0`)
-was older than the vendored Mathlib checkout required (`v4.33.0-rc1`), and
-that neither a prebuilt cache nor a from-source build could succeed as a
-result. That was traced to a stale LOCAL `lake-manifest.json` that had
-drifted out of sync with `lakefile.toml`'s already-correct `rev =
-"v4.31.0"` pin (never regenerated after that pin was set) -- not a real
-incompatibility. `lake update`, run against the unchanged `v4.31.0`
-toolchain (never an upgrade), regenerates a correct manifest, and the rest
-of this Lean project (including files that import Mathlib, like this one's
-neighbors would if they needed to) builds and passes `lake exe cache get`
-cleanly under it. `lake-manifest.json` itself is gitignored, so every
-fresh checkout (including CI) already resolves correctly from
-`lakefile.toml`'s pin and was never actually affected by this local
-staleness.
+**`Testv2/StructuralCapabilityMatrix.lean` is machine-verified in this
+repo.** Two earlier blockers, both now resolved:
 
-The actual remaining blocker for this specific file is different: adding
-`import Mathlib.Data.Real.Basic` (needed to resolve an `ℝ` instance-
-resolution gap this file's own two imports leave open) triggers a parser
-error, `unexpected token 'namespace'; expected 'lemma'`, at the
-`namespace Testv2.StructuralCapabilityMatrix` line above. Not yet
-root-caused. Until it is fixed, treat `symmetrized_is_symm`/
-`symmetrized_can_be_nonlocal` as **hand-checked against the real Mathlib
-API, not machine-verified anywhere in this repo**.
+- A stale LOCAL `lake-manifest.json` had drifted out of sync with
+  `lakefile.toml`'s already-correct `rev = "v4.31.0"` pin (never
+  regenerated after that pin was set), which was previously misdiagnosed as
+  a `lean-toolchain`/Mathlib version incompatibility. `lake update`, run
+  against the unchanged `v4.31.0` toolchain (never an upgrade), regenerates
+  a correct manifest. `lake-manifest.json` itself is gitignored, so a fresh
+  checkout (including CI) resolves correctly from `lakefile.toml`'s pin and
+  was never actually affected by this local staleness.
+- Adding `import Mathlib.Data.Real.Basic` (needed to resolve an `ℝ`
+  instance-resolution gap this file's other two imports leave open)
+  exposed a parser error, `unexpected token 'namespace'; expected 'lemma'`,
+  at the `namespace Testv2.StructuralCapabilityMatrix` line. Root cause:
+  the doc comment directly above that line used `/-- -/` (declaration-doc
+  syntax, valid only immediately before a `def`/`theorem`/etc.) where
+  `namespace` requires `/-! -/` (module/section-doc syntax). Fixing the
+  comment kind and adding the import resolved both issues; no changes were
+  needed to `symmetrized_is_symm` or `symmetrized_can_be_nonlocal`
+  themselves, since `Matrix.single_apply` (used in the latter's proof)
+  already exists in the vendored Mathlib rev and was never the problem.
 
 ## Known limitations
 

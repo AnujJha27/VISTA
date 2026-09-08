@@ -1,24 +1,19 @@
--- NOT MACHINE-VERIFIED IN THIS REPO. A prior version of this comment
--- claimed the blocker was a Lean/Mathlib version mismatch (`lean-toolchain`
--- v4.31.0 vs. a vendored Mathlib requiring v4.33.0-rc1) -- that diagnosis
--- was traced (research-readiness hardening pass) to a stale local
--- `lake-manifest.json` that had drifted out of sync with `lakefile.toml`'s
--- already-correct `rev = "v4.31.0"` pin, not a real incompatibility;
--- `lake update` against the unchanged v4.31.0 toolchain fixes it, and the
--- rest of this Lean project builds cleanly under it. The actual current
--- blocker for THIS file is a parser error (`unexpected token 'namespace';
--- expected 'lemma'` at the `namespace` line below) that appears only when
--- an additional `import Mathlib.Data.Real.Basic` is added to resolve an
--- unrelated `ℝ` instance-resolution gap this file's own imports leave
--- open -- not yet root-caused. See docs/structural-v2/
--- STRUCTURAL_CAPABILITY_CHECKS.md. The theorems below are hand-checked
--- against the real Mathlib API (exact lemma/def names confirmed against
--- the vendored source) but not Lean-checked here until that parser issue
--- is fixed.
+-- MACHINE-VERIFIED: this file is imported by `Testv2.lean` and builds
+-- cleanly under `lake build` (Lean v4.31.0 / Mathlib v4.31.0). Two prior
+-- blockers, both now fixed, are kept here for history: (1) a stale local
+-- `lake-manifest.json` had drifted out of sync with `lakefile.toml`'s
+-- already-correct `rev = "v4.31.0"` pin, misdiagnosed as a toolchain/Mathlib
+-- version mismatch -- `lake update` against the unchanged v4.31.0 toolchain
+-- fixed it; (2) the doc comment immediately above `namespace
+-- Testv2.StructuralCapabilityMatrix` used `/-- -/` (declaration-doc syntax,
+-- only valid before a `def`/`theorem`/etc.), which the parser rejected --
+-- changed to `/-! -/` (module/section-doc syntax), which `namespace`
+-- accepts. See docs/structural-v2/STRUCTURAL_CAPABILITY_CHECKS.md.
 import Mathlib.Data.Matrix.Basis
 import Mathlib.LinearAlgebra.Matrix.Symmetric
+import Mathlib.Data.Real.Basic
 
-/-- The generic real-matrix facts behind `canRepresentNonLocal`/
+/-! The generic real-matrix facts behind `canRepresentNonLocal`/
     `guaranteedSelfAdjoint` (`Testv2.StructuralV2`) for the `symmetrized`
     (`B + Bᵀ`) operator recipe: for *every* real matrix `B`, `B + Bᵀ` is
     symmetric, and for `n ≥ 2` *some* real matrix `B` makes `B + Bᵀ` actually

@@ -42,9 +42,15 @@ verify`'s CLI calls these same functions, never a second implementation:
         session="session.json", project="examples/dft/lean", trusted_local=True,
     )
 
+    # `artifact`/`extraction_result` are required here too, and always take
+    # priority over whatever is already at `session` on disk: the
+    # certification-relevant session state is always freshly re-derived
+    # from them, overwriting `session`, never read back from it trustingly
+    # (research-readiness audit: persisted-session trust gap, see
+    # `docs/verification/TRUST_CHAIN_AUDIT.md`).
     certify_session(
         session="session.json", package="vista-package.json", project="examples/dft/lean",
-        output_dir="build/vista/certificate", trusted_local=True,
+        output_dir="build/vista/certificate", artifact="model.pt2", trusted_local=True,
     )
 
 The defensible claim this package establishes: VISTA checks whether

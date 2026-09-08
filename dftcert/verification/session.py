@@ -275,7 +275,7 @@ def start_session(
     *, artifact_sha256: str, inventory: dict[str, Any], extractor_version: str,
     package: dict[str, Any], adapter, project_root: str | Path, imports: list[str] | None = None,
     output: str | Path, lean_command=("lake", "env", "lean", "-j", "1"),
-    timeout_s: int = 600, trusted_local: bool = False,
+    timeout_s: int = 600, trusted_local: bool = False, force_fresh: bool = False,
 ) -> VerificationSession:
     """The canonical trusted entrypoint (spec/theorem-centric-gaps issue 1):
     takes the raw, safely-extracted graph `inventory` (never a pre-built
@@ -291,7 +291,22 @@ def start_session(
     (issue 3) and that the executing adapter matches the package's
     recorded identity (issue 4) before doing any resolution work.
     `adapter` is a `StructuralPlugin` instance -- its `lean_import` is the
-    default module to import unless `imports` overrides it."""
+    default module to import unless `imports` overrides it.
+
+    `force_fresh=True` (used by `dftcert.verification.api.certify_session`,
+    the certificate-issuing path -- see `docs/verification/
+    TRUST_CHAIN_AUDIT.md`) skips the "reuse the existing file at `output`
+    unchanged" shortcut below entirely, even when its hash-bound fields
+    all still match. That shortcut compares `artifact_sha256`/
+    `package_sha256`/`adapter_binding`/`ir_sha256` only -- none of which
+    cover `nodes` (the resolved binder/premise assignments actually used to
+    build a certificate) -- so an on-disk session whose `nodes` were
+    hand-edited after the fact, while every one of those four bindings was
+    left untouched, would otherwise be read back and reused verbatim
+    without ever re-running resolution. `force_fresh=True` always falls
+    through to a full re-derivation and unconditionally overwrites
+    `output`, so the caller never has to trust anything already on disk at
+    that path."""
     check_package_freshness(package, project_root)
     adapter_binding = check_adapter_identity(package, adapter)
     artifact_ir = structural_ir_from_inventory(
@@ -301,7 +316,7 @@ def start_session(
     ir_sha256 = sha256_value(artifact_ir)
     package_sha = package_sha256(package)
     output_path = Path(output)
-    if output_path.exists():
+    if output_path.exists() and not force_fresh:
         existing = json.loads(output_path.read_text(encoding="utf-8"))
         unchanged = (
             existing.get("artifact_binding", {}).get("artifact_sha256") == artifact_sha256

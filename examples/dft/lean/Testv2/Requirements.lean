@@ -72,6 +72,28 @@ theorem ValidPretrainingArchitectureConditional
     AcceptableArchitecture siteCount longRangePairs op xc :=
   ⟨hSA, hLR, hXC⟩
 
+/-- The minimal pre-training structural guarantee VISTA itself demonstrates
+    (as opposed to the fuller DFT-specific `AcceptableArchitecture` above):
+    self-adjointness of the artifact's recognized operator construction
+    alone, with no site-count/long-range/XC/message-passing premises. `A =
+    B + Bᵀ` is self-adjoint for any `B` (`ATᵀ = (B + Bᵀ)ᵀ = Bᵀ + B = B + Bᵀ
+    = A`); `guaranteedSelfAdjoint` is the finite, computable `OperatorForm`
+    grammar's stand-in for exactly that fact (see
+    `examples/dft/lean/Testv2/StructuralCapabilityMatrix.lean` for the
+    underlying real-matrix statement `guaranteedSelfAdjoint`'s `add
+    (adjoint) `/`add _ (adjoint)` cases stand in for). Kept independent of
+    `AcceptableArchitecture` on purpose (module docstring): one requirement
+    should not force an artifact to also carry unrelated site-count/XC/
+    message-passing facts merely because the same adapter happens to
+    derive them too. -/
+def SelfAdjointCompatible (op : OperatorForm) : Prop :=
+  guaranteedSelfAdjoint op = true
+
+theorem ValidSelfAdjointConstruction
+    (op : OperatorForm) (hSA : guaranteedSelfAdjoint op = true) :
+    SelfAdjointCompatible op :=
+  hSA
+
 /-- The message-passing receptive-field requirement, kept separate from
     `AcceptableArchitecture` -- see module docstring. -/
 def MessagePassingCoverage (edges : List (Nat × Nat)) (depth siteCount : Nat) : Prop :=

@@ -1,0 +1,19 @@
+# Reproducibility environment for VISTA's extraction/example-model path
+# (torch.export -> .pt2, the sandboxed extractor worker) -- NOT a general
+# project dependency list (the Lean/Mathlib toolchain, pinned separately in
+# examples/dft/lean/lakefile.toml at v4.31.0, is unaffected by this file and
+# must never be upgraded to match a newer torch).
+#
+# Pinned to the exact torch build this repository's committed real .pt2
+# fixtures (tests/fixtures/certified_ring.pt2 and this pass's
+# tests/fixtures/unconstrained_operator.pt2/certified_ring_seed_*.pt2) and
+# evaluation evidence (evaluation/structural_v2/results/**/evidence.json,
+# "torch_version") were actually produced and tested under. Do not upgrade
+# arbitrarily -- torch.export's serialized schema/opset can drift between
+# releases, which would silently invalidate the reproducibility claim these
+# fixtures make.
+#
+# Install into whichever Python interpreter runs
+# `extractors/torch_export_worker.py` (directly, or via the Bubblewrap
+# sandbox's --extractor-python): `pip install -r requirements-repro.txt`
+torch==2.6.0

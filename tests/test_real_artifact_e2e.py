@@ -22,6 +22,7 @@ skipped explicitly (never faked) when `bwrap` is unavailable or the
 sandboxed interpreter can't import torch.
 """
 import json
+import os
 import shutil
 import subprocess
 import unittest
@@ -36,7 +37,14 @@ from extractors.torch_export_worker import extract
 
 from tests.test_lean_introspection import _HAS_LEAN, _SKIP_REASON
 
-_SANDBOX_PYTHON = "/usr/bin/python3"
+# Defaults to the system interpreter (present in most sandboxable Linux
+# environments) -- override via VISTA_SANDBOX_PYTHON for an environment
+# (e.g. a conda/venv install) whose torch isn't on the system Python at all.
+# `dftcert.sandbox.BubblewrapExtractor._sandbox_python` already handles a
+# non-system interpreter generically: it bind-mounts that interpreter's own
+# environment root into the sandbox, so any real Python with torch works,
+# not just `/usr/bin/python3`.
+_SANDBOX_PYTHON = os.environ.get("VISTA_SANDBOX_PYTHON", "/usr/bin/python3")
 
 
 def _bubblewrap_skip_reason() -> str | None:
@@ -102,7 +110,7 @@ class RealArtifactEndToEndTests(unittest.TestCase):
             output_dir = Path(tmp) / "certificate"
             manifest = certify_session(
                 session=str(session_path), package=str(package_path), project=str(PROJECT),
-                output_dir=str(output_dir),
+                output_dir=str(output_dir), extraction_result=str(extraction_path),
                 trusted_local=True, timeout_s=180,
             )
             self.assertEqual(manifest["status"], "certified")
@@ -192,9 +200,23 @@ class BubblewrapSandboxEndToEndTests(unittest.TestCase):
             ).write(package_path)
             session_path = Path(tmp) / "session.json"
 
+            # `trusted_local=True` here gates ONLY the Lean toolchain
+            # invocation (there is no separate Lean-compiler sandbox in
+            # this repo yet -- every test in this suite that invokes Lean
+            # at all sets this, including the "real artifact" tests
+            # above); it does NOT weaken artifact-extraction trust --
+            # `_extraction_result` always routes a supplied `artifact=`
+            # through the real `BubblewrapExtractor` regardless of this
+            # flag's value (only the `extraction_result=` bypass path
+            # checks it). This test previously never set it and so could
+            # never actually run to completion (skipped everywhere lacking
+            # a simultaneous bwrap+torch+Lean environment) -- a
+            # pre-existing gap, unrelated to this pass's own changes,
+            # surfaced only now that such an environment exists.
             session = start_session(
                 artifact=str(ARTIFACT), package=str(package_path),
-                session=str(session_path), project=str(PROJECT), timeout_s=180,
+                session=str(session_path), project=str(PROJECT),
+                extractor_python=_SANDBOX_PYTHON, trusted_local=True, timeout_s=180,
             )
             self.assertEqual(session.value["artifact_binding"]["artifact_sha256"], result["artifact_sha256"])
             self.assertEqual(session.status, "ready_for_certificate")
@@ -202,7 +224,8 @@ class BubblewrapSandboxEndToEndTests(unittest.TestCase):
             output_dir = Path(tmp) / "certificate"
             manifest = certify_session(
                 session=str(session_path), package=str(package_path), project=str(PROJECT),
-                output_dir=str(output_dir), timeout_s=180,
+                output_dir=str(output_dir), artifact=str(ARTIFACT),
+                extractor_python=_SANDBOX_PYTHON, trusted_local=True, timeout_s=180,
             )
             self.assertEqual(manifest["status"], "certified")
             self.assertEqual(manifest["artifact_binding"]["artifact_sha256"], result["artifact_sha256"])
