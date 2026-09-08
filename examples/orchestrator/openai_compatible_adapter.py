@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
-"""OpenAI-compatible chat-completions adapter for Noether.
+"""OpenAI-compatible chat-completions adapter for VISTA.
 
 Works with many hosted local/cluster inference servers that expose:
 
-  POST {NOETHER_OPENAI_BASE_URL}/chat/completions
+  POST {VISTA_OPENAI_BASE_URL}/chat/completions
 
 or, when the base URL already ends in `/chat/completions`, exactly that URL.
 
 Environment:
 
-  NOETHER_OPENAI_BASE_URL=http://cluster-host:8000/v1
-  NOETHER_OPENAI_MODEL=local-coder
-  NOETHER_OPENAI_API_KEY=...          # optional for local servers
-  NOETHER_OPENAI_MAX_TOKENS=1800      # optional
-NOETHER_OPENAI_TIMEOUT_S=600        # optional; local servers may queue requests
+  VISTA_OPENAI_BASE_URL=http://cluster-host:8000/v1
+  VISTA_OPENAI_MODEL=local-coder
+  VISTA_OPENAI_API_KEY=...          # optional for local servers
+  VISTA_OPENAI_MAX_TOKENS=1800      # optional
+VISTA_OPENAI_TIMEOUT_S=600        # optional; local servers may queue requests
 """
 
 from __future__ import annotations
@@ -49,16 +49,16 @@ def endpoint_from_base(base_url: str) -> str:
 
 
 def complete(request: dict[str, Any]) -> dict[str, Any]:
-    base_url = os.environ.get("NOETHER_OPENAI_BASE_URL")
-    model = os.environ.get("NOETHER_OPENAI_MODEL")
+    base_url = os.environ.get("VISTA_OPENAI_BASE_URL")
+    model = os.environ.get("VISTA_OPENAI_MODEL")
     if not base_url:
-        raise RuntimeError("NOETHER_OPENAI_BASE_URL is required")
+        raise RuntimeError("VISTA_OPENAI_BASE_URL is required")
     if not model:
-        raise RuntimeError("NOETHER_OPENAI_MODEL is required")
+        raise RuntimeError("VISTA_OPENAI_MODEL is required")
     agent = str(request.get("agent", "agent"))
     schema = request.get("schema", {})
-    max_tokens = int(os.environ.get("NOETHER_OPENAI_MAX_TOKENS", "1800"))
-    timeout_s = int(os.environ.get("NOETHER_OPENAI_TIMEOUT_S", "600"))
+    max_tokens = int(os.environ.get("VISTA_OPENAI_MAX_TOKENS", "1800"))
+    timeout_s = int(os.environ.get("VISTA_OPENAI_TIMEOUT_S", "600"))
     body = {
         "model": model,
         "messages": [
@@ -72,14 +72,14 @@ def complete(request: dict[str, Any]) -> dict[str, Any]:
             },
             {
                 "role": "user",
-                "content": f"Noether agent: {agent}\n\n{request.get('prompt', '')}",
+                "content": f"VISTA agent: {agent}\n\n{request.get('prompt', '')}",
             },
         ],
         "temperature": 0.1 if agent == "critic" else 0.2,
         "max_tokens": max_tokens,
     }
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
-    api_key = os.environ.get("NOETHER_OPENAI_API_KEY")
+    api_key = os.environ.get("VISTA_OPENAI_API_KEY")
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
     http_request = urllib.request.Request(

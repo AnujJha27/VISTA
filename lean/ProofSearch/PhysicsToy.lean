@@ -1,7 +1,7 @@
 namespace ProofSearch.PhysicsToy
 
 /-!
-Small physics-flavored Lean targets for Noether demos.
+Small physics-flavored Lean targets for VISTA demos.
 
 These are intentionally dependency-light and bundled with the repository. They
 are not meant to be a physics library. Their job is to give the orchestrator

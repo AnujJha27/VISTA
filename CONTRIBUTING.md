@@ -20,7 +20,7 @@ Then run:
 ```bash
 make test
 make wsl-smoke
-make noether-demo
+make vista-demo
 make benchmark
 ```
 
@@ -39,11 +39,11 @@ make benchmark
 ## Review checklist
 
 - `make test` passes.
-- `make noether-demo` passes.
+- `make vista-demo` passes.
 - `make wsl-smoke` passes on a machine with Lean installed.
 - DFT certificate commands that require an external Lean project explicitly set
   `DFT_PROJECT`.
-- Cluster/local model examples use `NOETHER_OPENAI_BASE_URL`,
-  `NOETHER_OPENAI_MODEL`, or documented `--llm` presets instead of hardcoded
+- Cluster/local model examples use `VISTA_OPENAI_BASE_URL`,
+  `VISTA_OPENAI_MODEL`, or documented `--llm` presets instead of hardcoded
   endpoints in code.
 - New policy facts have provenance and tests for incomplete evidence.

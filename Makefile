@@ -18,7 +18,7 @@ BENCH_SRC := src/benchmark.cpp $(CORE_SRC)
 
 .PHONY: all test benchmark benchmark-repeat clean lean check-cpp-deps orchestrator-test dftcert-test dftcert-example \
 	dftcert-obligations dftcert-assemble-example dftcert-certify-example \
-	dftcert-search-example sanity-demo tui wsl-smoke noether-demo verification-test
+	dftcert-search-example sanity-demo tui wsl-smoke vista-demo verification-test
 
 all: $(BUILD)/proof-search
 
@@ -27,7 +27,7 @@ $(BUILD):
 
 check-cpp-deps:
 	@printf '%s\n' '#include <nlohmann/json.hpp>' '#include <openssl/sha.h>' 'int main() { return 0; }' | \
-	  $(CXX) $(CXXFLAGS) -x c++ - -c -o /tmp/noether-json-check.o >/dev/null 2>&1 || \
+	  $(CXX) $(CXXFLAGS) -x c++ - -c -o /tmp/vista-json-check.o >/dev/null 2>&1 || \
 	  (echo "Missing C++ dependencies: nlohmann/json.hpp and OpenSSL headers"; \
 	   echo "Install it before building, for example:"; \
 	   echo "  conda install -c conda-forge nlohmann_json openssl"; \
@@ -65,7 +65,7 @@ dftcert-test:
 # so a plain local `make test` stays fast and dependency-light.
 verification-test:
 	cd examples/dft/lean && $(LAKE) exe cache get && $(LAKE) build
-	python3 -m pip install --quiet --upgrade pytest torch
+	python3 -m pip install --quiet pytest -r requirements-repro.txt
 	python3 -m pytest tests/ -q --ignore=tests/test_dftcert.py --ignore=tests/test_orchestrator.py
 
 dftcert-example:
@@ -121,8 +121,8 @@ sanity-demo:
 tui:
 	python3 -m dftcert.tui
 
-noether-demo: $(BUILD)/proof-search lean
-	./noether demo physics-toy
+vista-demo: $(BUILD)/proof-search lean
+	./vista demo physics-toy
 
 test: $(BUILD)/proof-search $(BUILD)/tests lean orchestrator-test dftcert-test
 	$(BUILD)/tests

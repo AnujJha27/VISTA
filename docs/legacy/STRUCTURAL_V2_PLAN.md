@@ -1,4 +1,4 @@
-# Noether Structural V2 Implementation Plan
+# VISTA Structural V2 Implementation Plan
 
 ## Objective
 

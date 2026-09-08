@@ -1,4 +1,4 @@
-# Noether examples for the DFT policy library
+# VISTA examples for the DFT policy library
 
 These examples are specific to the DFT V1 policy profile in
 `policies/dft-architecture-v1.json`. V1 is retained under `dftcert.legacy` for
@@ -25,7 +25,7 @@ python3 -m dftcert.legacy.cli generate-obligations \
   --jsonl
 ```
 
-The checked-in file `examples/dft/noether-obligations.jsonl` is the same style
+The checked-in file `examples/dft/vista-obligations.jsonl` is the same style
 of task object, with extra `context` and `subgoals` fields for the agentic
 orchestrator.
 
@@ -42,10 +42,10 @@ lake update mathlib
 lake exe cache get
 lake build Testv2.Verifier
 cd ../../..
-./noether demo dft
+./vista demo dft
 
-./noether replay build/runs/noether-dft
-./noether tui --run-dir build/runs/noether-dft --once
+./vista replay build/runs/vista-dft
+./vista tui --run-dir build/runs/vista-dft --once
 ```
 
 ## DFT demo carousel
@@ -54,19 +54,19 @@ Use named scenarios when presenting the DFT workflow:
 
 ```bash
 # Full agentic Lean proof search over the reviewed canonical architecture.
-./noether demo dft --scenario certified --llm maestro --run-dir build/runs/dft-certified
+./vista demo dft --scenario certified --llm maestro --run-dir build/runs/dft-certified
 
 # A stated non-self-adjoint operator: rejected by the policy before proof search.
-./noether demo dft --scenario non-self-adjoint --run-dir build/runs/dft-non-self-adjoint
+./vista demo dft --scenario non-self-adjoint --run-dir build/runs/dft-non-self-adjoint
 
 # Required assumptions are absent: deliberately inconclusive.
-./noether demo dft --scenario missing-assumptions --run-dir build/runs/dft-missing
+./vista demo dft --scenario missing-assumptions --run-dir build/runs/dft-missing
 
 # All three claims are present, but no reviewed Lean architecture profile exists yet.
-./noether demo dft --scenario formalization-gap --run-dir build/runs/dft-gap
+./vista demo dft --scenario formalization-gap --run-dir build/runs/dft-gap
 ```
 
-Inspect any case with `./noether tui --run-dir <run-directory>`. The three
+Inspect any case with `./vista tui --run-dir <run-directory>`. The three
 non-certified scenarios are deterministic policy fixtures and intentionally do
 not invoke proof search.
 
@@ -92,7 +92,7 @@ adapter and optional model routing:
 PROOF_SEARCH_ALLOW_GENERATED_OBLIGATIONS=1 \
 PROOF_SEARCH_PROJECT_DIR=examples/dft/lean \
 PROOF_SEARCH_DB=build/dft-real-model.db \
-./noether agentic \
+./vista agentic \
   --provider command \
   --llm-command "/path/to/adapter --model lean-prover" \
   --agents-file examples/orchestrator/agents.research.json \
@@ -100,16 +100,16 @@ PROOF_SEARCH_DB=build/dft-real-model.db \
   --verifier ./build/proof-search \
   --run-dir build/runs/dft-real-model \
   --max-rounds 3 \
-  < examples/dft/noether-obligations.jsonl
+  < examples/dft/vista-obligations.jsonl
 ```
 
 On the Maestro cluster, use the one-command local-model presets:
 
 ```bash
-./noether demo dft --llm maestro
-./noether demo dft --llm piano
-./noether demo dft --llm sitar
-./noether demo dft --llm violin
+./vista demo dft --llm maestro
+./vista demo dft --llm piano
+./vista demo dft --llm sitar
+./vista demo dft --llm violin
 ```
 
 ## End-to-end three-hop GNN demo
@@ -121,13 +121,13 @@ first extracts the English claims; review the resulting draft before using the
 checked facts and architecture IR to start proof search.
 
 ```bash
-./noether assess dft \
+./vista assess dft \
   --description examples/dft/gnn-3hop-description.txt \
   --model-id chain4-gnn \
   --llm maestro \
   --run-dir build/runs/chain4-gnn-assess
 
-./noether certify \
+./vista certify \
   --run-dir build/runs/chain4-gnn-certify \
   --description examples/dft/gnn-3hop-description.txt \
   --model-id chain4-gnn \
@@ -141,8 +141,8 @@ For `maestro`, the certificate command uses the same adapter environment as
 the demo command:
 
 ```bash
-export NOETHER_OPENAI_BASE_URL=http://127.0.0.1:11434/v1/chat/completions
-export NOETHER_OPENAI_MODEL=qwen3.6-64k:latest
+export VISTA_OPENAI_BASE_URL=http://127.0.0.1:11434/v1/chat/completions
+export VISTA_OPENAI_MODEL=qwen3.6-64k:latest
 ```
 
 `certify` deliberately requires the reviewed facts and IR; the assessment
@@ -155,8 +155,8 @@ coupling (`0 → 3`) but has two equally short paths around the ring.
 For the one-command bundled demos, use:
 
 ```bash
-./noether demo physics-toy --llm maestro
-./noether demo physics-toy --llm piano
-./noether demo physics-toy --llm sitar
-./noether demo physics-toy --llm violin
+./vista demo physics-toy --llm maestro
+./vista demo physics-toy --llm piano
+./vista demo physics-toy --llm sitar
+./vista demo physics-toy --llm violin
 ```

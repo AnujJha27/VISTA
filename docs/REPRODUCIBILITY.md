@@ -36,7 +36,7 @@ make wsl-smoke
 make benchmark
 make benchmark-repeat
 make sanity-demo
-make noether-demo
+make vista-demo
 ```
 
 Expected result:
@@ -49,15 +49,15 @@ Expected result:
   run-to-run variance.
 - `make sanity-demo` writes a draft hypothesis manifest and report under
   `build/`.
-- `make noether-demo` runs the deterministic bundled agentic workflow over
+- `make vista-demo` runs the deterministic bundled agentic workflow over
   `ProofSearch.PhysicsToy` and writes a durable run under
-  `build/runs/noether-physics-toy`.
+  `build/runs/vista-physics-toy`.
 
 Inspect the bundled demo:
 
 ```bash
-./noether replay build/runs/noether-physics-toy
-./noether tui --run-dir build/runs/noether-physics-toy --once
+./vista replay build/runs/vista-physics-toy
+./vista tui --run-dir build/runs/vista-physics-toy --once
 ```
 
 ## Terminal UI
@@ -76,7 +76,7 @@ python3 -m dftcert.tui --once
 
 ## Model adapter demos
 
-Noether can run with:
+VISTA can run with:
 
 - the deterministic checked-in adapter;
 - OpenRouter's free-model route through `OPENROUTER_API_KEY`;
@@ -86,13 +86,13 @@ Noether can run with:
 Examples:
 
 ```bash
-./noether demo physics-toy --llm openrouter-free
+./vista demo physics-toy --llm openrouter-free
 
-export NOETHER_OPENAI_BASE_URL=http://cluster-node:8000/v1
-export NOETHER_OPENAI_MODEL=local-lean-coder
-./noether demo physics-toy --llm openai-compatible
+export VISTA_OPENAI_BASE_URL=http://cluster-node:8000/v1
+export VISTA_OPENAI_MODEL=local-lean-coder
+./vista demo physics-toy --llm openai-compatible
 
-./noether demo physics-toy --llm maestro
+./vista demo physics-toy --llm maestro
 ```
 
 Real credentials belong in `.env`, which is ignored. Commit only
@@ -123,12 +123,12 @@ three are deterministic policy fixtures that demonstrate an explicit refusal
 before proof search.
 
 ```bash
-./noether demo dft --scenario certified --llm maestro --run-dir build/runs/dft-certified
-./noether demo dft --scenario non-self-adjoint --run-dir build/runs/dft-non-self-adjoint
-./noether demo dft --scenario missing-assumptions --run-dir build/runs/dft-missing
-./noether demo dft --scenario formalization-gap --run-dir build/runs/dft-gap
+./vista demo dft --scenario certified --llm maestro --run-dir build/runs/dft-certified
+./vista demo dft --scenario non-self-adjoint --run-dir build/runs/dft-non-self-adjoint
+./vista demo dft --scenario missing-assumptions --run-dir build/runs/dft-missing
+./vista demo dft --scenario formalization-gap --run-dir build/runs/dft-gap
 
-./noether tui --run-dir build/runs/dft-non-self-adjoint --once
+./vista tui --run-dir build/runs/dft-non-self-adjoint --once
 ```
 
 ## Benchmark interpretation

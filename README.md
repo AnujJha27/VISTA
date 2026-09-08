@@ -220,15 +220,20 @@ python vista verify start \
   --artifact tests/fixtures/certified_ring.pt2 \
   --package examples/self_adjoint_demo/vista-package.json \
   --session examples/self_adjoint_demo/session.json \
-  --project examples/dft/lean --timeout-s 180
+  --project examples/dft/lean --timeout-s 180 --trusted-local
 
 python vista verify certify \
   --session examples/self_adjoint_demo/session.json \
   --package examples/self_adjoint_demo/vista-package.json \
   --project examples/dft/lean \
   --output-dir examples/self_adjoint_demo/certificate \
-  --artifact tests/fixtures/certified_ring.pt2 --timeout-s 180
+  --artifact tests/fixtures/certified_ring.pt2 --timeout-s 180 --trusted-local
 ```
+
+`--artifact` still sends the `.pt2` through the Bubblewrap sandbox for
+extraction. `--trusted-local` is required here for a separate reason: it is
+also what permits the Lean compiler itself to be invoked locally (Lean
+resolution/introspection), which is not sandboxed.
 
 Expect `"status": "certified"`. Point `--artifact` at
 `tests/fixtures/unconstrained_operator.pt2` (build it first with

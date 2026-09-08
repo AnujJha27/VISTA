@@ -201,11 +201,11 @@ def _chat_completions(*, base_url: str, model: str, system: str, prompt: str,
             {"role": "user", "content": prompt},
         ],
         "temperature": 0.1,
-        "max_tokens": int(os.environ.get("NOETHER_OPENAI_MAX_TOKENS", "4096")),
+        "max_tokens": int(os.environ.get("VISTA_OPENAI_MAX_TOKENS", "4096")),
         "response_format": {"type": "json_object"},
     }
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
-    api_key = os.environ.get("NOETHER_OPENAI_API_KEY")
+    api_key = os.environ.get("VISTA_OPENAI_API_KEY")
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
     request = urllib.request.Request(

@@ -76,7 +76,7 @@ lineage edges, and frontier state before allocating new model calls.
 For multi-task durable runs above individual theorem search:
 
 ```bash
-noether agentic --provider command \
+vista agentic --provider command \
   --llm-command "/path/to/your-model-adapter --model lean-prover" \
   --run-dir build/runs/my-model \
   < tasks.jsonl > results.jsonl
@@ -94,8 +94,8 @@ The run directory contains `state.json`, `events.jsonl`, and per-task artifacts.
 Inspect or replay it with:
 
 ```bash
-noether tui --run-dir build/runs/my-model --once
-noether replay build/runs/my-model
+vista tui --run-dir build/runs/my-model --once
+vista replay build/runs/my-model
 ```
 
 The orchestrator is a provider-neutral Python 3 layer above `build/proof-search`. It uses multiple LLM roles to generate and rank Lean patches, asks the C++ service to verify them, and feeds Lean diagnostics into later repair rounds.
@@ -109,7 +109,7 @@ From the repository root:
 ```bash
 make
 make wsl-smoke
-./noether demo physics-toy
+./vista demo physics-toy
 ```
 
 The smoke test uses a deterministic mock LLM and the real C++/Lean verifier. It validates the complete process and pipe wiring but does not test model quality.
@@ -117,15 +117,15 @@ The smoke test uses a deterministic mock LLM and the real C++/Lean verifier. It 
 For a richer deterministic trace over bundled physics-flavored Lean tasks:
 
 ```bash
-./noether demo physics-toy
-./noether replay build/runs/noether-physics-toy
-./noether tui --run-dir build/runs/noether-physics-toy --once
+./vista demo physics-toy
+./vista replay build/runs/vista-physics-toy
+./vista tui --run-dir build/runs/vista-physics-toy --once
 ```
 
 For a free-model API demo, create an OpenRouter API key and run:
 
 ```bash
-./noether demo physics-toy --llm openrouter-free
+./vista demo physics-toy --llm openrouter-free
 ```
 
 The demo command loads `.env` from the repository root. `.env` is git-ignored;
@@ -134,18 +134,18 @@ use `.env.example` as the committed template.
 For a cluster-hosted OpenAI-compatible server:
 
 ```bash
-export NOETHER_OPENAI_BASE_URL="http://cluster-node:8000/v1"
-export NOETHER_OPENAI_MODEL="local-lean-coder"
-./noether demo physics-toy --llm openai-compatible
+export VISTA_OPENAI_BASE_URL="http://cluster-node:8000/v1"
+export VISTA_OPENAI_MODEL="local-lean-coder"
+./vista demo physics-toy --llm openai-compatible
 ```
 
 For the Maestro cluster presets:
 
 ```bash
-./noether demo physics-toy --llm maestro
-./noether demo physics-toy --llm piano
-./noether demo physics-toy --llm sitar
-./noether demo physics-toy --llm violin
+./vista demo physics-toy --llm maestro
+./vista demo physics-toy --llm piano
+./vista demo physics-toy --llm sitar
+./vista demo physics-toy --llm violin
 ```
 
 Run the fast orchestration unit tests with:
@@ -279,7 +279,7 @@ repair. Decomposed subgoals and compact run memory remain visible to proposers;
 only repeated metadata and verbose history are removed:
 
 ```bash
-./noether agentic --provider command \
+./vista agentic --provider command \
   --llm-command "/path/to/your-local-adapter --model local-lean-coder" \
   --small-model < tasks.jsonl
 ```

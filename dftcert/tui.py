@@ -669,7 +669,7 @@ def confirm_assumptions_tui(manifest: ArchitectureManifest, policy: Policy) -> N
         left_w = max(32, min(48, width // 3))
         right_x = left_w + 2
         right_w = width - left_w - 3
-        screen.addstr(0, 2, "† NOETHER ASSUMPTION REVIEW", attr("title") | curses.A_BOLD)
+        screen.addstr(0, 2, "† VISTA ASSUMPTION REVIEW", attr("title") | curses.A_BOLD)
         screen.addstr(0, 32, message[:max(0, width - 34)], attr("muted"))
 
         draw_box(screen, 2, 1, height - 3, left_w, "extracted assumptions")
@@ -1370,7 +1370,7 @@ class TuiApp:
 
 
 def arguments(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Terminal UI for Noether")
+    parser = argparse.ArgumentParser(description="Terminal UI for VISTA")
     parser.add_argument("--policy", default=str(DEFAULT_POLICY))
     parser.add_argument("--model-id", default="terminal-hypothesis")
     parser.add_argument("--hypothesis", default=DEFAULT_HYPOTHESIS)

@@ -1,4 +1,4 @@
-name = "noether-dft-example"
+name = "vista-dft-example"
 version = "0.1.0"
 keywords = ["math", "dft", "verification"]
 defaultTargets = ["Testv2"]

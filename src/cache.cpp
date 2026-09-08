@@ -50,7 +50,7 @@ Cache::Cache(const std::filesystem::path& database_path,
       inputs.push_back(iterator->path());
   }
   std::sort(inputs.begin(), inputs.end());
-  std::string project_contents = "noether-verifier-cache-v2\0" +
+  std::string project_contents = "vista-verifier-cache-v2\0" +
                                  project_dir_.string() + '\0' +
                                  lean_toolchain_identity(project_dir_) + '\0';
   for (const auto& input : inputs)

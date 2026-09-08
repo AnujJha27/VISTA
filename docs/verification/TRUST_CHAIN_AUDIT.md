@@ -123,7 +123,7 @@ entrypoint script (`vista`, at the repo root) on this project's primary dev
 toolchain (Windows `python.exe`), not by calling internal functions.
 
 **Two real bugs found and fixed, both the same class of problem:** the
-`vista`/`noether` console entrypoint (`dftcert.local_cli`) imported
+`vista`/`vista` console entrypoint (`dftcert.local_cli`) imported
 POSIX-only modules at module level that only specific *legacy* commands
 actually need — `curses` (only used by one assumption-confirmation TUI
 fallback) and `fcntl` (via `dftcert.legacy.pipeline`, only used by the

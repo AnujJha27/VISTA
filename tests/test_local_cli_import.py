@@ -1,5 +1,5 @@
-"""research-readiness audit section 8: `dftcert.local_cli` (the `noether`/
-`vista` console-script entrypoint) must actually be importable and able to
+"""research-readiness audit section 8: `dftcert.local_cli` (the `vista`
+console-script entrypoint) must actually be importable and able to
 reach the `verify` subcommand on this project's primary dev toolchain
 (Windows `python.exe`), not just under WSL. Two real module-level POSIX-only
 imports (`curses`, and `fcntl` via `dftcert.legacy.pipeline`) previously

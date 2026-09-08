@@ -67,7 +67,7 @@ Python path. The exporter writes `.pt2` files under
 Production analysis uses the no-network bubblewrap boundary:
 
 ```bash
-./noether structural analyze-pt2 build/structural-v2-models/certified-ring.pt2 \
+./vista structural analyze-pt2 build/structural-v2-models/certified-ring.pt2 \
   --constraints examples/dft/structural-v2-input-constraints.json \
   --output build/certified-ring-ir.json
 ```
@@ -86,12 +86,12 @@ That local route is for artifacts you created yourself. Uploaded or untrusted
 ## Generate and prove the exact obligations
 
 ```bash
-./noether structural generate --ir build/certified-ring-ir.json --jsonl \
+./vista structural generate --ir build/certified-ring-ir.json --jsonl \
   > build/certified-ring-tasks.jsonl
 
-./noether agentic \
+./vista agentic \
   --provider command \
-  --llm-command "python examples/orchestrator/noether_demo_llm.py" \
+  --llm-command "python examples/orchestrator/vista_demo_llm.py" \
   --verifier build/proof-search \
   --full-process \
   --small-model \
@@ -111,13 +111,13 @@ epochs add no nodes, the task is saved as `paused_stagnant` instead of burning
 the remaining local-model budget.
 
 ```bash
-./noether structural assemble \
+./vista structural assemble \
   --ir build/certified-ring-ir.json \
   --proof-results build/certified-ring-proof-results.jsonl \
   --source-output build/CertifiedRingCertificate.lean \
   --report-output build/certified-ring-certificate.json
 
-./noether structural check-certificate \
+./vista structural check-certificate \
   --project examples/dft/lean \
   --source build/CertifiedRingCertificate.lean \
   --trusted-local
@@ -130,13 +130,13 @@ claim about a `.pt2` file. The result is labelled
 `confirmed_specification`, not `artifact`.
 
 ```bash
-./noether structural draft-description \
+./vista structural draft-description \
   --description architecture.md \
   --llm-command "your-local-qwen-adapter" \
   --output build/spec-draft.json
 
 # Review proposed_claims in the draft, edit them if necessary, then confirm:
-./noether structural confirm-description \
+./vista structural confirm-description \
   --draft build/spec-draft.json \
   --reviewed-claims reviewed-claims.json \
   --confirmed \
@@ -148,7 +148,7 @@ same. The distinction between a specification certificate and an artifact
 certificate is permanent and recorded in the assembly report.
 
 Human confirmation only says that the reviewed IR is the specification the
-reviewer intends Noether to attempt to prove. It does not establish any
+reviewer intends VISTA to attempt to prove. It does not establish any
 structural property. The confirmed IR still generates the same three classes
 of Lean obligation, and certificate assembly still requires a Lean-verified
 proof result for every generated theorem.
@@ -156,7 +156,7 @@ proof result for every generated theorem.
 ## Direct Qwen comparison
 
 Do not compare systems by how convincing their prose sounds. Run direct Qwen
-and Qwen inside Noether on the same four cases, then store each result as:
+and Qwen inside VISTA on the same four cases, then store each result as:
 
 ```json
 {"case":"certified-ring","checks":{"xc_discontinuity_compatible":true,"spatial_nonlocality_compatible":true,"self_adjoint":true},"artifact_sha256":"...","ir_sha256":"...","certificate_status":"verified"}
@@ -167,7 +167,7 @@ Score both files with:
 ```bash
 python examples/dft/evaluate_structural_v2.py \
   --direct build/direct-qwen-results.json \
-  --harness build/noether-qwen-results.json
+  --harness build/vista-qwen-results.json
 ```
 
 The scorer reports structural answer accuracy separately from artifact-binding

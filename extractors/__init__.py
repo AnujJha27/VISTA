@@ -1,1 +1,1 @@
-"""Artifact extraction helpers for the Noether DFT certification prototype."""
+"""Artifact extraction helpers for the VISTA DFT certification prototype."""

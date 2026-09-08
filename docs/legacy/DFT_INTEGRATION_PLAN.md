@@ -282,17 +282,17 @@ The workflow remains provider-neutral. Current adapters include:
 Examples:
 
 ```bash
-./noether demo physics-toy
-./noether demo physics-toy --llm openrouter-free
-./noether demo physics-toy --llm maestro
-./noether demo dft --project "$DFT_PROJECT" --llm maestro
+./vista demo physics-toy
+./vista demo physics-toy --llm openrouter-free
+./vista demo physics-toy --llm maestro
+./vista demo dft --project "$DFT_PROJECT" --llm maestro
 
 # DFT presentation carousel: proof success, policy failure, missing evidence,
 # and a formalization gap.
-./noether demo dft --scenario certified --llm maestro
-./noether demo dft --scenario non-self-adjoint
-./noether demo dft --scenario missing-assumptions
-./noether demo dft --scenario formalization-gap
+./vista demo dft --scenario certified --llm maestro
+./vista demo dft --scenario non-self-adjoint
+./vista demo dft --scenario missing-assumptions
+./vista demo dft --scenario formalization-gap
 ```
 
 ## Deferred work

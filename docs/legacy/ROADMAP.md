@@ -1,4 +1,4 @@
-# Noether roadmap
+# VISTA roadmap
 
 ## Purpose
 

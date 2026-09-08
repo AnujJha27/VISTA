@@ -205,9 +205,9 @@ lake update mathlib
 lake exe cache get
 lake build Testv2.Verifier
 cd ../../..
-./noether demo dft
-./noether replay build/runs/noether-dft
-./noether tui --run-dir build/runs/noether-dft --once
+./vista demo dft
+./vista replay build/runs/vista-dft
+./vista tui --run-dir build/runs/vista-dft --once
 ```
 
 ### Presentation scenarios
@@ -218,38 +218,38 @@ unformalized-but-plausible description:
 
 ```bash
 # Full agentic search over the reviewed canonical Lean architecture.
-./noether demo dft --scenario certified --llm maestro --run-dir build/runs/dft-certified
+./vista demo dft --scenario certified --llm maestro --run-dir build/runs/dft-certified
 
 # No proof search: the submitted claim explicitly contradicts self-adjointness.
-./noether demo dft --scenario non-self-adjoint --run-dir build/runs/dft-non-self-adjoint
+./vista demo dft --scenario non-self-adjoint --run-dir build/runs/dft-non-self-adjoint
 
 # No proof search: required architecture claims were not supplied.
-./noether demo dft --scenario missing-assumptions --run-dir build/runs/dft-missing
+./vista demo dft --scenario missing-assumptions --run-dir build/runs/dft-missing
 
 # No proof search: all claims are present, but no reviewed Lean profile matches.
-./noether demo dft --scenario formalization-gap --run-dir build/runs/dft-gap
+./vista demo dft --scenario formalization-gap --run-dir build/runs/dft-gap
 ```
 
-Inspect a scenario with `./noether tui --run-dir <run-directory>`. The latter
-three are deterministic policy fixtures: they show why Noether refuses to run
+Inspect a scenario with `./vista tui --run-dir <run-directory>`. The latter
+three are deterministic policy fixtures: they show why VISTA refuses to run
 proof search, rather than presenting a failed proof search as a physics result.
 
 For local or cluster-hosted OpenAI-compatible models, use the demo presets or
 the command adapter. The bundled physics-toy demo does not require Testv2:
 
 ```bash
-./noether demo physics-toy --llm maestro
+./vista demo physics-toy --llm maestro
 
-export NOETHER_OPENAI_BASE_URL=http://cluster-node:8000/v1
-export NOETHER_OPENAI_MODEL=local-lean-coder
-./noether demo physics-toy --llm openai-compatible
+export VISTA_OPENAI_BASE_URL=http://cluster-node:8000/v1
+export VISTA_OPENAI_MODEL=local-lean-coder
+./vista demo physics-toy --llm openai-compatible
 ```
 
 For the DFT tasks against the vendored Testv2 snapshot:
 
 ```bash
-./noether demo dft --llm maestro
-./noether demo dft --llm openai-compatible
+./vista demo dft --llm maestro
+./vista demo dft --llm openai-compatible
 ```
 
 To test a separate Testv2 checkout under review, pass
@@ -292,7 +292,7 @@ No server or upload API is involved. Start a certification directly from an
 already confirmed/extracted manifest:
 
 ```bash
-./noether certify \
+./vista certify \
   --run-dir build/runs/my-model \
   --manifest examples/dft/example-manifest.json \
   --project /path/to/Testv2/project \
@@ -308,8 +308,8 @@ If proof search exhausts its current round budget or the process is stopped,
 continue on the same frontier without repeating completed obligations:
 
 ```bash
-./noether resume build/runs/my-model
-./noether status build/runs/my-model
+./vista resume build/runs/my-model
+./vista status build/runs/my-model
 ```
 
 English input can be confirmed and run locally in one command by supplying

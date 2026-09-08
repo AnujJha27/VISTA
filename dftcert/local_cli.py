@@ -107,7 +107,7 @@ def _ensure_lean_project_built(project: Path, target: str | None = None) -> None
 
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(
-        prog="noether",
+        prog="vista",
         description="Structural V2 certification with retained legacy V1 workflows",
     )
     root.add_argument("--policy", default=str(DEFAULT_POLICY))
@@ -156,7 +156,7 @@ def parser() -> argparse.ArgumentParser:
     )
     verify.add_argument("verify_args", nargs=argparse.REMAINDER)
 
-    demo = commands.add_parser("demo", help="run a bundled Noether workflow demo")
+    demo = commands.add_parser("demo", help="run a bundled VISTA workflow demo")
     demo.add_argument(
         "kind",
         nargs="?",
@@ -264,7 +264,7 @@ def _manifest(options: argparse.Namespace, policy: Policy) -> ArchitectureManife
     )
     # Deferred: `dftcert.sandbox` imports the POSIX-only `resource` module
     # at load time; only this (legacy) command path needs it, and a
-    # module-level import here would break every `noether`/`vista`
+    # module-level import here would break every `vista`
     # subcommand on Windows, including `verify` (research-readiness audit
     # section 8).
     from .sandbox import BubblewrapExtractor
@@ -322,7 +322,7 @@ def _write_dft_assessment_demo(
 ) -> int:
     spec = DFT_DEMO_SCENARIOS[scenario]
     hypothesis = spec["hypothesis"]
-    run_dir = Path(options.run_dir or (ROOT / "build/runs" / f"noether-dft-{scenario}"))
+    run_dir = Path(options.run_dir or (ROOT / "build/runs" / f"vista-dft-{scenario}"))
     manifest = draft_hypothesis(
         model_id=f"demo-fixture:{scenario}", hypothesis=hypothesis, policy=policy,
     )
@@ -346,7 +346,7 @@ def _write_dft_assessment_demo(
         "verdict": assessment["verdict"],
         "summary": assessment["summary"],
         "run_dir": str(run_dir),
-        "inspect": f"./noether tui --run-dir {run_dir}",
+        "inspect": f"./vista tui --run-dir {run_dir}",
         "note": "This scenario stops at policy assessment; it does not claim a Lean proof search ran.",
     }, sort_keys=True))
     return 0
@@ -359,19 +359,19 @@ def _run_demo(options: argparse.Namespace, policy: Policy) -> int:
     verifier = Path(options.verifier)
     if not verifier.exists():
         raise ValueError(f"verifier not found at {verifier}; run `make` first")
-    demo_adapter = ROOT / "examples/orchestrator/noether_demo_llm.py"
+    demo_adapter = ROOT / "examples/orchestrator/vista_demo_llm.py"
     openrouter_adapter = ROOT / "examples/orchestrator/openrouter_free_adapter.py"
     openai_compatible_adapter = ROOT / "examples/orchestrator/openai_compatible_adapter.py"
     agents = ROOT / "examples/orchestrator/agents.research.json"
     if options.kind == "physics-toy":
         tasks = ROOT / "examples/orchestrator/physics-toy-tasks.jsonl"
-        run_dir = options.run_dir or str(ROOT / "build/runs/noether-physics-toy")
+        run_dir = options.run_dir or str(ROOT / "build/runs/vista-physics-toy")
         env = os.environ.copy()
         _ensure_lean_project_built(ROOT / "lean")
     else:
-        tasks = ROOT / "examples/dft/noether-obligations.jsonl"
+        tasks = ROOT / "examples/dft/vista-obligations.jsonl"
         project = options.project or os.environ.get("DFT_PROJECT") or str(ROOT / "examples/dft/lean")
-        run_dir = options.run_dir or str(ROOT / "build/runs/noether-dft")
+        run_dir = options.run_dir or str(ROOT / "build/runs/vista-dft")
         _ensure_lean_project_built(Path(project), "Testv2.Verifier")
         env = os.environ.copy()
         env.update({
@@ -385,12 +385,12 @@ def _run_demo(options: argparse.Namespace, policy: Policy) -> int:
         llm_command = f"{shlex.quote(sys.executable)} {shlex.quote(str(openrouter_adapter))}"
         env["OPENROUTER_MODEL"] = options.model or "openrouter/free"
     elif options.llm == "openai-compatible":
-        if not env.get("NOETHER_OPENAI_BASE_URL"):
-            raise ValueError("NOETHER_OPENAI_BASE_URL is required for --llm openai-compatible")
-        if not env.get("NOETHER_OPENAI_MODEL") and not options.model:
-            raise ValueError("NOETHER_OPENAI_MODEL or --model is required for --llm openai-compatible")
+        if not env.get("VISTA_OPENAI_BASE_URL"):
+            raise ValueError("VISTA_OPENAI_BASE_URL is required for --llm openai-compatible")
+        if not env.get("VISTA_OPENAI_MODEL") and not options.model:
+            raise ValueError("VISTA_OPENAI_MODEL or --model is required for --llm openai-compatible")
         if options.model:
-            env["NOETHER_OPENAI_MODEL"] = options.model
+            env["VISTA_OPENAI_MODEL"] = options.model
         llm_command = f"{shlex.quote(sys.executable)} {shlex.quote(str(openai_compatible_adapter))}"
     else:
         llm_command = f"{shlex.quote(sys.executable)} {shlex.quote(str(demo_adapter))}"
@@ -445,15 +445,15 @@ def _run_demo(options: argparse.Namespace, policy: Policy) -> int:
         "kind": options.kind,
         "llm": options.llm,
         "model": (
-            (options.model or env.get("OPENROUTER_MODEL") or env.get("NOETHER_OPENAI_MODEL"))
+            (options.model or env.get("OPENROUTER_MODEL") or env.get("VISTA_OPENAI_MODEL"))
             if options.llm in {"openrouter-free", "openai-compatible"}
             else "deterministic"
         ),
         "run_dir": run_dir,
         "tasks": statuses,
         "results": str(Path(run_dir) / "results.jsonl"),
-        "replay": f"./noether replay {run_dir}",
-        "inspect": f"./noether tui --run-dir {run_dir} --once",
+        "replay": f"./vista replay {run_dir}",
+        "inspect": f"./vista tui --run-dir {run_dir} --once",
     }, sort_keys=True))
     return 0
 
@@ -471,12 +471,12 @@ def _run_assess(options: argparse.Namespace, policy: Policy) -> int:
             policy=policy,
         )
     else:
-        base_url = os.environ.get("NOETHER_OPENAI_BASE_URL")
-        model = options.model or os.environ.get("NOETHER_OPENAI_MODEL")
+        base_url = os.environ.get("VISTA_OPENAI_BASE_URL")
+        model = options.model or os.environ.get("VISTA_OPENAI_MODEL")
         if not base_url:
-            raise ValueError("NOETHER_OPENAI_BASE_URL is required for LLM assumption extraction")
+            raise ValueError("VISTA_OPENAI_BASE_URL is required for LLM assumption extraction")
         if not model:
-            raise ValueError("NOETHER_OPENAI_MODEL or --model is required for LLM assumption extraction")
+            raise ValueError("VISTA_OPENAI_MODEL or --model is required for LLM assumption extraction")
         manifest = draft_with_llm(
             model_id=options.model_id,
             description=description,
@@ -491,7 +491,7 @@ def _run_assess(options: argparse.Namespace, policy: Policy) -> int:
                 # `curses` (POSIX-only) and `dftcert.tui`, which imports it
                 # at module level, both stay deferred to exactly here -- a
                 # module-level `import curses` in *this* file would break
-                # every `noether`/`vista` subcommand on Windows, not just
+                # every `vista` subcommand on Windows, not just
                 # this one (research-readiness audit section 8: caught by
                 # actually running the documented workflow's CLI
                 # entrypoint).
@@ -525,7 +525,7 @@ def _run_assess(options: argparse.Namespace, policy: Policy) -> int:
         "verdict": assessment["verdict"],
         "summary": assessment["summary"],
         "run_dir": str(run_dir),
-        "inspect": f"./noether tui --run-dir {run_dir} --once",
+        "inspect": f"./vista tui --run-dir {run_dir} --once",
         "artifacts": {
             "assessment": str(run_dir / "assessment.json"),
             "manifest": str(run_dir / "manifest.json"),
@@ -556,7 +556,7 @@ def main(argv: list[str] | None = None) -> int:
         # Deferred: `dftcert.legacy.pipeline` imports the POSIX-only
         # `fcntl` module at load time; only the legacy (non-`verify`/
         # `structural`/`agentic`) commands below need it, and a
-        # module-level import would break every `noether`/`vista`
+        # module-level import would break every `vista`
         # subcommand on Windows, including `verify` (research-readiness
         # audit section 8).
         from .legacy.pipeline import LocalPipeline, LocalPipelineConfig, LocalRun, command_tuple

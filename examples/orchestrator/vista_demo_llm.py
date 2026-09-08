@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deterministic demo adapter for Noether examples.
+"""Deterministic demo adapter for VISTA examples.
 
 This is not an LLM. It implements the same JSON stdin/stdout contract as a
 model adapter so the agentic harness can be demonstrated reproducibly.

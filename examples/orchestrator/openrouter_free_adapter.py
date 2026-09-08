@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""OpenRouter free-model adapter for Noether.
+"""OpenRouter free-model adapter for VISTA.
 
-Reads the Noether provider envelope from stdin and writes one JSON object to
+Reads the VISTA provider envelope from stdin and writes one JSON object to
 stdout. Configure with:
 
   OPENROUTER_API_KEY=...
@@ -61,7 +61,7 @@ def complete(request: dict[str, Any]) -> dict[str, Any]:
             },
             {
                 "role": "user",
-                "content": f"Noether agent: {agent}\n\n{prompt}",
+                "content": f"VISTA agent: {agent}\n\n{prompt}",
             },
         ],
         "temperature": 0.1 if agent == "critic" else 0.2,
@@ -74,8 +74,8 @@ def complete(request: dict[str, Any]) -> dict[str, Any]:
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
             "Accept": "application/json",
-            "HTTP-Referer": "https://github.com/AnujJha27/Noether",
-            "X-Title": "Noether",
+            "HTTP-Referer": "https://github.com/AnujJha27/VISTA",
+            "X-Title": "VISTA",
         },
         method="POST",
     )

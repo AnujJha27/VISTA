@@ -36,7 +36,7 @@ def score(expected: dict[str, dict[str, bool]], value: Any) -> dict[str, float |
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Score direct-Qwen and Noether outputs on the same structural cases"
+        description="Score direct-Qwen and VISTA outputs on the same structural cases"
     )
     parser.add_argument("--direct", required=True)
     parser.add_argument("--harness", required=True)
@@ -50,7 +50,7 @@ def main() -> int:
     }
     print(json.dumps({
         "direct_qwen": score(expected, load(options.direct)),
-        "noether_qwen": score(expected, load(options.harness)),
+        "vista_qwen": score(expected, load(options.harness)),
     }, indent=2, sort_keys=True))
     return 0
 

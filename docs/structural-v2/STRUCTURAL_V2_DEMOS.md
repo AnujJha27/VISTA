@@ -40,7 +40,7 @@ Write a report for every case:
 ```bash
 for case in certified-ring identity-operator-ring zero-operator-ring \
   too-shallow-ring smooth-xc unconstrained-operator all-failures-ring; do
-  ./noether structural report \
+  ./vista structural report \
     --ir "build/structural-v2-analysis/$case.json" \
     --output "build/structural-v2-analysis/$case-report.json"
 done
@@ -66,13 +66,13 @@ export PROOF_SEARCH_ALLOW_GENERATED_OBLIGATIONS=1
 export PROOF_SEARCH_PROJECT_DIR="$PWD/examples/dft/lean"
 export PROOF_SEARCH_DB="$PWD/build/certified-ring.db"
 
-./noether structural generate \
+./vista structural generate \
   --ir build/structural-v2-analysis/certified-ring.json \
   --jsonl > build/certified-ring-tasks.jsonl
 
-./noether agentic \
+./vista agentic \
   --provider command \
-  --llm-command "python examples/orchestrator/noether_demo_llm.py" \
+  --llm-command "python examples/orchestrator/vista_demo_llm.py" \
   --verifier ./build/proof-search \
   --full-process --small-model \
   --max-epochs 3 --stagnation-epochs 2 \
@@ -81,13 +81,13 @@ export PROOF_SEARCH_DB="$PWD/build/certified-ring.db"
   < build/certified-ring-tasks.jsonl \
   > build/certified-ring-proof-results.jsonl
 
-./noether structural assemble \
+./vista structural assemble \
   --ir build/structural-v2-analysis/certified-ring.json \
   --proof-results build/certified-ring-proof-results.jsonl \
   --source-output build/CertifiedRingCertificate.lean \
   --report-output build/certified-ring-certificate.json
 
-./noether structural check-certificate \
+./vista structural check-certificate \
   --project examples/dft/lean \
   --source build/CertifiedRingCertificate.lean \
   --trusted-local
@@ -96,8 +96,8 @@ export PROOF_SEARCH_DB="$PWD/build/certified-ring.db"
 ## Browse a completed run
 
 ```bash
-./noether tui --run-dir build/runs/certified-ring
-./noether review --run-dir build/runs/certified-ring
+./vista tui --run-dir build/runs/certified-ring
+./vista review --run-dir build/runs/certified-ring
 ```
 
 ## Pre-training structural capability certification

@@ -1,11 +1,11 @@
-# Noether demo — 11 August
+# VISTA demo — 11 August
 
-Run this on Maestro from `/home/anuj/noether`.
+Run this on Maestro from `/home/anuj/vista`.
 
 ```bash
 module load miniconda
-conda activate noether
-cd /home/anuj/noether
+conda activate vista
+cd /home/anuj/vista
 ```
 
 ## Certified artifact → certificate
@@ -19,7 +19,7 @@ ls build/structural-v2-models/*.pt2
 Safely extract and lower the certified artifact into Structural IR:
 
 ```bash
-./noether structural analyze-pt2 \
+./vista structural analyze-pt2 \
   build/structural-v2-models/certified-ring.pt2 \
   --constraints examples/dft/structural-v2-input-constraints.json \
   --output build/prof-demo-ir.json
@@ -28,7 +28,7 @@ Safely extract and lower the certified artifact into Structural IR:
 Show the policy result, artifact binding, and translation validation:
 
 ```bash
-./noether structural report \
+./vista structural report \
   --ir build/prof-demo-ir.json \
   --output build/prof-demo-report.json
 ```
@@ -42,7 +42,7 @@ python -c "import json; x=json.load(open('build/prof-demo-ir.json')); print(json
 Generate the exact Lean obligations and build the DFT Lean project:
 
 ```bash
-./noether structural generate \
+./vista structural generate \
   --ir build/prof-demo-ir.json \
   --jsonl > build/prof-demo-tasks.jsonl
 
@@ -53,11 +53,11 @@ Run the untrusted proof-search layer and Lean verifier:
 
 ```bash
 PROOF_SEARCH_ALLOW_GENERATED_OBLIGATIONS=1 \
-PROOF_SEARCH_PROJECT_DIR=/home/anuj/noether/examples/dft/lean \
-PROOF_SEARCH_DB=/home/anuj/noether/build/prof-demo.db \
+PROOF_SEARCH_PROJECT_DIR=/home/anuj/vista/examples/dft/lean \
+PROOF_SEARCH_DB=/home/anuj/vista/build/prof-demo.db \
 python -m orchestrator.cli \
   --provider command \
-  --llm-command "python examples/orchestrator/noether_demo_llm.py" \
+  --llm-command "python examples/orchestrator/vista_demo_llm.py" \
   --verifier build/proof-search \
   --full-process --small-model \
   --max-epochs 3 --stagnation-epochs 2 \
@@ -74,20 +74,20 @@ Expected: three `verified` obligations.
 Inspect the proof-search trace and accepted Lean proofs:
 
 ```bash
-./noether tui --run-dir build/runs/prof-demo --once
-./noether review --run-dir build/runs/prof-demo --once
+./vista tui --run-dir build/runs/prof-demo --once
+./vista review --run-dir build/runs/prof-demo --once
 ```
 
 Assemble the certificate and verify its generated Lean source independently:
 
 ```bash
-./noether structural assemble \
+./vista structural assemble \
   --ir build/prof-demo-ir.json \
   --proof-results build/prof-demo-results.jsonl \
   --source-output build/ProfDemoCertificate.lean \
   --report-output build/prof-demo-certificate.json
 
-./noether structural check-certificate \
+./vista structural check-certificate \
   --project examples/dft/lean \
   --source build/ProfDemoCertificate.lean \
   --trusted-local
@@ -97,15 +97,15 @@ Expected final status: `verified`.
 
 ## Negative control
 
-Show that Noether fails closed when the required nonlocal coupling is not covered:
+Show that VISTA fails closed when the required nonlocal coupling is not covered:
 
 ```bash
-./noether structural analyze-pt2 \
+./vista structural analyze-pt2 \
   build/structural-v2-models/too-shallow-ring.pt2 \
   --constraints examples/dft/structural-v2-input-constraints.json \
   --output build/prof-too-shallow-ir.json
 
-./noether structural report \
+./vista structural report \
   --ir build/prof-too-shallow-ir.json \
   --output build/prof-too-shallow-report.json
 ```
