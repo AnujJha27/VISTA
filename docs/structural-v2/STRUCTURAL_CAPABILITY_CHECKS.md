@@ -121,21 +121,23 @@ definition is specified (via `R`), not verified.
   graph. It becomes a real, checkable claim only once a future recipe kind
   is recognized whose root actually depends on adjacency-fed message
   passing.
-- **`non_local_capacity`**: when `expected_locality == "non_local"` and
-  there are at least two sites, does the operator's construction *recipe*
-  admit some parameter assignment with a nonzero off-diagonal entry?
-  `zero`/`identity` never can. `unconstrained_parameter` (a free matrix)
-  can, and always requires a confirmed trainable parameter to even reach
-  that classification. `symmetrized` (`B + B^T`) can too, but only when
-  `B` is confirmed a free/trainable parameter -- a `B` the artifact gives
-  no positive trainability evidence for (a fixed buffer, a constant, or
-  simply missing classification metadata) is still self-adjoint by
-  construction, but has no parameter to choose and therefore no capacity
-  to realize an off-diagonal entry, exactly like `zero`/`identity`. A
-  second site must also exist for an off-diagonal entry to live at -- a
-  1x1 matrix has none, for any recipe. A fact about the recipe, the
-  parameter-confirmation evidence, and site count, never about the values
-  currently stored in it.
+- **`long_range_capacity`**: when `expected_locality == "non_local"`, does
+  the operator's construction *recipe* admit some parameter assignment
+  with nonzero coupling on at least one site pair the artifact-grounded
+  adjacency graph places more than the specified `locality_range` (`R`)
+  hops apart? This is the SAME graph-hop definition the theorem-centric
+  path uses (`long_range_capacity` above) -- this legacy fixed-policy check
+  no longer uses the retired "some off-diagonal entry exists" criterion
+  (`non_local_capacity`, kept in the IR only as a deprecated historical
+  value; see "Provisional graph-hop locality correction" above).
+  `zero`/`identity` never have this freedom, for any assignment.
+  `unconstrained_parameter` and `symmetrized` can, but only when the
+  parameter is confirmed trainable (a fixed buffer, constant, or missing
+  classification is still self-adjoint by construction, when symmetrized,
+  but has no parameter to choose) AND the derived graph-hop relation
+  actually classifies some pair as long-range. A fact about the recipe,
+  the parameter-confirmation evidence, and the topology, never about the
+  values currently stored in it.
 - **`self_adjoint`**: the declared operator output is structurally zero,
   identity, or a parameter plus its transpose -- recipe-only, no floats.
 - **`xc_discontinuity_compatible`**: the declared XC output path contains a
@@ -221,13 +223,19 @@ never needed this check and never will. Only the stronger claim, that the
 construction additionally has non-local representational capacity, needs
 a confirmed parameter to choose -- see `non_local_capacity` above.
 
-## Adjacency selection is either declared or a labeled heuristic
+## Adjacency selection is always declared, never guessed
 
-`input_constraints.adjacency_state_name` is optional; when omitted, the
-adjacency buffer is found by a name-match heuristic (any state entry whose
-name contains `"adjacency"`). `semantic_derivations.topology.metadata.
-selection_provenance` records `"declared"` or `"heuristic_name_match"`, so
-a reader can tell which happened without re-deriving it.
+`input_constraints.adjacency_state_name` is REQUIRED -- which state entry
+is "the adjacency" is a specified-interface interpretation, exactly like
+`output_contracts`, and is never inferred from a name-match heuristic. An
+artifact could otherwise contain, say, both `fake_adjacency_debug` and
+`physical_neighbour_matrix`; a heuristic ("any state entry whose name
+contains `adjacency`") could silently select the wrong one while remaining
+fully deterministic and while the selected tensor's own values were still
+genuinely extracted -- the proposition "these values encode the graph
+locality is defined on" would still be an unverified interpretation, not an
+artifact fact. `semantic_derivations.topology.metadata.selection_provenance`
+is always `"declared"`.
 
 ## Lean
 

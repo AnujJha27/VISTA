@@ -123,11 +123,11 @@ class DftRequirementsIntrospectionTests(unittest.TestCase):
     def test_fully_resolvable_entrypoint_binders(self):
         entry = self.results["Testv2.Requirements.ValidPretrainingArchitecture"]
         names = [b["name"] for b in entry["binders"]]
-        self.assertEqual(names, ["siteCount", "longRangePairs", "op", "xc", "hSA", "hLR", "hXC"])
+        self.assertEqual(names, ["siteCount", "edges", "locality", "op", "xc", "hSA", "hLR", "hXC"])
         is_prop = {b["name"]: b["is_prop"] for b in entry["binders"]}
         self.assertEqual(
-            {name: is_prop[name] for name in ("siteCount", "longRangePairs", "op", "xc")},
-            {"siteCount": False, "longRangePairs": False, "op": False, "xc": False},
+            {name: is_prop[name] for name in ("siteCount", "edges", "locality", "op", "xc")},
+            {"siteCount": False, "edges": False, "locality": False, "op": False, "xc": False},
         )
         self.assertTrue(all(is_prop[name] for name in ("hSA", "hLR", "hXC")))
 

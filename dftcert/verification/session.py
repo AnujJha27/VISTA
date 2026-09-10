@@ -332,10 +332,10 @@ def start_session(
     session["nodes"] = all_nodes
     session["targets"] = targets
     session["status"] = _session_status(all_nodes)
-    # Which state entry was selected as "the adjacency" and how (declared
-    # vs heuristic_name_match); already hash-bound into ir_sha256, surfaced
-    # here too. `.get(...)`: absent rather than a crash for a plugin whose
-    # IR has no such notion.
+    # Which state entry was selected as "the adjacency" (always a declared
+    # specified-interface fact, never a name-match guess); already hash-bound
+    # into ir_sha256, surfaced here too. `.get(...)`: absent rather than a
+    # crash for a plugin whose IR has no such notion.
     translation = artifact_ir.get("translation", {})
     selection_metadata = translation.get("semantic_derivations", {}).get("topology", {}).get("metadata", {})
     session["adjacency_selection"] = {

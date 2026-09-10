@@ -5,11 +5,12 @@ IR, or checks.
 
 Checks: `all_pairs_reachable` (site coverage within the operator's own
 message-passing ancestry, not applicable when the recipe doesn't depend on
-message passing at all), `non_local_capacity` (recipe admits a nonzero
-off-diagonal assignment, given >=2 sites), `self_adjoint` (output is zero,
-identity, or a parameter plus its transpose), `xc_discontinuity_compatible`
-(XC path contains a supported hinge). See
-`docs/structural-v2/STRUCTURAL_CAPABILITY_CHECKS.md`.
+message passing at all), `long_range_capacity` (recipe admits coupling on
+a site pair the artifact-grounded adjacency graph places more than the
+specified graph-hop range apart -- the same definition the theorem-centric
+path uses), `self_adjoint` (output is zero, identity, or a parameter plus
+its transpose), `xc_discontinuity_compatible` (XC path contains a
+supported hinge). See `docs/structural-v2/STRUCTURAL_CAPABILITY_CHECKS.md`.
 """
 from __future__ import annotations
 
@@ -313,42 +314,29 @@ def _message_chain(
         current = state[0]
 
 
-def _state_entry(inventory: dict[str, Any], requested: str | None) -> dict[str, Any] | None:
+def _state_entry(inventory: dict[str, Any], requested: str) -> dict[str, Any] | None:
     state = inventory.get("state", {})
     if not isinstance(state, dict):
         return None
-    if requested and isinstance(state.get(requested), dict):
-        return state[requested]
-    for name, value in state.items():
-        if "adjacency" in name.lower() and isinstance(value, dict):
-            return value
-    return None
-
-
-def _state_name(inventory: dict[str, Any], requested: str | None) -> str | None:
-    state = inventory.get("state", {})
-    if not isinstance(state, dict):
-        return None
-    if requested and isinstance(state.get(requested), dict):
-        return requested
-    return next(
-        (name for name, value in state.items()
-         if isinstance(name, str) and "adjacency" in name.lower() and isinstance(value, dict)),
-        None,
-    )
+    entry = state.get(requested)
+    return entry if isinstance(entry, dict) else None
 
 
 def _topology(
     inventory: dict[str, Any], input_constraints: dict[str, Any],
 ) -> tuple[int, list[list[int]], list[str], str, str]:
+    # Which state entry is "the adjacency" is a SPECIFIED-INTERFACE
+    # interpretation, never an artifact fact -- required, never guessed at
+    # by a name-match heuristic (a fake_adjacency_debug tensor could
+    # otherwise outrank the real one and still look artifact-grounded).
     requested = input_constraints.get("adjacency_state_name")
-    state_name = _state_name(inventory, requested)
-    # Recorded since it's an interpretation choice, not an artifact fact:
-    # either the analyst's declared name, or a heuristic name-match fallback.
-    selection_provenance = "declared" if requested is not None and state_name == requested else "heuristic_name_match"
+    if not isinstance(requested, str) or not requested:
+        raise ManifestError("interface_contract.adjacency_state_name is required (which state entry is the adjacency)")
+    state_name = requested
+    selection_provenance = "declared"
     entry = _state_entry(inventory, state_name)
     if not entry:
-        raise ManifestError("artifact has no extractable structural adjacency buffer")
+        raise ManifestError(f"artifact has no state entry named {state_name!r}")
     values = entry.get("structural_values")
     if (
         not isinstance(values, list) or not values
@@ -789,8 +777,13 @@ class DFTCapabilityPlugin(StructuralPlugin):
             raise ManifestError("capabilities.all_pairs_reachable must be boolean")
         if not isinstance(capabilities.get("all_pairs_reachable_applicable"), bool):
             raise ManifestError("capabilities.all_pairs_reachable_applicable must be boolean")
-        if not isinstance(capabilities.get("non_local_capacity"), bool):
-            raise ManifestError("capabilities.non_local_capacity must be boolean")
+        # Deprecated historical value (superseded by `long_range_capacity`
+        # below) -- optional, since only the artifact-derived path (never
+        # `confirmed_description_ir`, which has no graph to compute it
+        # from) still populates it.
+        non_local_capacity = capabilities.get("non_local_capacity")
+        if non_local_capacity is not None and not isinstance(non_local_capacity, bool):
+            raise ManifestError("capabilities.non_local_capacity must be boolean when present")
         long_range_capacity = capabilities.get("long_range_capacity")
         if long_range_capacity is not None and not isinstance(long_range_capacity, bool):
             raise ManifestError("capabilities.long_range_capacity must be boolean or null (unsupported)")
@@ -829,11 +822,20 @@ class DFTCapabilityPlugin(StructuralPlugin):
         capabilities = value["capabilities"]
         expected = capabilities["expected_locality"]
         # Unlike formal_binding_candidates, this fixed-policy judgment can't
-        # evaluate non_local_capacity without a concrete requirement.
+        # evaluate long_range_capacity without a concrete requirement.
         if expected not in {"local", "non_local"}:
             raise ManifestError(
                 "capabilities.expected_locality must be 'local' or 'non_local' to evaluate structural checks"
             )
+        # research-soundness correction: this legacy fixed-policy path now
+        # uses the SAME graph-hop long-range definition as the
+        # theorem-centric path (`long_range_capacity`), never the retired
+        # "some off-diagonal entry exists" criterion (`non_local_capacity`,
+        # kept in the IR only as a deprecated historical value). `None`
+        # (grouped-layout, unresolved) is treated as not satisfied here --
+        # this legacy path needs a concrete Bool, and the same operator term
+        # would independently reduce to `.opaque`/`false` in Lean anyway.
+        long_range_capacity = capabilities["long_range_capacity"]
         return {
             "xc_discontinuity_compatible": {
                 "satisfied": value["xc"]["form"] == "hinge",
@@ -847,10 +849,10 @@ class DFTCapabilityPlugin(StructuralPlugin):
                 "operator_message_depth": capabilities["operator_message_depth"],
                 "provenance_nodes": value["operator"].get("provenance_nodes", []),
             },
-            "non_local_capacity": {
-                "satisfied": expected == "local" or capabilities["non_local_capacity"],
+            "long_range_capacity": {
+                "satisfied": expected == "local" or bool(long_range_capacity),
                 "expected": expected,
-                "capacity": capabilities["non_local_capacity"],
+                "capacity": long_range_capacity,
                 "provenance_nodes": value["operator"].get("provenance_nodes", []),
             },
             "self_adjoint": {
@@ -880,9 +882,9 @@ class DFTCapabilityPlugin(StructuralPlugin):
                 "operator_message_depth": check["operator_message_depth"],
                 "provenance_nodes": check["provenance_nodes"],
             }
-        if name == "non_local_capacity":
+        if name == "long_range_capacity":
             return {
-                "fact": name, "kind": "insufficient_operator_capacity",
+                "fact": name, "kind": "insufficient_long_range_capacity",
                 "expected": check["expected"], "capacity": check["capacity"],
                 "provenance_nodes": check["provenance_nodes"],
             }
@@ -901,11 +903,12 @@ class DFTCapabilityPlugin(StructuralPlugin):
                 "the operator's construction recipe does not depend on message-passing at all (the only "
                 "recipes this plugin currently recognizes -- bare and symmetrized parameters -- never do)."
             ),
-            "non_local_capacity": (
-                "When non-locality is claimed and there are at least two sites, the operator's "
-                "construction recipe admits some parameter assignment with a nonzero off-diagonal entry "
-                "-- a fact about the construction and site count, never about the values currently "
-                "stored in it."
+            "long_range_capacity": (
+                "When non-locality is claimed, the operator's construction recipe admits some "
+                "parameter assignment with nonzero coupling on at least one site pair the "
+                "artifact-grounded adjacency graph places more than the specified graph-hop range "
+                "apart -- never merely 'some off-diagonal entry exists', and never about the "
+                "values currently stored in the parameter."
             ),
             "self_adjoint": "The declared operator output is structurally zero, identity, or a parameter plus its transpose.",
         }
@@ -923,7 +926,7 @@ class DFTCapabilityPlugin(StructuralPlugin):
             f"- All-pairs receptive field (within the operator's own ancestry): {coverage}"
             + ("" if capabilities["operator_message_depth"] is None else f" within depth {capabilities['operator_message_depth']}")
             + ".",
-            f"- Self-energy non-local capacity: {capabilities['non_local_capacity']} (claimed {capabilities['expected_locality']}).",
+            f"- Self-energy long-range capacity: {capabilities['long_range_capacity']} (claimed {capabilities['expected_locality']}).",
             f"- Self-energy construction: {value['operator']['construction']}; supporting graph nodes: {value['operator'].get('provenance_nodes', [])}.",
             f"- XC output construction: {value['xc']['form']}; supporting graph nodes: {value['xc'].get('provenance_nodes', [])}.",
             "- No extracted floating-point weight value was read to compute any of the above.",
@@ -947,6 +950,8 @@ class DFTCapabilityPlugin(StructuralPlugin):
             f"def operatorMessageDepth : Nat := {depth}\n"
             f"def expectedLocal : Bool := {str(capabilities['expected_locality'] == 'local').lower()}\n"
             f"def xcForm : {self.lean_import}.XCForm := {_lean_xc(value['xc']['form'])}\n"
+            f"def localityRange : {self.lean_import}.LocalityRange := "
+            f"{_lean_locality_range(value.get('locality_range', 4))}\n"
             f"def operatorForm : {self.lean_import}.OperatorForm := "
             f"{_lean_operator(value['operator']['construction'], value['operator'].get('recipe'))}"
         )
@@ -959,10 +964,11 @@ class DFTCapabilityPlugin(StructuralPlugin):
                 f"theorem generated_xc_structure : {self.lean_import}.xcSupportsDiscontinuity "
                 f"{namespace}.xcForm = {str(checks['xc_discontinuity_compatible']['satisfied']).lower()}"
             ),
-            "non_local_capacity": (
+            "long_range_capacity": (
                 f"theorem generated_capacity_structure : ({namespace}.expectedLocal || "
-                f"{self.lean_import}.canRepresentNonLocal {namespace}.siteCount {namespace}.operatorForm) = "
-                f"{str(checks['non_local_capacity']['satisfied']).lower()}"
+                f"{self.lean_import}.canRepresentLongRangeCoupling {namespace}.siteCount {namespace}.edges "
+                f"{namespace}.localityRange {namespace}.operatorForm) = "
+                f"{str(checks['long_range_capacity']['satisfied']).lower()}"
             ),
             "self_adjoint": (
                 f"theorem generated_operator_structure : {self.lean_import}.guaranteedSelfAdjoint "

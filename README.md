@@ -56,9 +56,14 @@ Lean kernel, not asserted by any Python code, LLM, or human review?
 2. **Structural evidence.** `dftcert/structural/core.py` derives an
    architecture-level structural IR from the raw inventory: topology,
    operator construction, exchange-correlation form, message-passing
-   structure (for the DFT case study adapter) -- independently re-derived
-   and cross-checked against the raw graph nodes it claims to summarize
-   (`validate_translation`), never merely asserted.
+   structure (for the DFT case study adapter) -- deterministically
+   re-derived and checked for consistency against the raw graph nodes it
+   claims to summarize (`validate_translation`), never merely asserted.
+   This is the same adapter implementation re-run, not a second,
+   independent semantic checker -- it catches a mutated or stale IR, not a
+   bug shared by both derivations (a systematic bug in the adapter's own
+   pattern-matching logic would reproduce identically in both runs and
+   pass; see "Current limitations" below).
 3. **Semantic adapter.** A domain adapter (`dftcert/structural/plugin.py`'s
    `StructuralPlugin` interface; the one adapter in this repo is
    `dft_capability_plugin.py`) turns structural IR facts into candidate Lean
@@ -79,9 +84,15 @@ Lean kernel, not asserted by any Python code, LLM, or human review?
 6. **Certificate.** The result is a JSON bundle (`manifest.json` plus one
    `.lean`/`-report.json` pair per certified target) hash-bound to the exact
    artifact, the verification package, and the Lean project/toolchain
-   fingerprint -- independently re-derivable and re-checkable
-   (`vista verify verify-bundle`) without trusting any field merely because
-   it is already present in the bundle.
+   fingerprint -- independently consistency-checkable and Lean-recompilable
+   against supplied live bindings (`vista verify verify-bundle --full`)
+   without trusting any field merely because it is already present in the
+   bundle. `--full` recomputes hashes, checks package/adapter/project
+   bindings, recompiles the generated Lean source, and recomputes the
+   generated theorem's axiom closure -- it does not re-run extraction
+   against the original artifact bytes and re-derive the session from
+   scratch; that fresh end-to-end replay happens only at issuance
+   (`certify_session`), never at bundle-verification time.
 
 ## Trust model
 

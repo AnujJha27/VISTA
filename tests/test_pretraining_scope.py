@@ -38,6 +38,7 @@ SEED_A = FIXTURES / "certified_ring_seed_a.pt2"
 SEED_B = FIXTURES / "certified_ring_seed_b.pt2"
 ENTRYPOINT = "Testv2.Requirements.ValidSelfAdjointConstruction"
 CONSTRAINTS = {
+    "adjacency_state_name": "adjacency",
     "adjacency_convention": "target_source",
     "output_contracts": [
         {"index": 0, "role": "xc_energy"},

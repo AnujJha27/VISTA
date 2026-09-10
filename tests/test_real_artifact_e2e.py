@@ -77,6 +77,7 @@ PROJECT = Path(__file__).resolve().parent.parent / "examples" / "dft" / "lean"
 ARTIFACT = Path(__file__).resolve().parent / "fixtures" / "certified_ring.pt2"
 ENTRYPOINT = "Testv2.Requirements.ValidPretrainingArchitecture"
 CONSTRAINTS = {
+    "adjacency_state_name": "adjacency",
     "adjacency_convention": "target_source",
     "output_contracts": [
         {"index": 0, "role": "xc_energy"},

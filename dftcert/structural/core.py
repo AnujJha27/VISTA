@@ -415,15 +415,18 @@ def confirmed_description_ir(
         raise ManifestError("locality.expected must be 'local' or 'non_local'")
     # No real tensor here to declare a layout for; default to plain n x n.
     operator = {"layout": {"output_axes": [0], "input_axes": [1]}, **operator}
-    # No message-passing graph either: coverage is vacuously true/not-applicable,
-    # and non-local capacity is the human's direct confirmation, not a derivation.
+    # No message-passing graph either: coverage is vacuously true/not-applicable.
+    # No adjacency graph exists here at all, so long-range capacity can't be
+    # graph-hop-derived the way an artifact-backed IR derives it -- this is
+    # the human's direct confirmation instead, stored under the same key so
+    # `checks()` doesn't need to know which path produced the IR.
     capabilities = {
         "expected_locality": expected_locality,
         "all_pairs_reachable": True,
         "all_pairs_reachable_applicable": False,
         "unreachable_pairs": None,
         "operator_message_depth": None,
-        "non_local_capacity": expected_locality == "non_local",
+        "long_range_capacity": expected_locality == "non_local",
     }
     value = {
         "ir_schema_version": plugin.ir_schema_version,
@@ -444,6 +447,10 @@ def confirmed_description_ir(
         "message_passing": message_passing,
         "xc": xc,
         "operator": operator,
+        # Inert here: there is no adjacency graph in this human-only path
+        # for a range to apply to. Present only because the IR schema
+        # requires it uniformly across every source kind.
+        "locality_range": 4,
         "capabilities": capabilities,
     }
     validate_structural_ir(value, plugin=plugin)

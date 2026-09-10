@@ -21,8 +21,9 @@ distinction the tool makes, not a marketing claim:
   `#3`, `#4` in the real report): `siteCount = 6`, the ring adjacency
   (`edges`), the self-adjoint operator construction, and the XC form are
   read directly from the real `.pt2`'s exported computation graph and
-  adjacency buffer -- independently re-derived and checked against the raw
-  extraction, never merely asserted.
+  adjacency buffer -- deterministically re-derived and checked for
+  consistency against the raw extraction (the same adapter implementation
+  re-run, not a second independent checker), never merely asserted.
 - **Supplied interface interpretation** (`specified_interface_nodes`, node
   `#2` in the real report): which of the graph's output nodes correspond to
   "the XC energy", "the learned self-energy", and "the message state" is a
@@ -45,7 +46,16 @@ distinction the tool makes, not a marketing claim:
   or formal theory establishes. Accepting it (`accept_assumption.py`)
   records the *exact* proposition, its fingerprint, and a rationale into the
   package; it survives on the generated certificate theorem as a real,
-  unproven binder -- never discharged, never an `axiom`.
+  unproven binder -- never discharged, never an `axiom`. Critically, the
+  generated certificate's *conclusion* (`ConditionallyAcceptableArchitecture`)
+  literally conjoins `TargetRequiresLongRangeCoupling` with the derived
+  structural facts, so accepting this assumption is what makes the stronger,
+  conjoined claim available at all -- it is never a decorative premise a
+  reader could drop without changing what gets proven (an earlier version of
+  this entrypoint had exactly that flaw: its conclusion was plain
+  `AcceptableArchitecture`, which `ValidPretrainingArchitecture` already
+  proves with strictly fewer premises, making the assumption provably
+  unused).
 - **Lean-checked conclusions** (`formally_discharged_nodes`, nodes `#6`,
   `#7`, `#8`; `certificate_axiom_closure`): given the artifact-derived
   siteCount/edges/operator/XC values AND the specified `localityRange`,

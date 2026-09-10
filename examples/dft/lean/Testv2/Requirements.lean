@@ -44,10 +44,27 @@ theorem ValidPretrainingArchitecture
     AcceptableArchitecture siteCount edges locality op xc :=
   ⟨hSA, hLR, hXC⟩
 
-/-- Same requirement plus one premise not formalizable from any artifact
-    fact: `TargetRequiresLongRangeCoupling` is a genuine `Prop` binder, not
-    a global `axiom`, so it stays an explicit assumption on the generated
-    certificate theorem, never silently discharged. -/
+/-- `AcceptableArchitecture` together with the external physical premise
+    itself, not merely alongside it: accepting `TargetRequiresLongRangeCoupling`
+    must genuinely strengthen what the certificate states, not survive as
+    an unused binder next to a conclusion that would hold without it (a
+    prior version's conclusion was plain `AcceptableArchitecture`, making
+    `hPhysical` provably dead weight -- `ValidPretrainingArchitecture`
+    above already proves the exact same thing with strictly fewer
+    premises, so nothing here depended on the assumption at all). -/
+def ConditionallyAcceptableArchitecture
+    (siteCount : Nat) (edges : List (Nat × Nat)) (locality : LocalityRange)
+    (op : OperatorForm) (xc : XCForm) (TargetRequiresLongRangeCoupling : Prop) : Prop :=
+  TargetRequiresLongRangeCoupling ∧ AcceptableArchitecture siteCount edges locality op xc
+
+/-- Same structural requirement, plus one premise not formalizable from
+    any artifact fact: `TargetRequiresLongRangeCoupling` is a genuine
+    `Prop` binder, not a global `axiom`, so it stays an explicit
+    assumption on the generated certificate theorem, never silently
+    discharged -- and, unlike a version whose conclusion merely repeated
+    `AcceptableArchitecture`, this theorem's conclusion actually contains
+    `TargetRequiresLongRangeCoupling`, so accepting `hPhysical` is what
+    makes the stronger, conjoined claim available at all. -/
 theorem ValidPretrainingArchitectureConditional
     (siteCount : Nat) (edges : List (Nat × Nat)) (locality : LocalityRange)
     (op : OperatorForm) (xc : XCForm)
@@ -56,8 +73,8 @@ theorem ValidPretrainingArchitectureConditional
     (hLR : canRepresentLongRangeCoupling siteCount edges locality op = true)
     (hXC : xcSupportsDiscontinuity xc = true)
     (hPhysical : TargetRequiresLongRangeCoupling) :
-    AcceptableArchitecture siteCount edges locality op xc :=
-  ⟨hSA, hLR, hXC⟩
+    ConditionallyAcceptableArchitecture siteCount edges locality op xc TargetRequiresLongRangeCoupling :=
+  ⟨hPhysical, hSA, hLR, hXC⟩
 
 /-- VISTA's minimal pre-training guarantee: self-adjointness of the
     recognized operator alone, no site-count/long-range/XC premises.

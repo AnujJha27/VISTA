@@ -59,17 +59,18 @@ POSITIVE_ARTIFACT = FIXTURES / "certified_ring.pt2"
 NEGATIVE_ARTIFACT = FIXTURES / "unconstrained_operator.pt2"
 ENTRYPOINT = "Testv2.Requirements.ValidSelfAdjointConstruction"
 
-# The minimal self-adjointness demo's interface contains no locality
+# The minimal self-adjointness demo's interface contains no LOCALITY
 # information at all -- `ValidSelfAdjointConstruction`'s two binders (`op`,
 # `hSA`) never consume site-count/edges/locality_range/XC, and
 # `locality_range` has a default (see `_locality_range`), so there is
-# nothing to specify here. `structural_ir_from_inventory`/`derive` still
-# always compute the full, fixed IR regardless of which entrypoint a
-# package selects (spec/theorem-centric-gaps: theorem-driven SELECTION is
-# implemented, theorem-driven MINIMAL IR CONSTRUCTION is not -- see
-# `dftcert/verification/resolver.py`) -- this just confirms that a caller
-# who genuinely needs none of that data need not supply any of it either.
+# nothing to specify there. `adjacency_state_name` is still required
+# (topology is always derived regardless of which entrypoint a package
+# selects -- theorem-driven SELECTION is implemented, theorem-driven
+# MINIMAL IR CONSTRUCTION is not, see `dftcert/verification/resolver.py`),
+# and is never a name-match heuristic: which state entry is "the adjacency"
+# is a specified interpretation, not something to guess at.
 CONSTRAINTS = {
+    "adjacency_state_name": "adjacency",
     "adjacency_convention": "target_source",
     "output_contracts": [
         {"index": 0, "role": "xc_energy"},

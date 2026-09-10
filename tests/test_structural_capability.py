@@ -159,30 +159,36 @@ class AllPairsReachablePipelineTests(unittest.TestCase):
             self.assertIsNone(ir["capabilities"]["unreachable_pairs"])
 
 
-class NonLocalCapacityTests(unittest.TestCase):
+class LongRangeCapacityTests(unittest.TestCase):
+    """The legacy fixed-policy `checks()` path uses the SAME graph-hop
+    long-range definition as the theorem-centric path -- `_CHAIN3`'s
+    directed 0->1->2 chain makes the "backward" pairs (1,0)/(2,0)/(2,1)
+    unreachable (and so long-range) at any range, giving a real capacity
+    signal without depending on a specific `locality_range` value."""
+
     def test_symmetrized_operator_has_capacity_and_guaranteed_self_adjoint(self):
-        ir = _ir(adjacency=_RING3, stages=1, symmetrized=True)
-        self.assertTrue(ir["capabilities"]["non_local_capacity"])
+        ir = _ir(adjacency=_CHAIN3, stages=1, symmetrized=True)
+        self.assertTrue(ir["capabilities"]["long_range_capacity"])
         checks = generate_structural_obligations(ir, plugin=DFT_CAPABILITY_PLUGIN)["assessment"]["checks"]
-        self.assertTrue(checks["non_local_capacity"]["satisfied"])
+        self.assertTrue(checks["long_range_capacity"]["satisfied"])
         self.assertTrue(checks["self_adjoint"]["satisfied"])
 
     def test_bare_parameter_operator_has_capacity_but_not_guaranteed_self_adjoint(self):
-        ir = _ir(adjacency=_RING3, stages=1, symmetrized=False)
-        self.assertTrue(ir["capabilities"]["non_local_capacity"])
+        ir = _ir(adjacency=_CHAIN3, stages=1, symmetrized=False)
+        self.assertTrue(ir["capabilities"]["long_range_capacity"])
         checks = generate_structural_obligations(ir, plugin=DFT_CAPABILITY_PLUGIN)["assessment"]["checks"]
-        self.assertTrue(checks["non_local_capacity"]["satisfied"])
+        self.assertTrue(checks["long_range_capacity"]["satisfied"])
         self.assertFalse(checks["self_adjoint"]["satisfied"])
 
-    def test_single_site_never_has_non_local_capacity_even_for_a_free_parameter(self):
-        # A 1x1 matrix has no off-diagonal entry to assign, for any recipe.
+    def test_single_site_never_has_long_range_capacity_even_for_a_free_parameter(self):
+        # A single site has no distinct partner to couple with, for any recipe.
         ir = _ir(adjacency=[[False]], stages=0, symmetrized=True, expected_locality="non_local")
-        self.assertFalse(ir["capabilities"]["non_local_capacity"])
+        self.assertFalse(ir["capabilities"]["long_range_capacity"])
         checks = generate_structural_obligations(ir, plugin=DFT_CAPABILITY_PLUGIN)["assessment"]["checks"]
-        self.assertFalse(checks["non_local_capacity"]["satisfied"])
+        self.assertFalse(checks["long_range_capacity"]["satisfied"])
 
     def test_certifiable_without_any_extracted_floats(self):
-        inventory = _inventory(adjacency=_RING3, stages=1, symmetrized=True)
+        inventory = _inventory(adjacency=_CHAIN3, stages=1, symmetrized=True)
         # No numeric weight values anywhere -- `p_base`'s own state entry
         # (added for issue 5's positive-parameter-classification
         # requirement) carries only graph_inputs/shape/state_kind
@@ -196,6 +202,48 @@ class NonLocalCapacityTests(unittest.TestCase):
         )
         generated = generate_structural_obligations(ir, plugin=DFT_CAPABILITY_PLUGIN)
         self.assertEqual(generated["disposition"], "structurally_certifiable")
+
+
+class AdjacencySelectionTests(unittest.TestCase):
+    """Which state entry is "the adjacency" is a required, specified
+    interpretation -- never a name-match heuristic (research-soundness
+    correction): a decoy state entry whose name merely contains
+    "adjacency" must never be silently preferred over the real one just
+    because it happens to be declared, or picked at all when nothing is
+    declared."""
+
+    def _decoy_inventory(self):
+        inventory = _inventory(adjacency=_RING3, stages=0, symmetrized=True)
+        inventory["state"]["fake_adjacency_debug"] = {
+            "structural_values": [[True] * 3 for _ in range(3)],
+            "graph_inputs": [], "shape": [3, 3], "dtype": "torch.bool", "sha256": "b",
+        }
+        return inventory
+
+    def test_missing_adjacency_state_name_is_rejected(self):
+        from dftcert.manifest import ManifestError
+        constraints = _constraints()
+        del constraints["adjacency_state_name"]
+        with self.assertRaises(ManifestError):
+            structural_ir_from_inventory(
+                inventory=_inventory(adjacency=_RING3, stages=0, symmetrized=True),
+                artifact_sha256="a", extractor_version="t",
+                input_constraints=constraints, plugin=DFT_CAPABILITY_PLUGIN,
+            )
+
+    def test_decoy_state_entry_is_never_silently_preferred(self):
+        # A decoy that would win any "contains adjacency" heuristic sits
+        # in state too; the declared name must still be the one used.
+        ir = structural_ir_from_inventory(
+            inventory=self._decoy_inventory(), artifact_sha256="a", extractor_version="t",
+            input_constraints=_constraints(), plugin=DFT_CAPABILITY_PLUGIN,
+        )
+        self.assertEqual(ir["translation"]["topology"]["state_name"], "adjacency")
+        self.assertEqual(ir["topology"]["directed_edges"], structural_ir_from_inventory(
+            inventory=_inventory(adjacency=_RING3, stages=0, symmetrized=True),
+            artifact_sha256="a", extractor_version="t",
+            input_constraints=_constraints(), plugin=DFT_CAPABILITY_PLUGIN,
+        )["topology"]["directed_edges"])
 
 
 if __name__ == "__main__":

@@ -48,8 +48,10 @@ operator names:
   `expected_locality` claim (`"local"`/`"non_local"`) against the
   candidate's architectural capability instead -- see
   `STRUCTURAL_CAPABILITY_CHECKS.md`.
-- `adjacency_state_name` selects the exported structural adjacency state. If
-  omitted, the only supported fallback is a state name containing `adjacency`.
+- `adjacency_state_name` selects the exported structural adjacency state.
+  Required -- never inferred from a name-match heuristic, since which state
+  entry is "the adjacency" is a specified interpretation, not an artifact
+  fact a heuristic could safely guess.
 - `adjacency_convention` is `target_source` by default or `source_target`.
 
 The constraints are part of the translation derivation and IR hash. An invalid,

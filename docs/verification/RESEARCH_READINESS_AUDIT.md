@@ -65,9 +65,12 @@ exposing what was learned.
 
 `DFTCapabilityPlugin.derive`'s classifications -- site count, self-adjoint
 operator construction, XC form, message-passing depth -- computed by real
-graph-shape/ATen-op-name pattern matching and independently re-derived and
-compared on every use via `validate_translation`. Provenance-labeled
-`artifact_grounded`.
+graph-shape/ATen-op-name pattern matching and deterministically re-derived
+and checked for consistency on every use via `validate_translation`. This
+re-runs the same adapter implementation, not a second independent checker
+-- it catches a mutated or stale IR, never a systematic bug in the
+adapter's own pattern-matching rules (both derivations would share it).
+Provenance-labeled `artifact_grounded`.
 
 Issue 5 (fail-closed trainable-parameter classification): the
 `unconstrained_parameter` capacity claim now requires POSITIVE evidence of
@@ -141,14 +144,26 @@ is no pair list to validate bounds for at all: the long-range pair set is
 always derived from `R` and the artifact's own adjacency graph, never
 supplied.
 
-Issue 10 (adjacency selection provenance): which state entry was selected
-as "the adjacency" -- `declared` (matched the analyst's own
-`adjacency_state_name` exactly) vs `heuristic_name_match` (a fallback the
-tool applied because they didn't) -- was already hash-bound into
-`ir_sha256` but not previously retrievable from the theorem-centric
-certificate report itself. Now surfaced as `report["adjacency_selection"]
-= {"selected_state_name": ..., "selection_provenance": ...}`
-(`dftcert/verification/session.py`, `dftcert/verification/certificate.py`).
+Issue 10 (adjacency selection provenance): which state entry is "the
+adjacency" was already hash-bound into `ir_sha256` but not previously
+retrievable from the theorem-centric certificate report itself. Now
+surfaced as `report["adjacency_selection"] = {"selected_state_name": ...,
+"selection_provenance": ...}` (`dftcert/verification/session.py`,
+`dftcert/verification/certificate.py`).
+
+Further research-soundness correction: the original fix still allowed a
+`heuristic_name_match` fallback (any state entry whose name contains
+`"adjacency"`) when `adjacency_state_name` was omitted -- disclosed via
+`selection_provenance`, but still a guess. An adversarial artifact
+containing both `fake_adjacency_debug` and `physical_neighbour_matrix`
+could have the wrong one selected while remaining fully deterministic and
+while the selected tensor's own values were still genuinely extracted --
+the proposition "these values encode the graph locality is defined on"
+would still be an unverified interpretation smuggled in as if it were an
+artifact fact. `adjacency_state_name` is now REQUIRED
+(`_topology` raises `ManifestError` without it); the heuristic fallback and
+`heuristic_name_match` have been removed entirely, and
+`selection_provenance` is always `"declared"`.
 Regression: `tests/test_theorem_certificate.py::UnconditionalCertificateTests::
 test_report_marks_unconditional_certificate_with_no_assumptions`.
 

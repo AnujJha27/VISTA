@@ -1,4 +1,5 @@
 {
+  "adjacency_state_name": "adjacency",
   "adjacency_convention": "target_source",
   "output_contracts": [
     {"index": 0, "role": "xc_energy"},
