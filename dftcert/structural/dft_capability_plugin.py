@@ -459,73 +459,54 @@ def _lean_operator(construction: str, recipe: dict[str, Any] | None = None, layo
     }[construction]
 
 
-def _long_range_pairs_syntax(input_constraints: dict[str, Any]) -> list[list[int]]:
-    """Syntax-only validation of the DFT interface contract's optional
-    `long_range_pairs` field (research-soundness correction: an explicitly
-    SPECIFIED-INTERFACE fact -- which site pairs the domain considers
-    long-range -- never derived from the artifact). Bounds validation
-    against the artifact's own derived `site_count` deliberately happens
-    later, inside `Testv2.StructuralV2.validLongRangePair` itself, once the
-    artifact is known -- a package may be authored before the artifact is,
-    so only shape can be checked here. Defaults to `[]` (no long-range
-    pairs specified -- capacity can then never be granted, which is the
-    correct fail-closed default, not an error)."""
-    pairs = input_constraints.get("long_range_pairs", [])
-    if not isinstance(pairs, list):
-        raise ManifestError("interface_contract.long_range_pairs must be an array")
-    result: list[list[int]] = []
-    for item in pairs:
-        if (
-            not isinstance(item, list) or len(item) != 2
-            or any(isinstance(index, bool) or not isinstance(index, int) or index < 0 for index in item)
-        ):
-            raise ManifestError(
-                f"interface_contract.long_range_pairs entry {item!r} must be a pair of non-negative integers"
-            )
-        result.append([item[0], item[1]])
-    return result
+def _locality_range(input_constraints: dict[str, Any]) -> int:
+    """Syntax validation of the DFT interface contract's `locality_range`
+    field `R` (default `4`): a SPECIFIED-INTERFACE domain parameter used
+    only to derive the operational long-range relation from the artifact's
+    own adjacency graph -- `LongRange_R(i, j) := shortestPathDistance_G(i,
+    j) > R`. VISTA never accepts a hand-supplied long-range pair list; the
+    pair set is always computed by VISTA itself from artifact-grounded
+    topology plus this one specified integer. This is a provisional
+    operational definition of "long-range" (graph-hop distance), not a
+    claim about the final physical definition of self-energy non-locality
+    -- see `docs/structural-v2/STRUCTURAL_CAPABILITY_CHECKS.md`."""
+    value = input_constraints.get("locality_range", 4)
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ManifestError("interface_contract.locality_range must be a non-negative integer")
+    return value
 
 
-def _valid_long_range_pairs(site_count: int, long_range_pairs: list[list[int]]) -> list[list[int]]:
-    """Pairs that are actually usable for `site_count` -- both indices in
-    bounds and naming two distinct sites. Mirrors `Testv2.StructuralV2.
-    validLongRangePair` exactly (kept as two independent implementations,
-    Python and Lean, deliberately: the Lean side is the one that actually
-    gates certification; this one is for the IR's own `long_range_capacity`
-    capability, used only by the legacy pre-training report)."""
-    return [
-        pair for pair in long_range_pairs
-        if pair[0] < site_count and pair[1] < site_count and pair[0] != pair[1]
-    ]
-
-
-def _lean_long_range_pairs(long_range_pairs: list[list[int]]) -> str:
-    """The anonymous-constructor form `⟨[...]⟩` of `Testv2.StructuralV2.
-    LongRangePairs` -- a genuine wrapper `structure`, not a bare `List
-    (Nat × Nat)` type alias, specifically so the theorem-centric resolver's
+def _lean_locality_range(locality_range: int) -> str:
+    """The anonymous-constructor form `⟨R⟩` of `Testv2.StructuralV2.
+    LocalityRange` -- a genuine wrapper `structure` around a bare `Nat`,
+    not a type alias, specifically so the theorem-centric resolver's
     purely-type-based candidate matching (`dftcert.verification.resolver`)
-    can never confuse this SPECIFIED-INTERFACE candidate with the
-    unrelated, artifact-grounded `edges` candidate (`ValidMessagePassingCoverage`'s
-    own `List (Nat × Nat)`-typed adjacency binder) -- anonymous-constructor
+    can never confuse this SPECIFIED-INTERFACE `Nat` with the unrelated,
+    artifact-grounded `siteCount : Nat` binder -- anonymous-constructor
     notation is type-directed and needs no namespace qualification."""
-    pairs = "[" + ", ".join(f"({left}, {right})" for left, right in long_range_pairs) + "]"
-    return f"⟨{pairs}⟩"
+    return f"⟨{locality_range}⟩"
 
 
 def _long_range_capacity(
-    recipe: dict[str, Any], site_count: int, layout: dict[str, Any], long_range_pairs: list[list[int]],
+    recipe: dict[str, Any], site_count: int, layout: dict[str, Any],
+    edges: list[list[int]], locality_range: int,
 ) -> bool | None:
     """`None` means unsupported/unresolved (issue 5: a grouped operator
     layout with no established site-axis correspondence), never a
     confident `False`. Otherwise: does the construction actually contain a
     confirmed free parameter (`_long_range_eligible`, plain layout only)
-    AND does at least one of the SPECIFIED (never artifact-derived)
-    `long_range_pairs` fall within bounds for `site_count`?"""
+    AND does the artifact-grounded adjacency graph place at least one pair
+    of distinct sites more than `locality_range` hops apart? The long-range
+    pair set is derived here (never hand-supplied) via `_unreachable_pairs`
+    -- a pair "unreachable within `locality_range` hops" is exactly a pair
+    whose shortest-path distance exceeds `locality_range` (disconnected
+    pairs included, consistently, since they are unreachable at any
+    depth)."""
     if _is_grouped_layout(layout):
         return None
     if not _long_range_eligible(recipe, layout):
         return False
-    return bool(_valid_long_range_pairs(site_count, long_range_pairs))
+    return bool(_unreachable_pairs(site_count, edges, locality_range))
 
 
 def _non_local_capacity(recipe: dict[str, Any], site_count: int) -> bool:
@@ -719,7 +700,7 @@ class DFTCapabilityPlugin(StructuralPlugin):
         if expected_locality not in {"local", "non_local", None}:
             raise ManifestError("input_constraints.expected_locality must be 'local' or 'non_local'")
         layout = _resolve_operator_layout(input_constraints)
-        long_range_pairs = _long_range_pairs_syntax(input_constraints)
+        locality_range = _locality_range(input_constraints)
         count, edges, graph_inputs, state_name, adjacency_selection_provenance = _topology(inventory, input_constraints)
         aliases = _adjacency_aliases(nodes, graph_inputs)
         stages, message_recognized = _message_chain(nodes, roles["message_state"], graph_inputs)
@@ -783,7 +764,7 @@ class DFTCapabilityPlugin(StructuralPlugin):
             "operator": operator, "operator_nodes": operator_nodes, "operator_recipe": operator_recipe,
             "operator_layout": layout,
             "expected_locality": expected_locality,
-            "long_range_pairs": long_range_pairs,
+            "locality_range": locality_range,
         }
 
     def derive(
@@ -813,7 +794,7 @@ class DFTCapabilityPlugin(StructuralPlugin):
             # layout), never a confident `False`.
             "long_range_capacity": _long_range_capacity(
                 derivation["operator_recipe"], derivation["site_count"],
-                derivation["operator_layout"], derivation["long_range_pairs"],
+                derivation["operator_layout"], derivation["edges"], derivation["locality_range"],
             ),
         }
         return derivation
@@ -843,14 +824,13 @@ class DFTCapabilityPlugin(StructuralPlugin):
                 # internal derivation bookkeeping to get it.
                 "recipe": derivation["operator_recipe"],
             },
-            # research-soundness correction: SPECIFIED INTERFACE, never
-            # artifact-grounded -- which site pairs the domain considers
-            # long-range is supplied by the verification specification's
-            # interface contract, not derived from the exported graph.
-            # Syntax-validated only (`_long_range_pairs_syntax`); bounds
-            # against `site_count` are checked later, by
-            # `Testv2.StructuralV2.validLongRangePair` itself.
-            "long_range_pairs": derivation["long_range_pairs"],
+            # research-soundness correction: `locality_range` (R) is the ONLY
+            # SPECIFIED-INTERFACE locality input -- a configurable graph-hop
+            # radius, not a hand-supplied pair list. Which pairs are
+            # long-range (`LongRange_R(i, j) := shortestPathDistance_G(i, j)
+            # > R`) is always derived by VISTA from the artifact-grounded
+            # adjacency graph above, never supplied by the caller.
+            "locality_range": derivation["locality_range"],
             "capabilities": derivation["capabilities"],
         }
 
@@ -881,13 +861,9 @@ class DFTCapabilityPlugin(StructuralPlugin):
     def validate_ir_sections(self, value: dict[str, Any]) -> None:
         _validate_structure_sections(value)
         count = value["topology"]["site_count"]
-        long_range_pairs = value.get("long_range_pairs")
-        if not isinstance(long_range_pairs, list) or any(
-            not isinstance(pair, list) or len(pair) != 2
-            or any(isinstance(index, bool) or not isinstance(index, int) or index < 0 for index in pair)
-            for pair in long_range_pairs
-        ):
-            raise ManifestError("long_range_pairs must be an array of [non-negative int, non-negative int] pairs")
+        locality_range = value.get("locality_range")
+        if isinstance(locality_range, bool) or not isinstance(locality_range, int) or locality_range < 0:
+            raise ManifestError("locality_range must be a non-negative integer")
         capabilities = value.get("capabilities")
         if not isinstance(capabilities, dict):
             raise ManifestError("structural IR is missing capabilities")
@@ -927,11 +903,11 @@ class DFTCapabilityPlugin(StructuralPlugin):
         _revalidate_structure(value=value, input_constraints=input_constraints, derivation=derivation, roles=roles)
         if value["capabilities"] != derivation["capabilities"]:
             raise ManifestError("capabilities claim does not match its derivation")
-        if value.get("long_range_pairs") != derivation["long_range_pairs"]:
-            raise ManifestError("long_range_pairs claim does not match the interface contract")
+        if value.get("locality_range") != derivation["locality_range"]:
+            raise ManifestError("locality_range claim does not match the interface contract")
 
     def checked_claim_names(self) -> list[str]:
-        return ["topology", "message_passing", "xc", "operator", "semantic_derivations", "capabilities", "long_range_pairs"]
+        return ["topology", "message_passing", "xc", "operator", "semantic_derivations", "capabilities", "locality_range"]
 
     def checks(self, value: dict[str, Any]) -> dict[str, dict[str, Any]]:
         capabilities = value["capabilities"]
@@ -1113,19 +1089,19 @@ class DFTCapabilityPlugin(StructuralPlugin):
                 display_label=f"operator = {operator['construction']}",
             ),
             FormalBindingCandidate(
-                key="long_range_pairs",
-                lean_expr=_lean_long_range_pairs(value.get("long_range_pairs", [])),
-                # research-soundness correction: this is SPECIFIED INTERFACE
-                # data -- which site pairs the domain considers long-range
-                # -- supplied by the verification package's interface
-                # contract, never derived from the artifact. Lean itself
-                # (`validLongRangePair`) is what actually rejects an
-                # out-of-bounds or self-pair entry once `siteCount` is
-                # bound; this candidate carries the raw specified list
-                # through unfiltered.
+                key="locality_range",
+                lean_expr=_lean_locality_range(value.get("locality_range", 4)),
+                # research-soundness correction: this is the ONLY SPECIFIED
+                # INTERFACE locality datum -- a configurable graph-hop
+                # radius `R`, supplied by the verification package's
+                # interface contract, never derived from the artifact.
+                # Lean itself (`isLongRangePair`/`hasLongRangePair`) derives
+                # the long-range relation from `edges` and `R` once
+                # `siteCount` is bound; this candidate carries only the raw
+                # specified integer through.
                 provenance="specified_interface",
                 evidence_refs=(),
-                display_label=f"longRangePairs = {value.get('long_range_pairs', [])}",
+                display_label=f"localityRange = {value.get('locality_range', 4)}",
             ),
             FormalBindingCandidate(
                 key="xc_form",

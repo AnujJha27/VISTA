@@ -100,36 +100,46 @@ ALIAS. Even the fixed grammar still treats "some off-diagonal entry exists"
 as sufficient evidence of physical non-locality, which is itself an
 unverified physical assumption -- an arbitrary off-diagonal entry does not
 establish that the coupling it represents is between sites the domain
-actually considers long-range. The live theorem-centric requirement now
-uses `canRepresentLongRangeCoupling siteCount longRangePairs op`, which
-requires an EXPLICITLY SPECIFIED (never inferred, never artifact-derived)
-list of long-range site pairs (`longRangePairs`, `specified_interface`
-provenance -- see section 5) and grants capacity only when the
-construction contains a confirmed free parameter with the freedom to
-couple at least one of those specified pairs. Self-adjointness is never
-weakened by this correction. A grouped `[N, m, N, m]` operator layout
-(multiple orbitals per site, no established site-axis correspondence) is
+actually considers long-range. An intermediate correction required an
+explicitly hand-supplied list of long-range site pairs; that too has been
+retired -- a hand-picked pair is a human interpretation disconnected from
+the artifact's actual topology. The live theorem-centric requirement now
+uses `canRepresentLongRangeCoupling siteCount edges locality op`, which
+derives the long-range relation itself (`LongRange_R(i, j) :=
+shortestPathDistance_G(i, j) > R`) from the artifact-grounded adjacency
+graph (`edges`) and a single specified graph-hop range (`locality :
+LocalityRange`, `specified_interface` provenance -- see section 5), and
+grants capacity only when the construction contains a confirmed free
+parameter with the freedom to couple at least one pair that relation
+classifies as long-range. VISTA never accepts a hand-supplied long-range
+pair list anywhere in this pipeline. Self-adjointness is never weakened by
+this correction. A grouped `[N, m, N, m]` operator layout (multiple
+orbitals per site, no established site-axis correspondence) is
 conservatively treated as unsupported/unresolved for long-range capacity
 specifically, never `false` (a confident negative would overclaim; `None`/
 unresolved is the honest answer). Regression:
-`tests/test_long_range_coupling.py` (18 cases across the five categories:
-long-range pairs, operator capacity, the symmetrized case, grouped
-layouts, message-passing independence). **The exact physical definition of
-"long-range" for this domain remains provisional, pending domain-expert
-confirmation** -- see `docs/structural-v2/STRUCTURAL_CAPABILITY_CHECKS.md`'s
-"Provisional long-range-coupling correction" section and
-`Testv2.Requirements`'s own module docstring.
+`tests/test_long_range_coupling.py` (graph-hop derivation, changing `R`,
+no manually supplied pair can influence the result, disconnected pairs,
+self-pairs, unsupported topology, operator capacity, the symmetrized case,
+grouped layouts, message-passing independence). **The exact physical
+definition of "long-range" for this domain remains provisional, pending
+domain-expert confirmation** -- see
+`docs/structural-v2/STRUCTURAL_CAPABILITY_CHECKS.md`'s "Provisional
+graph-hop locality correction" section and `Testv2.Requirements`'s own
+module docstring.
 
 ## 5. Specified interface assumptions
 
 The package's `interface_contract`: `output_contracts` (which exported
 output node is "the XC energy" etc.), `adjacency_convention`, and
-`long_range_pairs` (e.g. `[[0, 3]]` -- which site pairs the domain
-considers long-range, see section 4's further correction). The tool cannot
-discover these from the graph alone -- a declared interpretation,
-hash-bound into `package_sha256`, syntax-validated at authoring time
-(non-negative integer pairs) with bounds validated later against the
-artifact's own derived `site_count`.
+`locality_range` (default `4` -- the graph-hop radius `R` within which two
+sites are considered local, see section 4's further correction). The tool
+cannot discover these from the graph alone -- a declared interpretation,
+hash-bound into `package_sha256`, syntax-validated at authoring time (a
+non-negative integer). Unlike the earlier `long_range_pairs` design, there
+is no pair list to validate bounds for at all: the long-range pair set is
+always derived from `R` and the artifact's own adjacency graph, never
+supplied.
 
 Issue 10 (adjacency selection provenance): which state entry was selected
 as "the adjacency" -- `declared` (matched the analyst's own
@@ -352,15 +362,18 @@ test_full_reverification_requires_package_and_project`,
 ## 15. Known limitations
 
 - **The physical definition of "long-range" is provisional.** VISTA checks
-  capacity for coupling on an explicitly SPECIFIED pair set
-  (`long_range_pairs`); it has no notion of Euclidean distance, lattice
-  distance, graph-hop distance, or any other physical metric, and does not
-  claim the specified pairs are the physically correct notion of long-range
-  for this domain. This is a deliberate, minimal design choice (never infer
-  physical range from `i ≠ j`, a flattened tensor index, or message-passing
-  hop count) so the pair specification can be replaced later without
-  rewriting the theorem-centric harness -- pending domain-expert
-  confirmation of the actual physical definition.
+  capacity for coupling on at least one pair its own graph-hop-distance
+  relation (`shortestPathDistance_G(i, j) > R`, over the artifact-grounded
+  adjacency graph and a specified range `R`, `locality_range`) classifies
+  as long-range; it has no notion of Euclidean distance, lattice distance,
+  or any other physical metric, and does not claim graph-hop distance
+  beyond `R` is the physically correct notion of long-range for this
+  domain. This is a deliberate, minimal design choice (never infer physical
+  range from `i ≠ j`, a flattened tensor index, or message-passing hop
+  count, and never accept a hand-supplied pair list either) so the
+  operational definition can be replaced later without rewriting the
+  theorem-centric harness -- pending domain-expert confirmation of the
+  actual physical definition.
 - **Grouped operator layouts have no long-range-capacity support yet.** A
   `[N, m, N, m]` layout (multiple orbitals per site) is conservatively
   unsupported/unresolved (`None`) for `long_range_capacity`, never a

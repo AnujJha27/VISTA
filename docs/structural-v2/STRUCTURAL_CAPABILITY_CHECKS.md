@@ -20,12 +20,17 @@ entry registered today -- kept as a registry rather than hardcoded to one
 plugin specifically so a future second plugin (a different verification
 domain, or a second DFT variant) is "add an entry," not "redesign the CLI."
 
-## Provisional long-range-coupling correction (theorem-centric path)
+## Provisional graph-hop locality correction (theorem-centric path)
 
 **This section documents a further research-soundness correction. It does
 not present a final physical definition of locality; the exact physical
 notion of "long-range" for this domain is provisional pending domain-expert
 confirmation.**
+
+> VISTA currently uses graph-hop distance greater than a configurable range
+> `R` as a provisional operational definition of long-range coupling. The
+> graph is artifact-grounded; `R` is a specified domain parameter; the
+> long-range relation is derived by VISTA.
 
 `non_local_capacity` (below) treats "the operator's construction recipe
 admits *some* nonzero off-diagonal entry" as the notion of non-locality.
@@ -37,56 +42,70 @@ specifically: an arbitrary off-diagonal entry does not, by itself,
 establish that the coupling it represents is between sites the domain
 actually considers physically far apart ("long-range"). Treating `i ≠ j`
 alone as sufficient was itself an unverified physical assumption smuggled
-into a structural check.
+into a structural check. A first correction addressed this by requiring an
+explicitly, hand-supplied list of long-range site pairs -- itself later
+retired: a hand-picked pair is a human interpretation with no connection to
+the artifact's actual topology at all, and let the caller "declare" long-
+range coupling into existence regardless of the real adjacency graph.
 
 The theorem-centric requirement (`Testv2.Requirements.
-ValidPretrainingArchitecture`/`...Conditional`) has been corrected to use a
-provisional, explicitly weaker and more honest notion instead:
-**representational capacity to couple at least one EXPLICITLY SPECIFIED
-long-range site pair**, never an inferred one. `non_local_capacity`/
-`canRepresentNonLocal` (Lean) remain in this codebase only as deprecated,
-historical values -- kept so any already-generated certificate that
-references them stays re-checkable, never used as the live theorem-centric
-capacity premise.
+ValidPretrainingArchitecture`/`...Conditional`) now uses a provisional,
+purely operational notion instead: **shortest-path graph distance greater
+than a configurable range `R`** (`LongRange_R(i, j) := shortestPathDistance_G(i,
+j) > R`), derived by VISTA from the artifact's own adjacency graph -- never
+a hand-supplied pair set. `non_local_capacity`/`canRepresentNonLocal`
+(Lean) remain in this codebase only as deprecated, historical values --
+kept so any already-generated certificate that references them stays
+re-checkable, never used as the live theorem-centric capacity premise.
 
 The corrected design:
 
-- **`long_range_pairs`** (interface_contract field, e.g. `[[0, 3]]`): which
-  site pairs the domain specification declares to be outside the
-  local/short-range region. This is **SPECIFIED INTERFACE**, never
-  artifact-grounded -- the artifact establishes site count and operator
-  construction, never which physical distances count as "long-range."
-  Syntax-validated at package-authoring time (`_long_range_pairs_syntax`:
-  each entry must be a pair of non-negative integers); bounds against the
-  artifact's own derived `site_count` are validated later, by
-  `Testv2.StructuralV2.validLongRangePair` itself, once the artifact is
-  known (a package may be authored before the artifact is). An
-  out-of-range pair or a self-pair (`i = i`) is never counted as valid --
-  fails closed, never raises.
+- **`locality_range`** (interface_contract field, default `4`): the
+  graph-hop radius `R` within which two sites are considered local. This
+  is the **only** locality datum VISTA accepts, and it is **SPECIFIED
+  INTERFACE**, never artifact-grounded -- the artifact establishes site
+  count, adjacency, and operator construction, never which graph-hop
+  radius counts as "local" for this domain. Syntax-validated at
+  package-authoring time (`_locality_range`: must be a non-negative
+  integer). VISTA never accepts a hand-supplied long-range pair list at
+  any point in this pipeline.
+- The long-range pair set itself is **inferred**, never specified: given
+  the artifact-grounded adjacency graph and the specified `R`, VISTA (in
+  Python, for the IR's own `long_range_capacity` field, and independently
+  in Lean, for the live theorem-centric premise) computes shortest-path
+  distance and derives which pairs exceed `R`. Provenance is therefore:
+  adjacency/graph -> Extracted; `locality_range` (`R`) -> Specified
+  interface; shortest-path distance -> Inferred; long-range pair set ->
+  Inferred.
 - **`long_range_capacity`** (capability, theorem-centric-authoritative):
   `None` means unsupported/unresolved (a grouped `[N, m, N, m]` operator
   layout, where there is no established correspondence between a flattened
   tensor axis and the physical site index -- see "Grouped operator
   layouts" below); otherwise `True`/`False` depending on whether the
   construction contains a confirmed free parameter (never a fixed buffer,
-  constant, or unknown classification) AND at least one of the specified
-  `long_range_pairs` is valid for the derived `site_count`. Message-passing
-  depth never enters this computation at all -- GNN receptive field and
-  operator long-range capacity are unrelated statements, deliberately kept
-  separate (`ValidMessagePassingCoverage` stays its own entrypoint).
+  constant, or unknown classification) AND the derived graph-hop-distance
+  relation places at least one pair of distinct sites more than
+  `locality_range` hops apart. Disconnected pairs are handled explicitly
+  and consistently: they are always long-range, at any `R`, since they are
+  unreachable at any depth. Message-passing depth never enters this
+  computation at all -- GNN receptive field and operator long-range
+  capacity are unrelated statements, deliberately kept separate
+  (`ValidMessagePassingCoverage` stays its own entrypoint).
 - Self-adjointness is **never** weakened by any of this: `guaranteedSelfAdjoint`
   holds for `B + Bᵀ` regardless of whether `B` is a confirmed parameter or a
   grouped layout -- only the stronger long-range-capacity claim needs the
   extra evidence.
 
-**Paper-safe claim after this correction:** given an explicit specification
-of which site pairs count as long-range, VISTA checks whether the exported
-architecture contains sufficient structural freedom to represent coupling
-on at least one such pair, while independently checking structural
+**Paper-safe claim after this correction:** given a specified graph-hop
+range `R`, VISTA derives which site pairs its own artifact-grounded
+adjacency graph places more than `R` hops apart, and checks whether the
+exported architecture contains sufficient structural freedom to represent
+coupling on at least one such pair, while independently checking structural
 self-adjointness and other selected Lean requirements. It does **not**
 claim to have proven the self-energy is physically non-local, and it does
-**not** claim that the supplied long-range classification is itself
-physically correct -- that interpretation is specified, not verified.
+**not** claim that graph-hop distance beyond `R` is itself the physically
+correct notion of "long-range" for this domain -- that operational
+definition is specified (via `R`), not verified.
 
 ## What it checks
 
@@ -135,8 +154,9 @@ dict computed from that same structural derivation (message-passing
 reachability, non-local capacity) -- nothing in that path ever opens a
 parameter's actual stored values. `ir_sections()`/`validate_ir_sections()`/
 `revalidate()` never reference anything resembling a real-weight
-observation. There is no `locality`-shaped field anywhere in this plugin's
-IR to accidentally leak a float through.
+observation. The only locality-shaped field anywhere in this plugin's IR
+is `locality_range` -- a single specified integer, never a float, never a
+hand-supplied pair list.
 
 ## Operator layout: beyond a literal n x n matrix
 
@@ -224,21 +244,25 @@ a reader can tell which happened without re-deriving it.
   (.parameter _)) (.parameter _)`, only when `siteCount >= 2`; `false`
   otherwise, including for the exact same `add`/`adjoint` shape built from
   `.opaque` instead of `.parameter`.
-- `validLongRangePair siteCount pair : Bool` -- both indices `< siteCount`
-  and distinct; fails closed (false) on an out-of-bounds index or a
-  self-pair, never raises.
-- `LongRangePairs` -- a genuine wrapper `structure` around `List (Nat ×
-  Nat)`, not a bare type alias: the theorem-centric resolver matches a
-  candidate to a binder purely by Lean TYPE, and a plain alias would still
-  be definitionally equal to `List (Nat × Nat)`, risking silent
-  cross-matching with `ValidMessagePassingCoverage`'s own, unrelated
-  `edges : List (Nat × Nat)` binder.
-- `canRepresentLongRangeCoupling siteCount longRangePairs : OperatorForm →
+- `LocalityRange` -- a genuine wrapper `structure` around a bare `Nat`
+  (`range`), not a type alias: the theorem-centric resolver matches a
+  candidate to a binder purely by Lean TYPE, and a plain `Nat` would risk
+  silent cross-matching with the unrelated `siteCount : Nat` binder.
+- `isLongRangePair edges locality pair : Bool` -- `pair.1 != pair.2 &&
+  !reachableWithin edges locality.range pair.1 pair.2`: two distinct sites
+  whose shortest-path distance in `edges` exceeds `locality.range`: derived
+  from the graph and `R` alone, never a hand-supplied pair. A self-pair
+  (`i = i`) is never a witness. A disconnected pair (unreachable at any
+  depth) is long-range at any `R`, handled by the same predicate, no
+  special case.
+- `hasLongRangePair siteCount edges locality : Bool` -- whether some pair
+  of distinct sites in `[0, siteCount)` is long-range under `locality`.
+- `canRepresentLongRangeCoupling siteCount edges locality : OperatorForm →
   Bool` -- the live, theorem-centric-authoritative capacity premise.
   `true` for a bare `.parameter _`, or the same `add`/`adjoint` `.parameter`
-  shapes as `canRepresentNonLocal`, but only when `longRangePairs` contains
-  at least one pair valid for `siteCount` (`hasValidLongRangePair`) --
-  never merely `siteCount >= 2`. `false` otherwise, including for `.opaque`.
+  shapes as `canRepresentNonLocal`, but only when `hasLongRangePair
+  siteCount edges locality` -- never merely `siteCount >= 2`. `false`
+  otherwise, including for `.opaque`.
 - `OperatorForm` also has an `.opaque (name : String)` constructor,
   distinct from `.parameter`: a base term that is self-adjoint when
   symmetrized with its own adjoint (`guaranteedSelfAdjoint` holds for it

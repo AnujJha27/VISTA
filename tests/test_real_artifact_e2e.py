@@ -84,11 +84,11 @@ CONSTRAINTS = {
         {"index": 2, "role": "message_state"},
     ],
     # research-soundness correction: SPECIFIED INTERFACE, never
-    # artifact-grounded -- this real 6-site-ring fixture's domain
-    # specification declares sites 0 and 3 (furthest apart on the ring) as
-    # a long-range pair, matching examples/theorem_centric_demo's own
-    # interface_contract.json.
-    "long_range_pairs": [[0, 3]],
+    # artifact-grounded -- a graph-hop range `R = 2` for this real 6-site
+    # ring fixture. VISTA derives from this that sites 0 and 3 (3 hops
+    # apart, the furthest pair on the ring) are long-range, matching
+    # examples/theorem_centric_demo's own interface_contract.json.
+    "locality_range": 2,
 }
 
 

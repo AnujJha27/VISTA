@@ -59,13 +59,16 @@ POSITIVE_ARTIFACT = FIXTURES / "certified_ring.pt2"
 NEGATIVE_ARTIFACT = FIXTURES / "unconstrained_operator.pt2"
 ENTRYPOINT = "Testv2.Requirements.ValidSelfAdjointConstruction"
 
-# Same shape as tests/test_real_artifact_e2e.py's CONSTRAINTS -- the
-# site-count/XC/long-range facts it carries are simply never consumed by
-# `ValidSelfAdjointConstruction`'s two binders (`op`, `hSA`), but
-# `structural_ir_from_inventory`/`derive` always compute the full, fixed IR
-# regardless of which entrypoint a package selects (spec/theorem-centric-
-# gaps: theorem-driven SELECTION is implemented, theorem-driven MINIMAL IR
-# CONSTRUCTION is not -- see `dftcert/verification/resolver.py`).
+# The minimal self-adjointness demo's interface contains no locality
+# information at all -- `ValidSelfAdjointConstruction`'s two binders (`op`,
+# `hSA`) never consume site-count/edges/locality_range/XC, and
+# `locality_range` has a default (see `_locality_range`), so there is
+# nothing to specify here. `structural_ir_from_inventory`/`derive` still
+# always compute the full, fixed IR regardless of which entrypoint a
+# package selects (spec/theorem-centric-gaps: theorem-driven SELECTION is
+# implemented, theorem-driven MINIMAL IR CONSTRUCTION is not -- see
+# `dftcert/verification/resolver.py`) -- this just confirms that a caller
+# who genuinely needs none of that data need not supply any of it either.
 CONSTRAINTS = {
     "adjacency_convention": "target_source",
     "output_contracts": [
@@ -73,7 +76,6 @@ CONSTRAINTS = {
         {"index": 1, "role": "learned_self_energy"},
         {"index": 2, "role": "message_state"},
     ],
-    "long_range_pairs": [[0, 3]],
 }
 
 

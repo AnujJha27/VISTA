@@ -32,12 +32,18 @@ _HINGE = FormalBindingCandidate(
     provenance="artifact_grounded", evidence_refs=("a",), display_label="xc = hinge",
 )
 # research-soundness correction: `ValidPretrainingArchitecture`/
-# `...Conditional` now have a `longRangePairs : Testv2.StructuralV2.
-# LongRangePairs` binder (`hLR` depends on it); a valid pair for
-# `siteCount = 3` is needed for `hLR` to discharge at all.
-_LONG_RANGE_PAIRS = FormalBindingCandidate(
-    key="long_range_pairs", lean_expr="⟨[(0, 2)]⟩",
-    provenance="specified_interface", evidence_refs=(), display_label="longRangePairs = [[0, 2]]",
+# `...Conditional` now take `edges : List (Nat × Nat)` and
+# `locality : Testv2.StructuralV2.LocalityRange` directly (`hLR` depends on
+# both) and derive the long-range relation themselves -- never a supplied
+# pair list. A chain 0-1-2 (siteCount 3) with `range = 1` makes (0, 2)
+# (distance 2) long-range, which `hLR` needs to discharge at all.
+_EDGES = FormalBindingCandidate(
+    key="edges", lean_expr="[(0, 1), (1, 0), (1, 2), (2, 1)]",
+    provenance="artifact_grounded", evidence_refs=("a",), display_label="edges = [(0,1),(1,0),(1,2),(2,1)]",
+)
+_LOCALITY_RANGE = FormalBindingCandidate(
+    key="locality_range", lean_expr="⟨1⟩",
+    provenance="specified_interface", evidence_refs=(), display_label="localityRange = 1",
 )
 
 
@@ -53,7 +59,7 @@ class PremiseDischargeTests(unittest.TestCase):
     def test_all_premises_discharge_for_a_long_range_capable_symmetrized_operator(self):
         result = _resolve(
             "Testv2.Requirements.ValidPretrainingArchitecture",
-            [_SITE_COUNT_3, _LONG_RANGE_PAIRS, _SYMMETRIZED, _HINGE],
+            [_SITE_COUNT_3, _EDGES, _LOCALITY_RANGE, _SYMMETRIZED, _HINGE],
         )
         statuses = {p["index"]: p["status"] for p in result["premises"]}
         self.assertTrue(all(status == "formally_discharged" for status in statuses.values()), statuses)
@@ -65,7 +71,7 @@ class PremiseDischargeTests(unittest.TestCase):
         negation."""
         result = _resolve(
             "Testv2.Requirements.ValidPretrainingArchitecture",
-            [_SITE_COUNT_3, _LONG_RANGE_PAIRS, _IDENTITY, _HINGE],
+            [_SITE_COUNT_3, _EDGES, _LOCALITY_RANGE, _IDENTITY, _HINGE],
         )
         by_index = {p["index"]: p for p in result["premises"]}
         long_range_premise = next(
@@ -78,7 +84,7 @@ class PremiseDischargeTests(unittest.TestCase):
         metavariable -> discharge must not be attempted/claimed."""
         result = _resolve(
             "Testv2.Requirements.ValidPretrainingArchitecture",
-            [_SITE_COUNT_3, _LONG_RANGE_PAIRS, _SYMMETRIZED],
+            [_SITE_COUNT_3, _EDGES, _LOCALITY_RANGE, _SYMMETRIZED],
         )
         by_index = {p["index"]: p for p in result["premises"]}
         xc_premise = next(p for p in by_index.values() if "xcSupportsDiscontinuity" in p.get("type_display", ""))
@@ -87,7 +93,7 @@ class PremiseDischargeTests(unittest.TestCase):
     def test_conditional_entrypoints_external_assumption_premise_is_unresolved(self):
         result = _resolve(
             "Testv2.Requirements.ValidPretrainingArchitectureConditional",
-            [_SITE_COUNT_3, _LONG_RANGE_PAIRS, _SYMMETRIZED, _HINGE],
+            [_SITE_COUNT_3, _EDGES, _LOCALITY_RANGE, _SYMMETRIZED, _HINGE],
         )
         statuses = [p["status"] for p in result["premises"]]
         self.assertEqual(statuses.count("formally_discharged"), 3)

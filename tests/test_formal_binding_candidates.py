@@ -25,13 +25,16 @@ class FormalBindingCandidateTests(unittest.TestCase):
         self.assertEqual(by_key["xc_form"].lean_expr, "Testv2.StructuralV2.XCForm.hinge")
 
     def test_every_candidate_is_artifact_grounded_or_specified_interface_with_evidence(self):
-        # research-soundness correction: `long_range_pairs` is deliberately
-        # NOT artifact_grounded -- it is SPECIFIED INTERFACE data (which
-        # site pairs the domain considers long-range), and carries no
-        # artifact evidence_refs at all, unlike every other candidate here.
+        # research-soundness correction: `locality_range` is deliberately
+        # NOT artifact_grounded -- it is SPECIFIED INTERFACE data (the
+        # graph-hop radius `R`), and carries no artifact evidence_refs at
+        # all, unlike every other candidate here. Which pairs are
+        # long-range is never itself a candidate -- it is derived by Lean
+        # from `edges` and `R`, both of which ARE artifact/specified
+        # candidates already covered by this loop.
         value = _ir(adjacency=_CHAIN3, stages=0, symmetrized=True)
         for candidate in DFT_CAPABILITY_PLUGIN.formal_binding_candidates(value):
-            if candidate.key == "long_range_pairs":
+            if candidate.key == "locality_range":
                 self.assertEqual(candidate.provenance, "specified_interface")
                 continue
             self.assertEqual(candidate.provenance, "artifact_grounded")

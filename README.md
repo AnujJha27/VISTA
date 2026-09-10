@@ -309,9 +309,12 @@ accepts supplied extraction evidence directly.
   is a case study, not a completed physical theory; treat any module
   described as experimental/incomplete in `docs/structural-v2/` as exactly
   that, and consult that directory before relying on any one of them.
-- The fuller DFT case study's `long_range_pairs` notion of "long-range" is a
-  provisional, specified-interface definition, not a claim about physically
-  correct locality for this domain.
+- The fuller DFT case study uses graph-hop distance greater than a
+  configurable range `R` (`locality_range`) as a provisional operational
+  definition of long-range coupling: the adjacency graph is
+  artifact-grounded, `R` is a specified domain parameter, and the
+  long-range relation itself is derived by VISTA -- never a claim about
+  physically correct locality for this domain.
 
 ## Citation
 

@@ -92,48 +92,52 @@ def canRepresentNonLocal (siteCount : Nat) : OperatorForm → Bool
   | .add (.adjoint (.parameter _)) (.parameter _) => siteCount >= 2
   | _ => false
 
-/-- A site-pair reference is only meaningful for a declared `siteCount`
-    when both indices are actually sites (`< siteCount`) and it names two
-    distinct sites -- a self-pair (`i = i`) is never a coupling between two
-    sites at all, let alone a long-range one. Malformed pairs (out of
-    bounds, or a self-pair) fail closed: they simply don't count, rather
-    than raising or being silently dropped upstream. -/
-def validLongRangePair (siteCount : Nat) (pair : Nat × Nat) : Bool :=
-  pair.1 < siteCount && pair.2 < siteCount && pair.1 != pair.2
-
-/-- A wrapper around `List (Nat × Nat)`, not a bare type alias: the
-    theorem-centric resolver matches a candidate binding to a binder purely
-    by LEAN TYPE (`dftcert.verification.resolver`), and `ValidMessagePassingCoverage`'s
-    own `edges : List (Nat × Nat)` binder is a completely different,
-    artifact-derived fact (the GNN's adjacency, not a domain-specified
-    long-range pair set). A plain type alias (`def ... := List (Nat × Nat)`)
-    would still be definitionally equal to `List (Nat × Nat)` and could
-    therefore still be silently matched against `edges` (or vice versa); a
-    genuine `structure` cannot. -/
-structure LongRangePairs where
-  pairs : List (Nat × Nat)
+/-- A specified-interface domain parameter: the graph-hop radius within
+    which two sites are considered local (VISTA's provisional operational
+    definition of long-range coupling -- see `Testv2.Requirements` module
+    docstring). Wrapped in its own `structure`, not a bare `Nat`, so the
+    theorem-centric resolver's purely-type-based candidate matching
+    (`dftcert.verification.resolver`) can never confuse this
+    SPECIFIED-INTERFACE value with an unrelated artifact-grounded `Nat`
+    binder (e.g. `siteCount`). -/
+structure LocalityRange where
+  range : Nat
 deriving DecidableEq, Repr
 
-/-- Whether `longRangePairs` (SUPPLIED by the verification specification's
-    interface contract -- `specified_interface` provenance, never derived
-    from the artifact) contains at least one pair that is actually valid
-    for `siteCount`. -/
-def hasValidLongRangePair (siteCount : Nat) (longRangePairs : LongRangePairs) : Bool :=
-  longRangePairs.pairs.any (validLongRangePair siteCount)
+/-- Whether `(i, j)` is a LONG-RANGE pair under the provisional operational
+    definition `LongRange_R(i, j) := shortestPathDistance(i, j) > R`: two
+    distinct sites whose shortest-path distance in `edges` exceeds
+    `locality.range`. `reachableWithin edges locality.range i j` already
+    captures "some path of length <= locality.range hops exists"; its
+    negation therefore captures both "distance > locality.range" and "i, j
+    disconnected" uniformly -- the same directed-reachability predicate
+    already used for message-passing coverage, so no separate graph-theory
+    machinery is introduced here. A self-pair (`i = i`) is excluded
+    explicitly and is never a long-range witness. -/
+def isLongRangePair (edges : List (Nat × Nat)) (locality : LocalityRange) (pair : Nat × Nat) : Bool :=
+  pair.1 != pair.2 && !reachableWithin edges locality.range pair.1 pair.2
+
+/-- Whether at least one pair of distinct sites in `[0, siteCount)` is
+    long-range under `locality` -- the long-range relation DERIVED by
+    VISTA from the artifact-grounded `edges` and the specified `locality`,
+    never a hand-supplied pair set. -/
+def hasLongRangePair (siteCount : Nat) (edges : List (Nat × Nat)) (locality : LocalityRange) : Bool :=
+  (List.range siteCount).any fun i =>
+    (List.range siteCount).any fun j => isLongRangePair edges locality (i, j)
 
 /-- Does this operator construction admit *some* parameter assignment with
-    nonzero coupling on at least one of the explicitly specified
-    `longRangePairs`? This is the PROVISIONAL working notion of "long-range
-    representational capacity" (research-soundness correction -- see
-    `Testv2.Requirements` module docstring): capacity is no longer granted
-    merely because `siteCount >= 2` makes *some* off-diagonal entry exist
-    at all -- it requires that at least one of the site pairs the domain
-    specification has explicitly classified as long-range is even
-    representable by this `siteCount` (`hasValidLongRangePair`), AND that
-    the construction actually contains an unconstrained `.parameter` (never
-    an `.opaque` base the artifact could not positively confirm is
-    trainable -- see `OperatorForm.opaque`) with the freedom to realize
-    that coupling.
+    nonzero coupling on at least one pair the artifact-grounded adjacency
+    graph places more than `locality.range` hops apart? This is the
+    PROVISIONAL working notion of "long-range representational capacity"
+    (research-soundness correction -- see `Testv2.Requirements` module
+    docstring): capacity is no longer granted merely because `siteCount >=
+    2` makes *some* off-diagonal entry exist at all -- it requires that at
+    least one pair the derived graph-hop-distance relation actually
+    classifies as long-range exists (`hasLongRangePair`), AND that the
+    construction actually contains an unconstrained `.parameter` (never an
+    `.opaque` base the artifact could not positively confirm is trainable
+    -- see `OperatorForm.opaque`) with the freedom to realize that
+    coupling.
 
     `.zero`/`.identity` never have this freedom, for any assignment or any
     pair. Deliberately does NOT require the two `.parameter`s in an
@@ -142,17 +146,18 @@ def hasValidLongRangePair (siteCount : Nat) (longRangePairs : LongRangePairs) : 
     self-adjointness are independent properties of the same construction,
     checked separately, never conflated.
 
-    This does not itself decide which physical site pairs count as
-    "long-range" -- that is an unverified physical interpretation the
-    domain specification supplies (`longRangePairs`), not something this
-    function or the artifact establishes. -/
+    This does not itself decide the final physical definition of
+    "long-range" -- graph-hop distance beyond `locality.range` is a
+    provisional operational stand-in the domain specification supplies
+    (`locality.range`), not something this function or the artifact
+    establishes as physically final. -/
 def canRepresentLongRangeCoupling
-    (siteCount : Nat) (longRangePairs : LongRangePairs) : OperatorForm → Bool
+    (siteCount : Nat) (edges : List (Nat × Nat)) (locality : LocalityRange) : OperatorForm → Bool
   | .zero => false
   | .identity => false
-  | .parameter _ => hasValidLongRangePair siteCount longRangePairs
-  | .add (.parameter _) (.adjoint (.parameter _)) => hasValidLongRangePair siteCount longRangePairs
-  | .add (.adjoint (.parameter _)) (.parameter _) => hasValidLongRangePair siteCount longRangePairs
+  | .parameter _ => hasLongRangePair siteCount edges locality
+  | .add (.parameter _) (.adjoint (.parameter _)) => hasLongRangePair siteCount edges locality
+  | .add (.adjoint (.parameter _)) (.parameter _) => hasLongRangePair siteCount edges locality
   | _ => false
 
 -- research-readiness audit issue 3: exact truth-table regression checks,
@@ -193,39 +198,49 @@ def canRepresentLongRangeCoupling
 #guard canRepresentNonLocal 5 (.add (.opaque "base") (.adjoint (.opaque "base"))) == false
 #guard canRepresentNonLocal 5 (.opaque "base") == false
 
--- Provisional long-range-coupling semantics regression checks (research-
--- soundness correction: retires "any off-diagonal entry" as sufficient for
--- physical non-locality; requires an explicitly specified long-range pair).
-#guard validLongRangePair 4 (0, 3) == true
-#guard validLongRangePair 4 (3, 0) == true
-#guard validLongRangePair 4 (2, 2) == false
-#guard validLongRangePair 4 (0, 4) == false
-#guard validLongRangePair 4 (4, 0) == false
-#guard hasValidLongRangePair 4 ⟨[]⟩ == false
-#guard hasValidLongRangePair 4 ⟨[(2, 2)]⟩ == false
-#guard hasValidLongRangePair 4 ⟨[(2, 2), (0, 3)]⟩ == true
--- zero/identity: no representational freedom at all, regardless of pairs.
-#guard canRepresentLongRangeCoupling 5 ⟨[(0, 4)]⟩ .zero == false
-#guard canRepresentLongRangeCoupling 5 ⟨[(0, 4)]⟩ .identity == false
--- a bare free parameter: capacity tracks whether a VALID long-range pair
--- was even supplied, never `siteCount >= 2` alone.
-#guard canRepresentLongRangeCoupling 4 ⟨[(0, 3)]⟩ (.parameter "p") == true
-#guard canRepresentLongRangeCoupling 4 ⟨[]⟩ (.parameter "p") == false
-#guard canRepresentLongRangeCoupling 4 ⟨[(2, 2)]⟩ (.parameter "p") == false
-#guard canRepresentLongRangeCoupling 1 ⟨[(0, 0)]⟩ (.parameter "p") == false
--- symmetrized (same parameter on both sides): capacity requires a valid
--- pair too; self-adjointness (checked separately) is unaffected.
-#guard canRepresentLongRangeCoupling 4 ⟨[(0, 3)]⟩
+-- Provisional graph-hop long-range-coupling semantics regression checks
+-- (research-soundness correction: retires both "any off-diagonal entry"
+-- and a hand-supplied pair list as sufficient for physical non-locality;
+-- the long-range relation is now DERIVED from the artifact-grounded graph
+-- and a specified graph-hop range `R`, never hand-supplied).
+def chainEdges : List (Nat × Nat) := [(0, 1), (1, 0), (1, 2), (2, 1), (2, 3), (3, 2)]
+def disconnectedEdges : List (Nat × Nat) := [(0, 1), (1, 0), (2, 3), (3, 2)]
+
+-- self-pairs are never long-range witnesses, for any edges/range.
+#guard isLongRangePair chainEdges ⟨0⟩ (2, 2) == false
+#guard isLongRangePair chainEdges ⟨100⟩ (2, 2) == false
+-- distance(0, 3) = 3 hops along the chain: long-range once R < 3, local
+-- once R >= 3 -- same artifact facts (`chainEdges`), only R changes.
+#guard isLongRangePair chainEdges ⟨2⟩ (0, 3) == true
+#guard isLongRangePair chainEdges ⟨3⟩ (0, 3) == false
+#guard hasLongRangePair 4 chainEdges ⟨2⟩ == true
+#guard hasLongRangePair 4 chainEdges ⟨4⟩ == false
+-- disconnected sites are long-range at ANY range -- handled explicitly and
+-- consistently, never a special case.
+#guard isLongRangePair disconnectedEdges ⟨100⟩ (0, 2) == true
+#guard hasLongRangePair 4 disconnectedEdges ⟨100⟩ == true
+-- zero/identity: no representational freedom at all, regardless of the
+-- derived relation.
+#guard canRepresentLongRangeCoupling 4 chainEdges ⟨2⟩ .zero == false
+#guard canRepresentLongRangeCoupling 4 chainEdges ⟨2⟩ .identity == false
+-- a bare free parameter: capacity tracks whether the DERIVED relation
+-- contains a long-range pair, never `siteCount >= 2` alone.
+#guard canRepresentLongRangeCoupling 4 chainEdges ⟨2⟩ (.parameter "p") == true
+#guard canRepresentLongRangeCoupling 4 chainEdges ⟨4⟩ (.parameter "p") == false
+#guard canRepresentLongRangeCoupling 1 chainEdges ⟨0⟩ (.parameter "p") == false
+-- symmetrized (same parameter on both sides): capacity requires a derived
+-- long-range pair too; self-adjointness (checked separately) is unaffected.
+#guard canRepresentLongRangeCoupling 4 chainEdges ⟨2⟩
   (.add (.parameter "p") (.adjoint (.parameter "p"))) == true
-#guard canRepresentLongRangeCoupling 4 ⟨[]⟩
+#guard canRepresentLongRangeCoupling 4 chainEdges ⟨4⟩
   (.add (.parameter "p") (.adjoint (.parameter "p"))) == false
 -- an `.opaque` base (not positively confirmed trainable): still
 -- self-adjoint when symmetrized, but never granted long-range capacity,
--- regardless of how many valid pairs are supplied.
+-- regardless of the derived relation.
 #guard guaranteedSelfAdjoint (.add (.opaque "base") (.adjoint (.opaque "base"))) == true
-#guard canRepresentLongRangeCoupling 4 ⟨[(0, 3)]⟩
+#guard canRepresentLongRangeCoupling 4 chainEdges ⟨2⟩
   (.add (.opaque "base") (.adjoint (.opaque "base"))) == false
-#guard canRepresentLongRangeCoupling 4 ⟨[(0, 3)]⟩ (.opaque "base") == false
-#guard canRepresentLongRangeCoupling 4 ⟨[(0, 3)]⟩ .unsupported == false
+#guard canRepresentLongRangeCoupling 4 chainEdges ⟨2⟩ (.opaque "base") == false
+#guard canRepresentLongRangeCoupling 4 chainEdges ⟨2⟩ .unsupported == false
 
 end Testv2.StructuralV2

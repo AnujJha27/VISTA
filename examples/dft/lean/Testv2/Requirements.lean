@@ -17,43 +17,49 @@ capacity result below -- they are unrelated statements about unrelated
 things (GNN receptive field vs. the operator the architecture represents)
 unless a future theorem explicitly links them.
 
-PROVISIONAL LOCALITY NOTE (research-soundness correction): `siteCount` and
-`op` are artifact-grounded facts, but which pairs of sites the underlying
-physics actually considers "long-range" is not something this theory or
-the artifact can determine on its own -- it is a `specified_interface` fact
-the verification package supplies as `longRangePairs`. `AcceptableArchitecture`
-below checks structural self-adjointness and whether the operator can
-represent coupling on at least one of those SUPPLIED pairs; it does not,
-and cannot, establish that the supplied pairs are the physically correct
-notion of long-range coupling for this domain. That physical definition
-remains provisional pending domain-expert confirmation -- see
-`Testv2.StructuralV2.canRepresentLongRangeCoupling`'s own docstring and
-`docs/structural-v2/STRUCTURAL_CAPABILITY_CHECKS.md`. -/
+PROVISIONAL LOCALITY NOTE (research-soundness correction): `siteCount`,
+`edges`, and `op` are artifact-grounded facts, but which pairs of sites the
+underlying physics actually considers "long-range" is not something this
+theory or the artifact can determine on its own. VISTA currently uses
+graph-hop distance greater than a configurable range `R` (`locality :
+LocalityRange`, a `specified_interface` fact) as a provisional operational
+definition of long-range coupling: the long-range pair set itself is always
+DERIVED by `canRepresentLongRangeCoupling` from `edges` and `locality`,
+never hand-supplied. `AcceptableArchitecture` below checks structural
+self-adjointness and whether the operator can represent coupling on at
+least one pair that derived relation classifies as long-range; it does
+not, and cannot, establish that graph-hop distance beyond `locality.range`
+is the physically correct notion of long-range coupling for this domain.
+That physical definition remains provisional pending domain-expert
+confirmation -- see `Testv2.StructuralV2.canRepresentLongRangeCoupling`'s
+own docstring and `docs/structural-v2/STRUCTURAL_CAPABILITY_CHECKS.md`. -/
 
 namespace Testv2.Requirements
 
 open Testv2.StructuralV2
 
 /-- The pre-training structural requirement: a self-adjoint operator with
-    the representational capacity for coupling on at least one explicitly
-    specified long-range site pair, fed by an XC construction compatible
-    with the discontinuity DFT's exact exchange-correlation functional
-    must exhibit. `longRangePairs` is a `specified_interface` fact, never
-    artifact-grounded -- see the module docstring's provisional locality
-    note. -/
+    the representational capacity for coupling on at least one site pair
+    the graph-hop-distance relation DERIVES as long-range, fed by an XC
+    construction compatible with the discontinuity DFT's exact
+    exchange-correlation functional must exhibit. `edges` is
+    artifact-grounded; `locality` is a `specified_interface` fact (the
+    range `R`); the long-range relation itself is inferred, never
+    supplied -- see the module docstring's provisional locality note. -/
 def AcceptableArchitecture
-    (siteCount : Nat) (longRangePairs : LongRangePairs)
+    (siteCount : Nat) (edges : List (Nat × Nat)) (locality : LocalityRange)
     (op : OperatorForm) (xc : XCForm) : Prop :=
   guaranteedSelfAdjoint op = true ∧
-  canRepresentLongRangeCoupling siteCount longRangePairs op = true ∧
+  canRepresentLongRangeCoupling siteCount edges locality op = true ∧
   xcSupportsDiscontinuity xc = true
 
 theorem ValidPretrainingArchitecture
-    (siteCount : Nat) (longRangePairs : LongRangePairs) (op : OperatorForm) (xc : XCForm)
+    (siteCount : Nat) (edges : List (Nat × Nat)) (locality : LocalityRange)
+    (op : OperatorForm) (xc : XCForm)
     (hSA : guaranteedSelfAdjoint op = true)
-    (hLR : canRepresentLongRangeCoupling siteCount longRangePairs op = true)
+    (hLR : canRepresentLongRangeCoupling siteCount edges locality op = true)
     (hXC : xcSupportsDiscontinuity xc = true) :
-    AcceptableArchitecture siteCount longRangePairs op xc :=
+    AcceptableArchitecture siteCount edges locality op xc :=
   ⟨hSA, hLR, hXC⟩
 
 /-- Same structural requirement, plus one premise that is deliberately not
@@ -63,13 +69,14 @@ theorem ValidPretrainingArchitecture
     stays a binder on the generated certificate theorem, never gets
     silently proved or axiomatized (spec section 13). -/
 theorem ValidPretrainingArchitectureConditional
-    (siteCount : Nat) (longRangePairs : LongRangePairs) (op : OperatorForm) (xc : XCForm)
+    (siteCount : Nat) (edges : List (Nat × Nat)) (locality : LocalityRange)
+    (op : OperatorForm) (xc : XCForm)
     (TargetRequiresLongRangeCoupling : Prop)
     (hSA : guaranteedSelfAdjoint op = true)
-    (hLR : canRepresentLongRangeCoupling siteCount longRangePairs op = true)
+    (hLR : canRepresentLongRangeCoupling siteCount edges locality op = true)
     (hXC : xcSupportsDiscontinuity xc = true)
     (hPhysical : TargetRequiresLongRangeCoupling) :
-    AcceptableArchitecture siteCount longRangePairs op xc :=
+    AcceptableArchitecture siteCount edges locality op xc :=
   ⟨hSA, hLR, hXC⟩
 
 /-- The minimal pre-training structural guarantee VISTA itself demonstrates

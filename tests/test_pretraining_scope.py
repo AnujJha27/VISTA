@@ -44,7 +44,6 @@ CONSTRAINTS = {
         {"index": 1, "role": "learned_self_energy"},
         {"index": 2, "role": "message_state"},
     ],
-    "long_range_pairs": [[0, 3]],
 }
 
 _FIXTURES_MISSING = "" if (SEED_A.is_file() and SEED_B.is_file()) else (
