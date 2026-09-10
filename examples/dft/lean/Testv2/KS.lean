@@ -24,14 +24,13 @@ def IsNonLocal (A : Op X) : Prop :=
 theorem local_not_nonlocal {A : Op X} (hL : IsLocal X A) : ¬ IsNonLocal X A :=
   fun hNL => hNL hL
 
--- μ_xc: local (diagonal in position space) and self-adjoint (real-valued field)
+-- μ_xc: local (diagonal in position space), self-adjoint (real-valued field).
 structure XCPotential where
   op : Op X
   isLocal       : IsLocal X op
   isSelfAdjoint : IsSelfAdjoint op
 
--- Σ: non-local; treated as self-adjoint in the quasiparticle approximation
--- (Im Σ(E_QP) ≈ 0 for weakly correlated materials — Hybertsen & Louie 1986)
+-- Σ: non-local; self-adjoint in the quasiparticle approximation (Im Σ(E_QP) ≈ 0, Hybertsen & Louie 1986).
 structure SelfEnergy where
   op : Op X
   isNonLocal    : IsNonLocal X op
@@ -54,22 +53,19 @@ theorem correction_isNonLocal (selfE : SelfEnergy X) (μ : XCPotential X) :
     rw [h_split]; rfl
   rw [h_split_eval, hf, hg]; ring
 
--- (A − B)† = A† − B†, so C is self-adjoint whenever Σ and μ_xc are.
 theorem correction_isSelfAdjoint (selfE : SelfEnergy X) (μ : XCPotential X) :
     IsSelfAdjoint (correction X selfE μ) := by
   apply IsSelfAdjoint.sub
   · exact selfE.isSelfAdjoint
   · exact μ.isSelfAdjoint
 
--- ⟨φ, Aψ⟩ = ⟨ψ, Aφ⟩ for self-adjoint A over ℝ
 lemma selfAdjoint_inner_symm {A : Op X} (hA : IsSelfAdjoint A) (φ ψ : H X) :
     @inner ℝ _ _ φ (A ψ) = @inner ℝ _ _ ψ (A φ) := by
   rw [← ContinuousLinearMap.adjoint_inner_left]
   rw [hA.adjoint_eq]
   exact real_inner_comm _ _
 
--- Real polarization identity: ⟨ψ, Aφ⟩ = ¼[⟨φ+ψ, A(φ+ψ)⟩ − ⟨φ−ψ, A(φ−ψ)⟩]
--- (requires self-adjointness to collapse the cross terms)
+-- Requires self-adjointness to collapse the cross terms.
 lemma polarization_selfAdjoint {A : Op X} (hA : IsSelfAdjoint A) (φ ψ : H X) :
     @inner ℝ _ _ ψ (A φ) =
     (1/4 : ℝ) * (@inner ℝ _ _ (φ + ψ) (A (φ + ψ)) -
@@ -88,7 +84,6 @@ lemma polarization_selfAdjoint {A : Op X} (hA : IsSelfAdjoint A) (φ ψ : H X) :
     selfAdjoint_inner_symm X hA φ ψ
   rw [expand_plus, expand_minus, sym]; ring
 
--- Core lemma: self-adjoint A with ⟨φ, Aφ⟩ = 0 for all φ implies A = 0.
 -- FALSE without self-adjointness (counterexample: [[0,1],[-1,0]]).
 lemma inner_self_zero_of_selfAdj_implies_zero {A : Op X}
     (hA : IsSelfAdjoint A)
@@ -98,13 +93,10 @@ lemma inner_self_zero_of_selfAdj_implies_zero {A : Op X}
     intro φ ψ
     rw [polarization_selfAdjoint X hA φ ψ, h (φ + ψ), h (φ - ψ)]
     ring
-  -- Step 2: Aφ = 0 for all φ, by non-degeneracy of the inner product
-  --   Set ψ = Aφ: ⟨Aφ, Aφ⟩ = ‖Aφ‖² = 0, so Aφ = 0.
   have h_zero : ∀ φ : H X, A φ = 0 := by
     intro φ
     have h_norm_sq : @inner ℝ _ _ (A φ) (A φ) = (0 : ℝ) := h_bil φ (A φ)
     rwa [inner_self_eq_zero] at h_norm_sq
-  -- Step 3: A = 0 as a continuous linear map (by extensionality)
   ext φ
   simp [h_zero φ]
 
@@ -125,7 +117,6 @@ theorem ks_neq_quasiparticle (selfE : SelfEnergy X) (μ : XCPotential X) :
   have h_eq : selfE.op = μ.op := sub_eq_zero.mp h_C_zero
   exact selfE.isNonLocal (h_eq ▸ μ.isLocal)
 
--- eigenGap scales quadratically: eigenGap(r • φ) = r² * eigenGap(φ)
 private lemma eigenGap_smul (selfE : SelfEnergy X) (μ : XCPotential X) (r : ℝ) (φ : H X) :
     eigenGap X selfE μ (r • φ) = r ^ 2 * eigenGap X selfE μ φ := by
   simp only [eigenGap, correction, map_smul, real_inner_smul_left, real_inner_smul_right]
@@ -141,8 +132,6 @@ theorem correction_nonuniform_on_sphere (selfE : SelfEnergy X) (μ : XCPotential
   have hC_nl := correction_isNonLocal X selfE μ
   by_contra h
   push Not at h
-  -- h : ∀ φ ψ, ‖φ‖ = 1 → ‖ψ‖ = 1 → eigenGap φ = eigenGap ψ
-  -- Get a witness φ₀ with eigenGap(φ₀) ≠ 0 and normalize it to u₀.
   obtain ⟨φ₀, hφ₀⟩ := ks_neq_quasiparticle X selfE μ
   have hφ₀_ne : φ₀ ≠ 0 := fun heq => by simp [heq, eigenGap, correction] at hφ₀
   have hφ₀_pos : 0 < ‖φ₀‖ := norm_pos_iff.mpr hφ₀_ne
@@ -150,15 +139,12 @@ theorem correction_nonuniform_on_sphere (selfE : SelfEnergy X) (μ : XCPotential
   set u₀ := ‖φ₀‖⁻¹ • φ₀
   have hu₀_norm : ‖u₀‖ = 1 := by
     simp [u₀, norm_smul, inv_mul_cancel₀ hφ₀_nz]
-  -- eigenGap(u₀) ≠ 0 (scales by ‖φ₀‖⁻² > 0)
   have hu₀_gap : eigenGap X selfE μ u₀ ≠ 0 := by
     simp only [u₀, eigenGap_smul]
     exact mul_ne_zero (pow_ne_zero _ (ne_of_gt (inv_pos.mpr hφ₀_pos))) hφ₀
-  -- All unit vectors give eigenGap = c := eigenGap(u₀)
   set c := eigenGap X selfE μ u₀
   have h_unit : ∀ v : H X, ‖v‖ = 1 → eigenGap X selfE μ v = c :=
     fun v hv => h u₀ v hu₀_norm hv
-  -- For ANY v: eigenGap(v) = ‖v‖² * c  (by normalizing v to a unit vector)
   have h_quad : ∀ v : H X, eigenGap X selfE μ v = ‖v‖ ^ 2 * c := by
     intro v
     by_cases hv : v = 0
@@ -173,7 +159,6 @@ theorem correction_nonuniform_on_sphere (selfE : SelfEnergy X) (μ : XCPotential
       have heq : eigenGap X selfE μ v = c * ‖v‖ ^ 2 :=
         mul_left_cancel₀ hne (by rw [h1]; field_simp [hv_nz])
       linarith [heq]
-  -- ⟨v, (C − c·id)v⟩ = 0 for all v
   have h_zero : ∀ v : H X,
       @inner ℝ _ _ v ((correction X selfE μ - c • ContinuousLinearMap.id ℝ (H X)) v) = 0 := by
     intro v
@@ -182,7 +167,6 @@ theorem correction_nonuniform_on_sphere (selfE : SelfEnergy X) (μ : XCPotential
     simp only [sub_apply, smul_apply, ContinuousLinearMap.id_apply, inner_sub_right,
                real_inner_smul_right, real_inner_self_eq_norm_sq, hq]
     ring
-  -- C − c·id is self-adjoint
   have hD_sa : IsSelfAdjoint (correction X selfE μ - c • ContinuousLinearMap.id ℝ (H X)) := by
     apply IsSelfAdjoint.sub hC_sa
     rw [IsSelfAdjoint, ContinuousLinearMap.star_eq_adjoint]
@@ -192,11 +176,9 @@ theorem correction_nonuniform_on_sphere (selfE : SelfEnergy X) (μ : XCPotential
       apply ext_inner_left ℝ; intro φ
       simp [smul_apply, ContinuousLinearMap.id_apply, real_inner_smul_right]
     exact this
-  -- By core lemma: C − c·id = 0, so C = c·id
   have hD_zero := inner_self_zero_of_selfAdj_implies_zero X hD_sa h_zero
   have hC_eq : correction X selfE μ = c • ContinuousLinearMap.id ℝ (H X) :=
     sub_eq_zero.mp hD_zero
-  -- c·id is local, contradicting hC_nl
   apply hC_nl
   refine ⟨fun _ => c, fun φ x => ?_⟩
   have hCφ : correction X selfE μ φ = c • φ := by
@@ -205,7 +187,6 @@ theorem correction_nonuniform_on_sphere (selfE : SelfEnergy X) (μ : XCPotential
     exact this
   simp [hCφ, smul_eq_mul]
 
--- The zero operator is local (constant zero field).
 lemma IsLocal_zero : IsLocal X (0 : Op X) :=
   ⟨fun _ => 0, fun φ x => by simp⟩
 
@@ -225,11 +206,8 @@ lemma ks_expectation_eq_eigenvalue (H_KS : Op X) (φ : H X) (ε : ℝ)
   rw [hEig, real_inner_smul_right, real_inner_self_eq_norm_sq, hNorm]
   ring
 
--- ─────────────────────────────────────────────────────────────────────────────
--- Fundamental Gap Theorem
--- The KS fundamental gap εᴸ − εᴴ is corrected by ⟨φ_L|C|φ_L⟩ − ⟨φ_H|C|φ_H⟩
--- to give the quasiparticle gap (Hybertsen–Louie, PRB 34, 5390, 1986, Eq. 11)
--- ─────────────────────────────────────────────────────────────────────────────
+-- Fundamental Gap Theorem: εᴸ − εᴴ corrected by ⟨φ_L|C|φ_L⟩ − ⟨φ_H|C|φ_H⟩ gives the
+-- quasiparticle gap (Hybertsen–Louie, PRB 34, 5390, 1986, Eq. 11).
 
 /-- The Kohn-Sham fundamental gap between HOMO and LUMO KS eigenvalues. -/
 def ksGap (ε_HOMO ε_LUMO : ℝ) : ℝ := ε_LUMO - ε_HOMO
@@ -241,7 +219,6 @@ def qpGap (selfE : SelfEnergy X) (μ : XCPotential X)
     (φ_HOMO φ_LUMO : H X) (ε_HOMO ε_LUMO : ℝ) : ℝ :=
   (ε_LUMO + eigenGap X selfE μ φ_LUMO) - (ε_HOMO + eigenGap X selfE μ φ_HOMO)
 
--- The QP gap decomposes cleanly into the KS gap plus an orbital-dependent correction.
 lemma qpGap_eq_ksGap_add_correction (selfE : SelfEnergy X) (μ : XCPotential X)
     (φ_HOMO φ_LUMO : H X) (ε_HOMO ε_LUMO : ℝ) :
     qpGap X selfE μ φ_HOMO φ_LUMO ε_HOMO ε_LUMO =
@@ -268,8 +245,8 @@ theorem fundamental_gap_ne_ks_gap (selfE : SelfEnergy X) (μ : XCPotential X)
     whenever the GW self-energy correction has the physically correct sign. -/
 theorem ks_gap_underestimates_qp_gap (selfE : SelfEnergy X) (μ : XCPotential X)
     (φ_HOMO φ_LUMO : H X) (ε_HOMO ε_LUMO : ℝ)
-    (h_L : eigenGap X selfE μ φ_LUMO > 0) -- LUMO correction is positive
-    (h_H : eigenGap X selfE μ φ_HOMO ≤ 0) : -- HOMO correction is non-positive
+    (h_L : eigenGap X selfE μ φ_LUMO > 0)
+    (h_H : eigenGap X selfE μ φ_HOMO ≤ 0) :
     ksGap ε_HOMO ε_LUMO < qpGap X selfE μ φ_HOMO φ_LUMO ε_HOMO ε_LUMO := by
   rw [qpGap_eq_ksGap_add_correction]
   linarith

@@ -1,60 +1,30 @@
-"""Theorem binder/premise resolution engine (spec section 12): for one
-selected entrypoint, walk its FULL binder telescope in Lean itself --
-explicit, implicit, strict-implicit, and instance-implicit binders alike
-(theorem-centric-gaps issue 6) -- recording real dependency edges between
-binders (issue 8) rather than guessing from pretty-printed text, and then
-try, per proposition binder and in strict order: (1) deterministic
-Lean-checked discharge, (3) leave as an explicit external assumption --
-decided by the caller, never here -- or (4) leave unresolved. Route 2
-(handing an undischarged premise to the existing proof-search orchestrator)
-is out of scope for this phase; nothing here forecloses wiring it in later
-at the same point Route 1 gives up.
+"""Theorem binder/premise resolution engine: for one selected entrypoint,
+walk its full binder telescope in Lean itself, recording real dependency
+edges from Lean's own expression structure (never guessed from
+pretty-printed text), then try, per proposition binder, deterministic
+Lean-checked discharge, else leave it for the caller to accept as an
+external assumption, or leave unresolved. Failure to discharge a premise
+deterministically is not evidence it is false -- this module only ever
+reports `unresolved`, never invents a witness of falsity.
 
-Failure to discharge a premise deterministically is not evidence that it is
-false (spec section 2.5/12.3) -- this module only ever reports `unresolved`,
-never invents a witness of falsity.
+Binder classes:
+  explicit                -- tried against adapter candidates.
+  instanceImplicit        -- tried against Lean's `synthInstance` first,
+                             never offered artifact candidates.
+  implicit/strictImplicit -- left unassigned for transitive unification by
+                             a later explicit binder; genuinely unresolved
+                             ones are reported as such, never guessed.
 
-Binder classes (spec section 6):
-  explicit          -- (x : T): tried against adapter candidates.
-  instanceImplicit   -- [x : C]: tried against Lean's own `synthInstance`
-                        first; never offered artifact candidates.
-  implicit/strictImplicit -- {x : T}/{{x : T}}: never offered artifact
-                        candidates directly (a non-instance implicit binder
-                        is a type-level parameter meant to be inferred by
-                        unification with a later explicit argument, not
-                        artifact-data itself) -- left unassigned during the
-                        main resolution pass; a final sweep picks up
-                        whatever a later explicit binder's elaboration
-                        assigned transitively via unification, and reports
-                        genuinely unresolved ones as such rather than
-                        guessing.
+A single Lean invocation per entrypoint captures raw (pre-assignment)
+binder types and dependency edges, resolves left to right, then reports
+final status per binder.
 
-A single Lean invocation per entrypoint does the whole walk: capture raw
-(pre-assignment) binder types and dependency edges, resolve left to right,
-then report final status per binder -- never two separate probes redoing
-the same telescope (the previous `bindings.py`/`resolver.py` split).
-
-Research-readiness audit issue 11 -- an important scope distinction, worth
-stating plainly rather than leaving implicit: what this module does is
-theorem-driven binder/obligation SELECTION. The full structural IR
-(`dftcert.structural.core.structural_ir_from_inventory`) is always derived
-first, unconditionally, from the raw artifact inventory alone -- topology,
-message-passing depth, XC form, operator construction, capabilities -- with
-no awareness of which Lean entrypoint(s) a package even selected. This
-module then walks the SELECTED theorem's own binder telescope and asks,
-per binder, whether one of those already-computed, already-derived facts
-happens to fill it. What is explicitly NOT implemented anywhere in this
-codebase is theorem-driven MINIMAL IR CONSTRUCTION -- an architecture where
-the selected theorem's requirements would instead drive *which* structural
-facts get derived from the artifact in the first place, deriving only what
-that theorem's binders actually need and skipping the rest. VISTA always
-computes the full, fixed set of structural facts a plugin's `derive` knows
-how to compute, regardless of theorem selection; selection only chooses
-among facts that already exist. This is a real architectural scope
-boundary, not a bug -- it does not affect soundness (a resolved binder is
-still checked candidate-by-candidate against real evidence) -- and is
-recorded here as a documented distinction, not as a redesign in progress:
-no lazy/on-demand IR construction is planned or implied.
+Scope note: the full structural IR is always derived first from the raw
+inventory alone, with no awareness of which entrypoint was selected; this
+module then asks, per binder, whether one of those facts fills it.
+Theorem-driven minimal IR construction is not implemented -- VISTA always
+computes the plugin's full fixed fact set, and selection only chooses
+among what already exists. This is a scope boundary, not a soundness gap.
 """
 from __future__ import annotations
 
@@ -70,13 +40,11 @@ from .model import FormalBindingCandidate
 
 _MARKER = "VISTA_RESOLVE_JSON:"
 
-# Tried in order; the first that elaborates as a proof of the (fully
-# data-instantiated) premise wins. Both are checked by Lean's kernel like
-# any other proof -- this never "trusts" a tactic name.
+# Tried in order; each is checked by Lean's kernel like any other proof --
+# this never "trusts" a tactic name.
 _ROUTE1_TACTICS = ["rfl", "by decide"]
 
-# Same canonical-fingerprint options as `lean_inspect`: fully qualified,
-# no notation/unicode, every implicit shown -- never the display string.
+# Same canonical-fingerprint options as `lean_inspect`.
 _CANONICAL_PP_LEAN = (
     "(Options.empty)\n"
     "    |>.setBool `pp.all true\n"
@@ -105,7 +73,7 @@ private def vistaBinderInfoStr : BinderInfo → String
 
 /-- Elaborate `exprStr` against `expectedType`; `none` on any elaboration
     failure (a wrong-typed candidate is rejected by Lean itself, never by
-    Python string comparison -- spec section 27.3). -/
+    Python string comparison). -/
 private def vistaTryElab (env : Environment) (exprStr : String) (expectedType : Expr) :
     TermElabM (Option Expr) := do
   try
@@ -134,7 +102,7 @@ private def vistaTryElab (env : Environment) (exprStr : String) (expectedType : 
     -- Phase 0: capture each binder's RAW (pre-assignment) type and its
     -- real dependency edges onto earlier binders, before anything is
     -- resolved/assigned -- so dependency detection is never confused by
-    -- a later binder's own concrete substitution (spec issue 8).
+    -- a later binder's own concrete substitution.
     let mut rawTypes : Array Expr := #[]
     let mut depEdges : Array (Array Nat) := #[]
     for i in [0:mvars.size] do
@@ -227,17 +195,9 @@ private def vistaTryElab (env : Environment) (exprStr : String) (expectedType : 
         report := report.push (Json.mkObj fields.toList)
       else
         let mut status := if isAssignedNow then "resolved" else "unresolved"
-        -- Issue B: a data binder may only ever become a free assumption
-        -- parameter if Lean itself establishes its TYPE is exactly `Prop`
-        -- (e.g. `P : Prop`) -- never merely because a premise happens to
-        -- depend on it. `Nat`, `Type`, `Fin n`, etc. must never qualify.
-        -- A non-assigning STRUCTURAL check: `isDefEq` would happily
-        -- *assign* an unresolved metavariable to `Prop` as a side effect
-        -- (`?α =?= Sort 0` succeeds by unifying `?α := Prop`), silently
-        -- fabricating exactly the "is_prop_sort" evidence issue B forbids
-        -- for a genuinely unresolved binder. Whnf-reduce (in case of a
-        -- reducible alias) and pattern-match the literal `Sort 0` shape
-        -- instead -- this can never assign anything.
+        -- Must be non-assigning: isDefEq would *assign* an unresolved
+        -- mvar to Prop as a side effect, fabricating is_prop_sort for a
+        -- still-unresolved binder. whnf + literal Sort 0 match instead.
         let isPropSort := match (← whnf finalType) with
           | .sort .zero => true
           | _ => false
@@ -297,7 +257,7 @@ def resolve_entrypoint(
     lean_command: Sequence[str] = ("lake", "env", "lean", "-j", "1"),
     timeout_s: int = 300, trusted_local: bool = False,
 ) -> dict[str, Any]:
-    """The full section-12 pipeline for one entrypoint, in one Lean
+    """The full resolution pipeline for one entrypoint, in one Lean
     invocation: resolve every binder of its telescope (explicit against
     adapter candidates, instance-implicit via Lean's own typeclass
     synthesis, implicit/strict-implicit left for transitive unification),
@@ -306,7 +266,7 @@ def resolve_entrypoint(
     "premises": [...], "conclusion": {...}}`, the first two ordered by
     binder index and each carrying `binder_info` and `dependency_indices`
     (the earlier binder indices this binder's own type actually mentions,
-    per Lean's own expression structure -- spec issue 8)."""
+    per Lean's own expression structure)."""
     if not entrypoint:
         raise ManifestError("resolve_entrypoint needs an entrypoint")
     candidate_pairs = [(candidate.key, candidate.lean_expr) for candidate in candidates]

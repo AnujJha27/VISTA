@@ -1,14 +1,6 @@
 """VISTA theorem-centric verification: package/session data model, Lean
-introspection, binding resolution, and certificate assembly. See
-`VISTA_THEOREM_CENTRIC_CODEX_SPEC.md`.
-
-The generic structural harness (`dftcert.structural`) stays domain-agnostic
-and pre-training-only; this package adds a theorem-centric path alongside
-it without replacing it (`dftcert.structural.cli`'s existing `structural`
-commands keep working unchanged).
-
-Public author-facing API (spec/theorem-centric-gaps issue 14) -- `vista
-verify`'s CLI calls these same functions, never a second implementation:
+introspection, binding resolution, and certificate assembly, alongside
+(not replacing) the domain-agnostic `dftcert.structural` harness.
 
     from dftcert.verification import (
         VerificationPackageBuilder, start_session, resume_session, certify_session,
@@ -26,12 +18,9 @@ verify`'s CLI calls these same functions, never a second implementation:
         session="session.json", project="examples/dft/lean", trusted_local=True,
     )
 
-    # An explicit external assumption is authored into the PACKAGE, not the
-    # session (research-readiness audit issue 2: `VerificationSession.
-    # accept_assumption` is a session-local/exploratory decision only --
-    # it can never by itself make a target certifiable). Re-deriving the
-    # session from the now-changed package is what actually applies it,
-    # exactly like a binding choice.
+    # External assumptions are authored into the PACKAGE, not the session:
+    # `VerificationSession.accept_assumption` is session-local/exploratory
+    # and can never by itself make a target certifiable.
     for premise in session.unresolved_premises:
         add_external_assumption(
             "vista-package.json", premise_id=premise["id"],
@@ -42,55 +31,31 @@ verify`'s CLI calls these same functions, never a second implementation:
         session="session.json", project="examples/dft/lean", trusted_local=True,
     )
 
-    # `artifact`/`extraction_result` are required here too, and always take
-    # priority over whatever is already at `session` on disk: the
-    # certification-relevant session state is always freshly re-derived
-    # from them, overwriting `session`, never read back from it trustingly
-    # (research-readiness audit: persisted-session trust gap, see
-    # `docs/verification/TRUST_CHAIN_AUDIT.md`).
     certify_session(
         session="session.json", package="vista-package.json", project="examples/dft/lean",
         output_dir="build/vista/certificate", artifact="model.pt2", trusted_local=True,
     )
 
-The defensible claim this package establishes: VISTA checks whether
-artifact-grounded structural facts are sufficient to establish selected
-Lean requirements under explicit interface and external assumptions --
-never that Lean verifies the model itself, and never that an accepted
-external assumption has thereby been proven true (it remains a free
-binder on the generated certificate theorem, exactly as recorded).
+The claim VISTA establishes: artifact-grounded structural facts are
+sufficient to establish selected Lean requirements under explicit interface
+and external assumptions -- never that Lean verifies the model itself, and
+an accepted assumption stays a free binder on the certificate, never proven.
 
 Trust boundary, by node/fact provenance:
 
-    EXTRACTED           exact artifact hash, graph/state facts directly
-                        from safe extraction (`dftcert.sandbox`/
-                        `extractors.torch_export_worker`) -- unless the
-                        caller passed `trusted_local=True` with an
-                        already-produced extraction result (no Bubblewrap
-                        sandbox, no real artifact bytes read for this
-                        session at all), in which case these facts are
-                        only as trustworthy as that JSON file the caller
-                        supplied; VISTA re-derives the IR *from* it but has
-                        no way to independently confirm the file itself
-                        came from genuine artifact bytes (see
-                        `docs/verification/TRUST_CHAIN_AUDIT.md` section 2's
-                        trusted-local row).
-    INFERRED / DERIVED  adapter semantic classifications (`artifact_
-                        grounded` nodes) recomputed from extracted
-                        evidence, independently revalidated against it.
-    SPECIFIED INTERFACE output roles/layout/semantic interpretation
-                        supplied by the package's `interface_contract`.
-    SPECIFIED ASSUMPTION a theorem premise explicitly accepted by a user/
-                        domain expert (`specified_assumption` nodes) --
-                        stays a real binder on the certificate, never an
-                        `axiom`.
-    FORMALLY CHECKED    Lean elaboration/kernel checking: theorem
-                        introspection, premise discharge
-                        (`formally_discharged`), the generated certificate
-                        theorem itself.
-    UNVERIFIED          any physical/modeling claim outside those explicit
-                        theorem premises -- this package makes no claim
-                        about it at all.
+    EXTRACTED            artifact hash, graph/state facts from safe
+                          extraction -- or, under trusted_local=True with a
+                          pre-produced extraction result, only as
+                          trustworthy as that JSON file itself.
+    INFERRED / DERIVED   adapter semantic classifications recomputed from
+                          extracted evidence.
+    SPECIFIED INTERFACE  output roles/layout supplied by the package's
+                          `interface_contract`.
+    SPECIFIED ASSUMPTION  a premise explicitly accepted by a domain expert,
+                          staying a real certificate binder, never an axiom.
+    FORMALLY CHECKED      Lean elaboration/kernel checking.
+    UNVERIFIED            any claim outside those explicit theorem
+                          premises -- no claim made about it at all.
 """
 from __future__ import annotations
 
@@ -101,11 +66,8 @@ __all__ = [
     "verify_certificate_bundle",
 ]
 
-# `dftcert.verification.api` imports `dftcert.structural.dft_capability_plugin`,
-# which itself imports `dftcert.verification.model` -- importing `api` eagerly
-# here would deadlock whichever side is mid-import first. Lazy attribute
-# access (PEP 562) defers it until an attribute is actually used, by which
-# point both packages have finished initializing.
+# Lazy (PEP 562): eagerly importing `api` here would deadlock against
+# `dftcert.structural.dft_capability_plugin`'s import of this package.
 def __getattr__(name: str):
     if name in {"start_session", "resume_session", "certify_session", "verify_certificate_bundle"}:
         from . import api

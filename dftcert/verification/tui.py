@@ -1,40 +1,23 @@
-"""Theorem-centered terminal UI (spec section 15): the primary screen is a
-selected target's premise/evidence tree, not the raw artifact inventory.
-An authoring/review surface only -- every action goes through
-`VerificationSession` methods (`accept_assumption`/`save`), the same ones
-the Python API uses (spec section 16); this module adds no resolution
-semantics of its own.
+"""Theorem-centered terminal UI: the primary screen is a selected target's
+premise/evidence tree, not the raw inventory. Authoring/review surface
+only -- every action goes through `VerificationSession` methods, adding no
+resolution semantics of its own.
 
-`render_target_tree`/`node_detail_lines` are plain functions returning text,
-independent of `curses`, so they're testable without a real screen -- the
-same split `dftcert.tui` already uses (`render_plain` vs `curses.wrapper`).
+`render_target_tree`/`node_detail_lines` are plain functions returning
+text, independent of `curses`, so they're testable without a real screen.
 
-The `[b] choose binding` action for an `ambiguous_binding` node writes the
-choice into the package file itself via `package.add_binding_choice` (a
-binding choice is authored package state, not TUI-local/session-local
-state -- spec issues 7/9) and tells the user to re-run `vista verify
-start`, which re-checks the choice against Lean and produces a fresh
-session; it never flips a node's status in this process without Lean
-re-verifying it, and never silently picks among ambiguous candidates.
+`[b] choose binding` and `[a] accept assumption` (with `--package` given)
+write into the package file via `package.add_binding_choice`/
+`add_external_assumption` -- authored, re-derivable package state, not
+TUI-local -- then tell the user to re-run `vista verify start`, which
+re-checks the choice against Lean; neither ever flips a node's status
+without Lean re-verifying it. Without `--package`, accept-assumption falls
+back to the session-local-only `VerificationSession.accept_assumption`,
+which won't survive a re-derived session.
 
-The `[a] accept assumption` action follows the same pattern (spec/
-theorem-centric-gaps issue E): with `--package` given it writes the
-assumption into the package file via `package.add_external_assumption`
--- exactly the same normalized, re-derivable package state a binding
-choice gets -- rather than leaving it as session-local state that
-vanishes the next time the session is re-derived from the package.
-Without `--package` it falls back to the old session-local-only
-`VerificationSession.accept_assumption` so the action still works, just
-without surviving a re-derived session.
-
-Both actions then try `api.refresh_session` (spec/theorem-centric-gaps
-issue F): if the session was created via `dftcert.verification.api.
-start_session`, a workspace descriptor sits next to it recording the
-exact inputs that call needs, and refreshing just re-invokes that same
-trusted backend -- never reimplementing resolution here. If no
-descriptor exists (the session was built some other way), the action
-falls back to telling the user to re-run `vista verify start` manually;
-either way this module adds no resolution semantics of its own.
+Both actions then try `api.refresh_session`, which re-invokes the trusted
+`start_session` backend via the session's workspace descriptor if one
+exists, falling back to a manual re-run instruction otherwise.
 """
 from __future__ import annotations
 
@@ -64,8 +47,7 @@ def _node_line(node_id: str, node: dict[str, Any], *, prefix: str) -> str:
 
 
 def render_target_tree(session: dict[str, Any], entrypoint: str, *, width: int = 100) -> str:
-    """The primary screen (spec section 15): the target and its ordered
-    binder nodes, most-blocking-first status visible at a glance."""
+    """The primary screen: the target and its ordered binder nodes, status visible at a glance."""
     target = next((t for t in session["targets"] if t["entrypoint"] == entrypoint), None)
     if target is None:
         return f"no such target: {entrypoint}"
@@ -86,7 +68,7 @@ def render_target_tree(session: dict[str, Any], entrypoint: str, *, width: int =
 
 
 def node_detail_lines(session: dict[str, Any], node_id: str) -> list[str]:
-    """The section-15 "selecting an unresolved node" screen."""
+    """The "selecting an unresolved node" detail screen."""
     node = session["nodes"].get(node_id)
     if node is None:
         return [f"no such node: {node_id}"]
@@ -116,21 +98,17 @@ def node_detail_lines(session: dict[str, Any], node_id: str) -> list[str]:
 
 
 def run_interactive(session_path: str, *, package_path: str | None = None) -> int:
-    """`vista verify interact --session ... --package ...`. Never provides
-    "assume everything" -- exactly one exact proposition at a time, saved
-    immediately (spec section 15). `package_path` enables `[b] choose
-    binding` for an `ambiguous_binding` node; without it that action is
-    unavailable (the node can still be inspected, just not resolved from
-    inside `interact`)."""
+    """`vista verify interact --session ... --package ...`. Exactly one
+    exact proposition accepted at a time, saved immediately -- never
+    "assume everything". `package_path` enables `[b] choose binding`;
+    without it the node can still be inspected, just not resolved."""
     import curses
 
     session = resume_session(session_path)
 
     def _refresh_after_package_write(recorded_what: str) -> str:
-        """Issue F: re-invoke the same trusted `start_session` backend via
-        the session's own workspace descriptor, rather than duplicating
-        resolver logic or manually telling the user every time -- falls
-        back to the manual instruction only when no descriptor exists."""
+        """Re-invoke `start_session` via the session's workspace
+        descriptor; falls back to a manual instruction if none exists."""
         nonlocal session
         try:
             session = api.refresh_session(session_path)
@@ -187,9 +165,7 @@ def run_interactive(session_path: str, *, package_path: str | None = None) -> in
                 curses.noecho()
                 rationale = rationale or "accepted via TUI"
                 if package_path is None:
-                    # No package to author into -- fall back to the old
-                    # session-local acceptance so the action still works,
-                    # but it will not survive a re-derived session.
+                    # Session-local fallback; won't survive a re-derived session.
                     session.accept_assumption(premise_id=current_id, rationale=rationale)
                     message = f"accepted {current_id} as an explicit assumption (session-local only; no --package given)"
                 else:

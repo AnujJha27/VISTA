@@ -1,51 +1,33 @@
 import Testv2.StructuralV2
 
-/-! First theorem-centric verification entrypoints for the DFT domain
-(`VISTA_THEOREM_CENTRIC_CODEX_SPEC.md` section 20.3). Ordinary Lean
-theorems, no VISTA-specific annotations, no `axiom`/`sorry`: a theorem's
-elaborated binder telescope IS the requirement the theorem-centric resolver
-reads back via `dftcert.verification.lean_inspect`.
+/-! Theorem-centric DFT entrypoints: ordinary Lean theorems, no VISTA
+annotations, no `axiom`/`sorry` -- a theorem's binder telescope IS the
+requirement `dftcert.verification.lean_inspect` reads back.
 
-`allPairsReachable` is deliberately its own entrypoint
-(`ValidMessagePassingCoverage`), not folded into `AcceptableArchitecture`:
-none of the operator-construction recipes `DFTCapabilityPlugin` currently
-recognizes (bare or symmetrized parameters) depend on message passing at
-all, so a combined requirement would force an inapplicable premise onto
-every artifact this project can currently certify. Keeping them separate
-also means message-passing depth alone can never change the operator
-capacity result below -- they are unrelated statements about unrelated
-things (GNN receptive field vs. the operator the architecture represents)
-unless a future theorem explicitly links them.
+`allPairsReachable` gets its own entrypoint (`ValidMessagePassingCoverage`),
+not folded into `AcceptableArchitecture`: no operator-construction recipe
+`DFTCapabilityPlugin` recognizes depends on message passing, so combining
+them would force an inapplicable premise on every certifiable artifact.
 
-PROVISIONAL LOCALITY NOTE (research-soundness correction): `siteCount`,
-`edges`, and `op` are artifact-grounded facts, but which pairs of sites the
-underlying physics actually considers "long-range" is not something this
-theory or the artifact can determine on its own. VISTA currently uses
-graph-hop distance greater than a configurable range `R` (`locality :
-LocalityRange`, a `specified_interface` fact) as a provisional operational
-definition of long-range coupling: the long-range pair set itself is always
-DERIVED by `canRepresentLongRangeCoupling` from `edges` and `locality`,
-never hand-supplied. `AcceptableArchitecture` below checks structural
-self-adjointness and whether the operator can represent coupling on at
-least one pair that derived relation classifies as long-range; it does
-not, and cannot, establish that graph-hop distance beyond `locality.range`
-is the physically correct notion of long-range coupling for this domain.
-That physical definition remains provisional pending domain-expert
-confirmation -- see `Testv2.StructuralV2.canRepresentLongRangeCoupling`'s
-own docstring and `docs/structural-v2/STRUCTURAL_CAPABILITY_CHECKS.md`. -/
+PROVISIONAL LOCALITY: `siteCount`/`edges`/`op` are artifact-grounded, but
+"long-range" is not decidable from this theory alone. VISTA uses graph-hop
+distance beyond a `specified_interface` range (`locality : LocalityRange`)
+as a provisional definition; the long-range pair set is always DERIVED by
+`canRepresentLongRangeCoupling` from `edges` and `locality`, never supplied.
+This cannot establish that graph-hop distance is the physically correct
+notion of long-range for this domain -- pending domain-expert confirmation.
+See `Testv2.StructuralV2.canRepresentLongRangeCoupling` and
+`docs/structural-v2/STRUCTURAL_CAPABILITY_CHECKS.md`. -/
 
 namespace Testv2.Requirements
 
 open Testv2.StructuralV2
 
-/-- The pre-training structural requirement: a self-adjoint operator with
-    the representational capacity for coupling on at least one site pair
-    the graph-hop-distance relation DERIVES as long-range, fed by an XC
-    construction compatible with the discontinuity DFT's exact
-    exchange-correlation functional must exhibit. `edges` is
-    artifact-grounded; `locality` is a `specified_interface` fact (the
-    range `R`); the long-range relation itself is inferred, never
-    supplied -- see the module docstring's provisional locality note. -/
+/-- Pre-training requirement: a self-adjoint operator with capacity for
+    coupling on some pair the graph-hop relation DERIVES as long-range, fed
+    by a discontinuity-compatible XC form. `locality` (the range `R`) is
+    `specified_interface`; the long-range relation itself is inferred, not
+    supplied -- see the module docstring. -/
 def AcceptableArchitecture
     (siteCount : Nat) (edges : List (Nat × Nat)) (locality : LocalityRange)
     (op : OperatorForm) (xc : XCForm) : Prop :=
@@ -62,12 +44,10 @@ theorem ValidPretrainingArchitecture
     AcceptableArchitecture siteCount edges locality op xc :=
   ⟨hSA, hLR, hXC⟩
 
-/-- Same structural requirement, plus one premise that is deliberately not
-    formalizable from any artifact fact or this theory: `TargetRequiresLongRangeCoupling`
-    is a genuine `Prop`-sorted binder (never a global `axiom`), so the resolver
-    can only ever discharge it as an explicit external assumption -- it
-    stays a binder on the generated certificate theorem, never gets
-    silently proved or axiomatized (spec section 13). -/
+/-- Same requirement plus one premise not formalizable from any artifact
+    fact: `TargetRequiresLongRangeCoupling` is a genuine `Prop` binder, not
+    a global `axiom`, so it stays an explicit assumption on the generated
+    certificate theorem, never silently discharged. -/
 theorem ValidPretrainingArchitectureConditional
     (siteCount : Nat) (edges : List (Nat × Nat)) (locality : LocalityRange)
     (op : OperatorForm) (xc : XCForm)
@@ -79,20 +59,12 @@ theorem ValidPretrainingArchitectureConditional
     AcceptableArchitecture siteCount edges locality op xc :=
   ⟨hSA, hLR, hXC⟩
 
-/-- The minimal pre-training structural guarantee VISTA itself demonstrates
-    (as opposed to the fuller DFT-specific `AcceptableArchitecture` above):
-    self-adjointness of the artifact's recognized operator construction
-    alone, with no site-count/long-range/XC/message-passing premises. `A =
-    B + Bᵀ` is self-adjoint for any `B` (`ATᵀ = (B + Bᵀ)ᵀ = Bᵀ + B = B + Bᵀ
-    = A`); `guaranteedSelfAdjoint` is the finite, computable `OperatorForm`
-    grammar's stand-in for exactly that fact (see
-    `examples/dft/lean/Testv2/StructuralCapabilityMatrix.lean` for the
-    underlying real-matrix statement `guaranteedSelfAdjoint`'s `add
-    (adjoint) `/`add _ (adjoint)` cases stand in for). Kept independent of
-    `AcceptableArchitecture` on purpose (module docstring): one requirement
-    should not force an artifact to also carry unrelated site-count/XC/
-    message-passing facts merely because the same adapter happens to
-    derive them too. -/
+/-- VISTA's minimal pre-training guarantee: self-adjointness of the
+    recognized operator alone, no site-count/long-range/XC premises.
+    `guaranteedSelfAdjoint` stands in for `B + Bᵀ` self-adjointness for any
+    `B` (see `StructuralCapabilityMatrix.lean`). Kept independent of
+    `AcceptableArchitecture` so this requirement can't force unrelated
+    facts onto an artifact. -/
 def SelfAdjointCompatible (op : OperatorForm) : Prop :=
   guaranteedSelfAdjoint op = true
 

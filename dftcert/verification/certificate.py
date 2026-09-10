@@ -1,26 +1,10 @@
-"""Theorem-centric certificate generation (spec sections 19/23,
-theorem-centric-gaps issues A/B/C): from a `ready_for_certificate` session,
-construct the final wrapper theorem for the selected entrypoint using
-Lean's own elaborator -- never Python string concatenation assuming every
-data binder is an ordinary positional explicit argument. Lean itself:
-
-  - assigns artifact-grounded/specified-interface explicit args and
-    formally-discharged premise proofs;
-  - synthesizes instance-implicit binders (`lean_resolved`,
-    `resolution: instance_synthesized`);
-  - leaves other `lean_resolved` (transitively-unified implicit) binders
-    untouched, exactly as the resolver left them;
-  - turns every `specified_assumption` binder (data or premise) into a
-    genuine free binder of the generated theorem via `Meta.mkForallFVars`/
-    `mkLambdaFVars` over a fresh metavariable, so a later binder's printed
-    type shows its real name (`P`, not `?m.5`) rather than the previous
-    "guess a companion Prop binder" heuristic;
-  - refuses (raises) if any metavariable is left unassigned at the end --
-    never silently guessing a value or coercing a type.
-
-External assumptions survive as real theorem binders; none is ever
-emitted as an `axiom` (spec section 13).
-"""
+"""Theorem-centric certificate generation: from a `ready_for_certificate`
+session, construct the final wrapper theorem for the selected entrypoint
+using Lean's own elaborator, never Python string concatenation. Lean
+assigns resolved binders, synthesizes instance-implicits, turns every
+`specified_assumption` binder into a genuine free binder (never an
+`axiom`), and refuses if any metavariable is left unassigned rather than
+guessing a value."""
 from __future__ import annotations
 
 import hashlib
@@ -34,11 +18,9 @@ from .lean_inspect import run_marker_probe
 
 _MARKER = "VISTA_CERT_BUILD_JSON:"
 
-# Embedded in the generated certificate source itself (issue C): the
-# axiom closure of the *generated* `certificate` declaration, collected in
-# the same compilation that type-checks it, since that declaration is a
-# transient standalone file, never an importable module `lean_inspect`
-# could look back up afterwards.
+# Axiom closure of the generated `certificate` declaration, collected in the
+# same compilation that type-checks it (it's a transient file, not an
+# importable module `lean_inspect` could look up afterward).
 AXIOM_MARKER = "VISTA_CERT_AXIOMS_JSON:"
 _AXIOM_MARKER_LINE = re.compile(re.escape(AXIOM_MARKER) + r"(.*)$")
 
@@ -123,11 +105,10 @@ private def vistaTryElab (env : Environment) (exprStr : String) (expectedType : 
                   let expectedType ← instantiateMVars (← mvarId.getType)
                   -- `expectedType` may legitimately still mention EARLIER
                   -- free binders (e.g. `h : P ∧ Q` after `P`/`Q` were
-                  -- frozen into fresh named mvars just above) -- that is
-                  -- exactly the intended shape `mkForallFVars`/
-                  -- `mkLambdaFVars` will later abstract over, not an
-                  -- unresolved dependency. Only reject if some OTHER,
-                  -- non-free mvar remains.
+                  -- frozen into fresh named mvars just above) -- that's the
+                  -- intended shape `mkForallFVars`/`mkLambdaFVars` will
+                  -- later abstract over, not an unresolved dependency. Only
+                  -- reject if some OTHER, non-free mvar remains.
                   let mentioned := (Lean.Expr.collectMVars {{}} expectedType).result
                   let freeMvarIds := freeMvars.map (fun m => m.mvarId!)
                   if mentioned.any (fun m => !freeMvarIds.contains m) then
@@ -187,19 +168,11 @@ def generate_certificate_source(
     project_root: str | Path,
     lean_command=("lake", "env", "lean", "-j", "1"), timeout_s: int = 300, trusted_local: bool = False,
 ) -> str:
-    """The generated wrapper theorem's full Lean source, ready to append
-    after `import`ing every module in `entry_modules`. `entry_modules` must
-    be exactly `package["lean_theory"]["entry_modules"]` -- the package,
-    not a separate caller-supplied runtime import set, is the sole source
-    of the formal environment a certificate is built and checked against
-    (spec/theorem-centric-gaps issue 1: resolution and certificate
-    generation must never be able to run under two different imported
-    environments). Raises if any node this target's root set depends on is
-    not in a resolved/discharged/assumed state -- no certificate may be
-    assembled while a required premise is unresolved (spec section 19) --
-    or if Lean itself refuses the constructed application (spec/theorem-
-    centric-gaps issue A: Lean, not Python string assembly, determines the
-    final application)."""
+    """The generated wrapper theorem's full Lean source. `entry_modules`
+    must be exactly `package["lean_theory"]["entry_modules"]`, so resolution
+    and certificate generation always run under the same formal
+    environment. Raises if any required node is unresolved, or if Lean
+    itself refuses the constructed application."""
     nodes = _ordered_nodes(session, entrypoint)
     if not nodes:
         raise ManifestError(f"no nodes recorded for entrypoint {entrypoint!r}")
@@ -218,7 +191,7 @@ def generate_certificate_source(
             elif status == "lean_resolved" and node.get("resolution") == "instance_synthesized":
                 instance_indices.append(index)
             elif status == "lean_resolved":
-                pass  # transitive unification -- left for Lean to have already resolved
+                pass  # transitive unification; Lean has already resolved it
             elif status == "specified_assumption":
                 free_indices.append((index, name))
             else:
@@ -255,10 +228,7 @@ def generate_certificate_source(
         f"theorem certificate : {payload['type']} :=",
         f"  {payload['value']}",
         "",
-        # Issue C: the axiom closure of THIS generated declaration,
-        # collected in the same compilation that type-checks it (it is
-        # never saved as an importable module `lean_inspect` could look
-        # up afterwards).
+        # This generated declaration's own axiom closure, collected in the same compilation.
         "#eval show Lean.Elab.Command.CommandElabM Unit from do",
         f"  let axioms ← Lean.collectAxioms (`{namespace}.certificate)",
         f'  Lean.logInfo m!"{AXIOM_MARKER}{{(Lean.Json.arr (axioms.map (fun n => Lean.Json.str n.toString))).compress}}"',
@@ -271,11 +241,9 @@ def generate_certificate_source(
 
 def parse_certificate_axiom_closure(diagnostics: str) -> list[str]:
     """Extract the generated certificate declaration's own axiom closure
-    (issue C) from the compile diagnostics `dftcert.structural.core.
-    verify_structural_certificate` returns for the same generated source
-    -- never a substitute for it (the selected entrypoint's own closure,
-    from `lean_inspect.inspect_declarations`, is recorded separately, for
-    audit only)."""
+    from its compile diagnostics -- distinct from the entrypoint's own
+    closure, which `lean_inspect.inspect_declarations` records for audit
+    only."""
     matches = [
         match.group(1) for line in diagnostics.splitlines()
         for match in [_AXIOM_MARKER_LINE.search(line)] if match
@@ -293,18 +261,13 @@ def assemble_certificate_report(
     certificate_source: str, entrypoint_axiom_closure: list[str],
     certificate_axiom_closure: list[str], allowed_axioms: frozenset[str],
 ) -> dict[str, Any]:
-    """The distinguishing report (spec section 19): every node's provenance
-    class, the axiom closure, and whether the result is conditional on any
-    external assumption. Does not itself invoke Lean -- pass in the
-    already-computed axiom closures and the compiled `certificate_source`'s
-    own status separately.
-
-    theorem-centric-gaps issue C: `certificate_axiom_closure` (the axiom
-    closure of the *generated* `certificate` declaration itself, not the
-    selected entrypoint) is what gates certification -- a resolved data
-    binder's own Lean expression, or a future adapter's helper constants,
-    could depend on an axiom the entrypoint theorem itself never
-    mentions. `entrypoint_axiom_closure` is recorded for audit only."""
+    """The distinguishing report: every node's provenance class, the axiom
+    closure, and whether the result is conditional on an external
+    assumption. Does not itself invoke Lean; takes the already-computed
+    axiom closures. `certificate_axiom_closure` (of the generated
+    declaration, not the entrypoint) is what gates certification, since a
+    resolved binder's expression could depend on an axiom the entrypoint
+    itself never mentions; `entrypoint_axiom_closure` is audit only."""
     nodes = dict(_ordered_nodes(session, entrypoint))
     if "sorryAx" in certificate_axiom_closure:
         raise ManifestError("certificate blocked: generated certificate's axiom closure includes sorryAx")
@@ -323,9 +286,7 @@ def assemble_certificate_report(
         node["external_assumption"] for node in nodes.values()
         if node["status"] == "specified_assumption" and node["kind"] == "premise"
     ]
-    # Spec section 18: the certificate records exactly which IR provenance
-    # nodes actually supported a selected theorem's binders -- not a new
-    # general-purpose IR projection, just this target's own evidence_refs.
+    # Just this target's own evidence_refs, not a general-purpose IR projection.
     used_facts = sorted({ref for node in nodes.values() for ref in node.get("evidence_refs", [])})
     report = {
         "status": "certified",
@@ -344,11 +305,7 @@ def assemble_certificate_report(
         "adapter_binding": session["adapter_binding"],
         "formal_package_binding": session["formal_package_binding"],
         "ir_sha256": session["ir_sha256"],
-        # research-readiness audit issue 10: which state entry was selected
-        # as "the adjacency" and how (`declared` vs `heuristic_name_match`)
-        # -- already hash-bound into `ir_sha256`, now also directly visible
-        # in the report itself rather than only recoverable by re-deriving
-        # the full IR by hand.
+        # Already hash-bound into ir_sha256; surfaced here for direct visibility.
         "adjacency_selection": session.get("adjacency_selection", {}),
         "certificate_source_sha256": hashlib.sha256(certificate_source.encode()).hexdigest(),
     }

@@ -1,16 +1,9 @@
-"""Persistent `VerificationSession` (spec section 14): derives artifact-
-grounded structural facts itself (never trusts a foreign IR blob -- see
-`start_session`), runs the full per-entrypoint resolution pipeline
-(`dftcert.verification.resolver`) once, records every data/premise node
-with its status and provenance, and is resumable as long as the artifact/
-package/adapter/Lean-project fingerprints it was built from still match. A
-blocked run is a normal, valid, resumable session -- never `failed`.
-
-The Python API (`start_session`/`resume_session`/`VerificationSession.
-accept_assumption`) and the TUI (`dftcert.verification.tui`) must both go
-through this module's methods -- neither may reimplement resolution
-semantics of its own (spec section 16).
-"""
+"""Persistent `VerificationSession`: derives artifact-grounded structural
+facts itself (never trusts a foreign IR blob), runs the per-entrypoint
+resolution pipeline once, and records every data/premise node with its
+status and provenance. Resumable as long as the artifact/package/adapter/
+Lean-project fingerprints still match. A blocked run is a normal, valid,
+resumable session, never `failed`."""
 from __future__ import annotations
 
 import json
@@ -27,10 +20,8 @@ from .package import package_sha256
 from .resolver import resolve_entrypoint
 
 # Node statuses that count as resolved for `ready_for_certificate`.
-# `lean_resolved` is Lean's own typeclass synthesis or transitive
-# unification (an implicit/instance-implicit binder) -- not artifact
-# evidence, not a user interpretation, but also not something that should
-# block certification once Lean itself has legitimately supplied it.
+# `lean_resolved` is Lean's own synthesis/unification, not artifact evidence,
+# but legitimate enough not to block certification.
 _RESOLVED_STATUSES = frozenset({
     "artifact_grounded", "specified_interface", "formally_discharged",
     "specified_assumption", "lean_resolved",
@@ -46,10 +37,9 @@ def _node_id(entrypoint: str, index: int) -> str:
 
 
 def check_package_freshness(package: dict[str, Any], project_root: str | Path) -> None:
-    """Issue 3: the package's recorded Lean project fingerprint/toolchain
-    are checked against the LIVE project on disk, not merely stored. A
-    package authored before the theory changed is stale evidence even if
-    its own JSON is internally self-consistent."""
+    """Checks the package's recorded Lean project fingerprint/toolchain
+    against the live project on disk -- an internally self-consistent
+    package can still be stale evidence against a changed theory."""
     root = Path(project_root)
     toolchain_path = root / "lean-toolchain"
     if not toolchain_path.is_file():
@@ -68,10 +58,9 @@ def check_package_freshness(package: dict[str, Any], project_root: str | Path) -
 
 
 def check_adapter_identity(package: dict[str, Any], adapter) -> dict[str, str]:
-    """Issue 4: the adapter's identity is computed from the *executing*
-    implementation (`StructuralPlugin.semantic_identity`), never trusted
-    from package-authored text, and checked against what the package
-    recorded at authoring time. Returns the live identity for binding."""
+    """The adapter's identity is computed from the executing implementation,
+    never trusted from package-authored text, and checked against what the
+    package recorded at authoring time. Returns the live identity."""
     live = adapter.semantic_identity
     recorded = package["adapter"]
     if live != recorded:
@@ -120,9 +109,7 @@ def _build_nodes_for_entrypoint(
                 "candidate_keys": [key], "chosen_candidate_key": key, "lean_expr": candidate.lean_expr,
             }
         elif status == "resolved":
-            # An implicit/strict-implicit binder resolved transitively via
-            # unification with a later explicit binder's candidate --
-            # Lean's own elaborator supplied the value, not the adapter.
+            # Resolved transitively via unification; Lean supplied the value, not the adapter.
             nodes[node_id] = {
                 **base, "pretty_type": entry["type_display"], "status": "lean_resolved",
                 "evidence_refs": [], "resolution": "transitive_unification",
@@ -141,13 +128,9 @@ def _build_nodes_for_entrypoint(
     for entry in resolved["premises"]:
         node_id = _node_id(entrypoint, entry["index"])
         assumption = external_assumptions.get(node_id)
-        # Issue 7: a package-declared assumption is only ever applied if
-        # its recorded proposition fingerprint matches the fingerprint
-        # Lean *just now* derived for this exact premise, and only to a
-        # premise that is genuinely unresolved -- never silently
-        # downgrading an already formally_discharged proof, and never
-        # applied to a different proposition than the one the rationale
-        # was actually written against.
+        # Applies only if the recorded fingerprint matches Lean's derived
+        # type for this premise, and only to a genuinely unresolved one --
+        # never downgrading an already-discharged proof.
         assumption_applies = (
             assumption is not None
             and entry["status"] != "formally_discharged"
@@ -179,25 +162,16 @@ def _build_nodes_for_entrypoint(
 
 
 def _apply_companion_conversions(nodes: dict[str, dict[str, Any]], premise_node: dict[str, Any]) -> None:
-    """A premise like `hPhysical : TargetRequiresLongRangeCoupling` (spec section
-    13) is preceded by its own bare `Prop`-sorted DATA binder -- no adapter
-    candidate can ever ground an arbitrary proposition, and none should
-    try to. Accepting the proof premise as an explicit assumption resolves
-    that companion binder too, using this premise's OWN Lean-derived
-    dependency_node_ids -- but ONLY a dependency whose type Lean itself
-    established is exactly `Prop` (`is_prop_sort`), never merely because
-    the premise happens to depend on it (theorem-centric-gaps issue B):
-    `(x : Nat) (h : Pred x)` must never turn `x` into a `Prop` parameter
-    just because `h` depends on it -- `x` stays unresolved, blocking
-    certification, unless it is separately resolved. Both a qualifying
-    companion and the premise itself stay free binders on the generated
-    certificate theorem (never a concrete substitution, never an
-    `axiom`) rather than blocking forever.
+    """A premise like `hPhysical : TargetRequiresLongRangeCoupling` is
+    preceded by its own bare `Prop`-sorted data binder that no adapter
+    candidate can ground. Accepting the premise also resolves that
+    companion binder, but only when Lean established its type is exactly
+    `Prop` (`is_prop_sort`) -- never merely because the premise depends on
+    it, e.g. `(x : Nat) (h : Pred x)` must never turn `x` into a `Prop`
+    parameter. Both stay free binders on the certificate, never an axiom.
 
-    Shared by `accept_assumption` (the session-local acceptance path) and
-    `_build_nodes_for_entrypoint` (a package-declared assumption applied
-    fresh at `start_session` time, spec/theorem-centric-gaps issue E) so
-    the two paths can never silently diverge on this semantics."""
+    Shared by `accept_assumption` and `_build_nodes_for_entrypoint` so the
+    two paths can't diverge."""
     for dep_id in premise_node["dependency_node_ids"]:
         dep = nodes.get(dep_id)
         if (
@@ -213,10 +187,8 @@ def _session_status(nodes: dict[str, dict[str, Any]]) -> str:
 
 
 class VerificationSession:
-    """Thin wrapper over the session dict (spec section 14) plus the path
-    it persists to. `.value` is always the canonical, schema-validated
-    representation -- callers should not mutate it directly; go through
-    `accept_assumption`/`save`."""
+    """Thin wrapper over the session dict and the path it persists to.
+    `.value` is schema-validated; mutate only via `accept_assumption`/`save`."""
 
     def __init__(self, value: dict[str, Any], *, path: str | Path | None = None):
         validate_session(value)
@@ -277,36 +249,23 @@ def start_session(
     output: str | Path, lean_command=("lake", "env", "lean", "-j", "1"),
     timeout_s: int = 600, trusted_local: bool = False, force_fresh: bool = False,
 ) -> VerificationSession:
-    """The canonical trusted entrypoint (spec/theorem-centric-gaps issue 1):
-    takes the raw, safely-extracted graph `inventory` (never a pre-built
-    IR) and derives the structural IR itself, via
-    `dftcert.structural.core.structural_ir_from_inventory` under the
-    package's OWN `interface_contract` (issue 2) -- which independently
-    re-derives and compares every semantic claim against the inventory as
-    part of that same call. There is no way to hand this function an
-    edited semantic fact while keeping the artifact hash: the IR is never
-    accepted as input, only ever built by this trusted code path.
+    """The canonical trusted entrypoint: takes the raw, safely-extracted
+    `inventory` (never a pre-built IR) and derives the structural IR itself
+    via `structural_ir_from_inventory`, which re-derives and compares every
+    semantic claim against the inventory in that same call -- the IR is
+    never accepted as input, only built by this trusted code path.
 
-    Also verifies the package is fresh against the live Lean project
-    (issue 3) and that the executing adapter matches the package's
-    recorded identity (issue 4) before doing any resolution work.
-    `adapter` is a `StructuralPlugin` instance -- its `lean_import` is the
-    default module to import unless `imports` overrides it.
+    Also verifies the package is fresh against the live Lean project and
+    that the executing adapter matches the package's recorded identity
+    before resolving anything.
 
-    `force_fresh=True` (used by `dftcert.verification.api.certify_session`,
-    the certificate-issuing path -- see `docs/verification/
-    TRUST_CHAIN_AUDIT.md`) skips the "reuse the existing file at `output`
-    unchanged" shortcut below entirely, even when its hash-bound fields
-    all still match. That shortcut compares `artifact_sha256`/
-    `package_sha256`/`adapter_binding`/`ir_sha256` only -- none of which
-    cover `nodes` (the resolved binder/premise assignments actually used to
-    build a certificate) -- so an on-disk session whose `nodes` were
-    hand-edited after the fact, while every one of those four bindings was
-    left untouched, would otherwise be read back and reused verbatim
-    without ever re-running resolution. `force_fresh=True` always falls
-    through to a full re-derivation and unconditionally overwrites
-    `output`, so the caller never has to trust anything already on disk at
-    that path."""
+    `force_fresh=True` (used by `certify_session`) skips the "reuse the
+    existing file at `output` unchanged" shortcut, which compares only
+    `artifact_sha256`/`package_sha256`/`adapter_binding`/`ir_sha256` -- none
+    of which cover `nodes`, so a session whose `nodes` were hand-edited
+    while those bindings stayed untouched would otherwise be reused without
+    re-running resolution. `force_fresh=True` always re-derives and
+    unconditionally overwrites `output`."""
     check_package_freshness(package, project_root)
     adapter_binding = check_adapter_identity(package, adapter)
     artifact_ir = structural_ir_from_inventory(
@@ -373,16 +332,10 @@ def start_session(
     session["nodes"] = all_nodes
     session["targets"] = targets
     session["status"] = _session_status(all_nodes)
-    # research-readiness audit issue 10: surface which state entry was
-    # selected as "the adjacency" and how (`declared` -- the analyst's own
-    # `adjacency_state_name` -- vs `heuristic_name_match`, a fallback the
-    # tool applied because they didn't) -- already hash-bound into
-    # `ir_sha256` via `translation`/`semantic_derivations`, but previously
-    # not retrievable from the theorem-centric certificate report at all.
-    # `.get(...)` throughout: generic to any plugin's IR shape (narrowly
-    # scoped to exposing this one existing fact, not a general provenance
-    # redesign) -- absent for a plugin whose IR has no such notion, never
-    # a crash.
+    # Which state entry was selected as "the adjacency" and how (declared
+    # vs heuristic_name_match); already hash-bound into ir_sha256, surfaced
+    # here too. `.get(...)`: absent rather than a crash for a plugin whose
+    # IR has no such notion.
     translation = artifact_ir.get("translation", {})
     selection_metadata = translation.get("semantic_derivations", {}).get("topology", {}).get("metadata", {})
     session["adjacency_selection"] = {
@@ -395,17 +348,12 @@ def start_session(
 
 
 def load_session(path: str | Path) -> VerificationSession:
-    """Raw deserialization for read-only inspection -- does NOT check the
-    session is still fresh against any live input (spec/theorem-centric-
-    gaps issue D). Prefer `dftcert.verification.resume_session` (the
-    validated public API) for anything that will make a decision or
-    certify based on the result."""
+    """Raw deserialization for read-only inspection; does NOT check
+    freshness. Prefer `dftcert.verification.resume_session` for anything
+    that will make a decision or certify based on the result."""
     value = json.loads(Path(path).read_text(encoding="utf-8"))
     return VerificationSession(value, path=Path(path))
 
 
-# Historical alias -- every internal caller that only ever needed a raw
-# load (never re-validated the loaded session against anything) keeps
-# working unchanged; new code should call `load_session` by that name to
-# make clear it is NOT the validated resume.
+# Alias for existing callers; new code should call `load_session` directly.
 resume_session = load_session

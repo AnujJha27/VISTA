@@ -1,11 +1,7 @@
-"""Pure data model for the theorem-centric verification package and session.
-
-Follows the rest of `dftcert`'s convention (see `dftcert.manifest`): plain
-dicts validated by explicit functions, not a heavyweight class hierarchy.
-`FormalBindingCandidate` is the one frozen dataclass, because the spec
-(`VISTA_THEOREM_CENTRIC_CODEX_SPEC.md` section 10) defines it as such and it
-crosses the `StructuralPlugin` interface boundary.
-"""
+"""Pure data model for the theorem-centric verification package and session:
+plain dicts validated by explicit functions, following `dftcert.manifest`'s
+convention. `FormalBindingCandidate` is the one frozen dataclass, since it
+crosses the `StructuralPlugin` interface boundary."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -16,10 +12,8 @@ from ..manifest import ManifestError
 PACKAGE_SCHEMA_VERSION = 1
 SESSION_SCHEMA_VERSION = 1
 
-# Section 24: precise node statuses. A node's status doubles as its
-# epistemic-provenance class (section 2) -- the spec never asks for these to
-# be tracked separately, and splitting them would just be a second field that
-# always agrees with the first.
+# A node's status doubles as its epistemic-provenance class -- there is no
+# separate field for that, since it would always just agree with this one.
 NODE_STATUSES = frozenset({
     "artifact_grounded",
     "specified_interface",
@@ -29,7 +23,7 @@ NODE_STATUSES = frozenset({
     "unresolved",
     # Lean's own typeclass synthesis or transitive unification resolved an
     # instance-implicit/implicit binder -- not artifact evidence, not a
-    # user interpretation (spec/theorem-centric-gaps issue 6).
+    # user interpretation.
     "lean_resolved",
 })
 
@@ -50,10 +44,8 @@ BINDER_INFOS = frozenset({"explicit", "implicit", "strictImplicit", "instanceImp
 
 @dataclass(frozen=True)
 class FormalBindingCandidate:
-    """A Lean-expressible term the artifact adapter can justify, offered to
-    instantiate a theorem's data binders. `provenance` is `artifact_grounded`
-    (derived from validated extraction) or `specified_interface` (supplied
-    interpretation context, e.g. an output role)."""
+    """A Lean-expressible term the adapter offers to instantiate a data
+    binder. `provenance` is `artifact_grounded` or `specified_interface`."""
 
     key: str
     lean_expr: str

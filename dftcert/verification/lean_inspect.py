@@ -1,13 +1,8 @@
-"""Structured Lean declaration introspection (spec section 8). Never parses
-`#print` text with regex: a generated probe source uses Lean's own
-`Environment`/`Meta` APIs to emit one marker-prefixed JSON payload, and the
-Python side parses only that.
-
-The probe is run with the caller's own `lean_command` from the supplied
-Lean project root, exactly like `dftcert.structural.core.
-verify_structural_certificate` already runs generated certificates -- same
-subprocess/timeout/trust-boundary shape, reused rather than reinvented.
-"""
+"""Structured Lean declaration introspection: a generated probe uses Lean's
+own `Environment`/`Meta` APIs to emit one marker-prefixed JSON payload,
+which the Python side parses -- never regex over `#print` text. Run with
+the same subprocess/timeout/trust-boundary shape as
+`dftcert.structural.core.verify_structural_certificate`."""
 from __future__ import annotations
 
 import hashlib
@@ -25,10 +20,9 @@ from ..manifest import ManifestError
 _MARKER = "VISTA_INSPECT_JSON:"
 _MARKER_LINE = re.compile(re.escape(_MARKER) + r"(.*)$")
 
-# The pretty-printer options used for the *fingerprint* source string: fully
-# qualified names, no notation/unicode macros, every implicit argument shown
-# -- a canonical machine representation, deliberately never the same string
-# a human-facing `#print`/default pretty-print would produce (spec 8.1/8.2).
+# Canonical machine representation for fingerprinting: fully qualified,
+# no notation/unicode, every implicit shown -- deliberately not the same
+# string a human-facing pretty-print would produce.
 _CANONICAL_PP_LEAN = (
     "(Options.empty)\n"
     "    |>.setBool `pp.all true\n"
@@ -162,9 +156,8 @@ def _render_probe(*, imports: list[str], declarations: list[str]) -> str:
 
 
 class LeanIntrospectionError(RuntimeError):
-    """The probe could not be run, or ran without producing the marker
-    payload -- a tool/introspection failure (spec section 25), not a
-    statement about any declaration's truth."""
+    """The probe could not be run, or produced no marker payload -- a tool
+    failure, not a statement about any declaration's truth."""
 
 
 def _fingerprint(value: str) -> str:
@@ -194,12 +187,8 @@ def run_marker_probe(
     timeout_s: int = 300, trusted_local: bool = False,
 ) -> Any:
     """Run a generated Lean probe source from `project_root` via the
-    caller's own `lean_command`, and return the JSON payload of the last
-    `marker`-prefixed line in its output. Shared by every VISTA Lean probe
-    (`inspect_declarations` here, `dftcert.verification.bindings`'
-    candidate-matching probe) -- same subprocess/timeout/trust-boundary
-    shape `dftcert.structural.core.verify_structural_certificate` already
-    uses for generated certificates."""
+    caller's `lean_command`, and return the JSON payload of the last
+    `marker`-prefixed line in its output. Shared by every VISTA Lean probe."""
     if not trusted_local:
         raise ManifestError(
             "Lean introspection requires --trusted-local until a compiler sandbox is configured"
@@ -236,9 +225,8 @@ def inspect_declarations(
     lean_command: Sequence[str] = ("lake", "env", "lean", "-j", "1"),
     timeout_s: int = 300, trusted_local: bool = False,
 ) -> dict[str, dict[str, Any]]:
-    """Run the structured inspector for `declarations` (fully qualified Lean
-    names) after `import`ing `imports`, from `project_root` via the caller's
-    own `lean_command`. Returns `{declaration_name: inspection_result}`."""
+    """Run the structured inspector for `declarations` after importing
+    `imports`. Returns `{declaration_name: inspection_result}`."""
     if not declarations:
         raise ManifestError("Lean introspection needs at least one declaration name")
     payload = run_marker_probe(

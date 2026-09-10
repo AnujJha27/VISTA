@@ -63,10 +63,13 @@ _DISCONNECTED4 = [
 ]
 
 
-def _inventory(*, adjacency, root_target, root_kwargs=None, state_kind=None):
+def _inventory(*, adjacency, root_target, root_kwargs=None, state_kind=None, param_shape=None):
     """`learned_self_energy` is a bare placeholder `p_base` unless
     `root_target` names a zero/identity-constructing op instead (in which
-    case `p_base` is unused and dropped from the graph)."""
+    case `p_base` is unused and dropped from the graph). `param_shape`
+    overrides `p_base`'s own exported shape (default `[site_count,
+    site_count]`), to exercise a genuine trainable parameter whose
+    dimension does NOT agree with the artifact-derived site space."""
     site_count = len(adjacency)
     nodes = [
         {"name": "b_adjacency", "op": "placeholder", "target": "b_adjacency", "args": [], "kwargs": {}},
@@ -94,17 +97,20 @@ def _inventory(*, adjacency, root_target, root_kwargs=None, state_kind=None):
     }
     if root_target == "p_base":
         state["p_base"] = {
-            "graph_inputs": ["p_base"], "shape": [site_count, site_count],
+            "graph_inputs": ["p_base"], "shape": param_shape if param_shape is not None else [site_count, site_count],
             **({"state_kind": state_kind} if state_kind is not None else {}),
         }
     return {"nodes": nodes, "state": state}
 
 
-def _symmetrized_inventory(*, adjacency, state_kind=None, orbitals=None):
+def _symmetrized_inventory(*, adjacency, state_kind=None, orbitals=None, param_shape=None):
     """`p_base + adjoint(p_base)` -- the `symmetrized` recipe. `orbitals`,
     if given, makes `p_base` rank-4 (`[N, m, N, m]`, a grouped layout) and
     builds the adjoint via `permute` (the only construction a grouped
-    layout can recognize) instead of `transpose.int`."""
+    layout can recognize) instead of `transpose.int`. `param_shape`
+    overrides `p_base`'s own exported shape, to exercise a genuine
+    trainable parameter whose dimension does NOT agree with the
+    artifact-derived site space."""
     site_count = len(adjacency)
     nodes = [
         {"name": "b_adjacency", "op": "placeholder", "target": "b_adjacency", "args": [], "kwargs": {}},
@@ -127,7 +133,8 @@ def _symmetrized_inventory(*, adjacency, state_kind=None, orbitals=None):
         "name": "output", "op": "output", "target": "output",
         "args": [[_ref("relu"), _ref("add"), _ref("density")]], "kwargs": {},
     })
-    shape = [site_count, orbitals, site_count, orbitals] if orbitals else [site_count, site_count]
+    default_shape = [site_count, orbitals, site_count, orbitals] if orbitals else [site_count, site_count]
+    shape = param_shape if param_shape is not None else default_shape
     state = {
         "adjacency": {
             "structural_values": adjacency, "graph_inputs": ["b_adjacency"],
@@ -267,6 +274,51 @@ class SymmetrizedLongRangeCapacityTests(unittest.TestCase):
         candidates = {c.key: c for c in DFT_CAPABILITY_PLUGIN.formal_binding_candidates(ir)}
         self.assertNotIn('.parameter "base"', candidates["operator_form"].lean_expr)
         self.assertIn("opaque", candidates["operator_form"].lean_expr)
+
+
+class OperatorDimensionAgreementTests(unittest.TestCase):
+    """F. A genuinely confirmed free parameter still cannot represent
+    long-range coupling if its own exported shape does not agree with the
+    artifact-derived site count -- a 2x2 operator plainly cannot couple
+    across 6 sites, however many long-range pairs the topology has
+    (research-soundness correction)."""
+
+    def test_mismatched_bare_parameter_shape_has_no_capacity(self):
+        ir = _ir(
+            _inventory(adjacency=_CHAIN6, root_target="p_base", state_kind="InputKind.PARAMETER", param_shape=[2, 2]),
+            locality_range=4,
+        )
+        self.assertEqual(ir["operator"]["construction"], "unconstrained_parameter")
+        self.assertFalse(ir["capabilities"]["long_range_capacity"])
+        candidates = {c.key: c for c in DFT_CAPABILITY_PLUGIN.formal_binding_candidates(ir)}
+        self.assertNotIn('.parameter "unconstrained"', candidates["operator_form"].lean_expr)
+        self.assertIn("opaque", candidates["operator_form"].lean_expr)
+
+    def test_mismatched_symmetrized_parameter_shape_is_self_adjoint_but_has_no_capacity(self):
+        ir = _ir(
+            _symmetrized_inventory(adjacency=_CHAIN6, state_kind="InputKind.PARAMETER", param_shape=[2, 2]),
+            locality_range=4,
+        )
+        self.assertEqual(ir["operator"]["construction"], "symmetrized")
+        checks = DFT_CAPABILITY_PLUGIN.checks(ir)
+        self.assertTrue(checks["self_adjoint"]["satisfied"])  # never weakened by a shape mismatch
+        self.assertFalse(ir["capabilities"]["long_range_capacity"])
+        candidates = {c.key: c for c in DFT_CAPABILITY_PLUGIN.formal_binding_candidates(ir)}
+        self.assertNotIn('.parameter "base"', candidates["operator_form"].lean_expr)
+        self.assertIn("opaque", candidates["operator_form"].lean_expr)
+
+    def test_missing_shape_has_no_capacity(self):
+        inventory = _inventory(adjacency=_CHAIN6, root_target="p_base", state_kind="InputKind.PARAMETER")
+        del inventory["state"]["p_base"]["shape"]
+        ir = _ir(inventory, locality_range=4)
+        self.assertFalse(ir["capabilities"]["long_range_capacity"])
+
+    def test_matching_shape_is_unaffected(self):
+        ir = _ir(
+            _inventory(adjacency=_CHAIN6, root_target="p_base", state_kind="InputKind.PARAMETER", param_shape=[6, 6]),
+            locality_range=4,
+        )
+        self.assertTrue(ir["capabilities"]["long_range_capacity"])
 
 
 class GroupedLayoutUnsupportedTopologyTests(unittest.TestCase):

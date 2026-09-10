@@ -1,9 +1,7 @@
-/-! Adversarial fixture for theorem-centric-gaps issue C: the selected
-entrypoint theorem itself is completely clean, but a value an adapter/
-candidate might resolve a binder to depends on a custom axiom. VISTA must
-reject certification because the *generated certificate's own* axiom
-closure contains it -- checking only the entrypoint's closure would miss
-this entirely. -/
+/-! The selected entrypoint theorem is completely clean, but a value an
+adapter/candidate might resolve a binder to depends on a custom axiom. VISTA
+must reject certification because the *generated certificate's own* axiom
+closure contains it -- checking only the entrypoint's closure would miss this. -/
 namespace Testv2.AxiomAdversarial
 
 axiom MyCustomAxiom : Nat

@@ -1,8 +1,6 @@
-"""Authoring surface for the canonical `ResolvedVerificationPackage` JSON
-(spec sections 6-7). `VerificationPackageBuilder` is normal Python the user
-runs themselves; the trusted verification CLI only ever consumes the
-resolved JSON this module writes, never imports/executes user Python.
-"""
+"""Authoring surface for the canonical `ResolvedVerificationPackage` JSON.
+The trusted CLI only ever consumes the resolved JSON this module writes,
+never imports/executes user Python."""
 from __future__ import annotations
 
 import json
@@ -15,11 +13,8 @@ from .model import validate_package
 
 
 def _entry_module(entrypoint: str) -> str:
-    """Auto-derived module guess for an entrypoint with no explicit
-    `entry_modules` override -- only correct when a declaration's
-    namespace happens to match its module path (spec/theorem-centric-gaps
-    issue 13: this is NOT assumed in general; pass `entry_modules`
-    explicitly whenever they differ)."""
+    """Module guess for an entrypoint with no explicit `entry_modules`
+    override; correct only when the namespace matches the module path."""
     if "." not in entrypoint:
         raise ManifestError(f"entrypoint {entrypoint!r} must be a fully qualified Lean declaration name")
     return entrypoint.rsplit(".", 1)[0]
@@ -34,12 +29,10 @@ class VerificationPackageBuilder:
         axiom_policy: dict[str, Any] | None = None,
         selection_source: str = "python",
     ) -> None:
-        """`adapter` is a `StructuralPlugin` instance (or anything exposing
-        `.semantic_identity`) -- its identity is computed from the
-        executing implementation itself (spec issue 4), never authored as
-        free text. `entry_modules`, if given, is used verbatim (spec issue
-        13: a declaration's namespace need not match its module path);
-        otherwise it is guessed from each entrypoint's own namespace."""
+        """`adapter` exposes `.semantic_identity`, computed from the
+        executing implementation, never authored as free text.
+        `entry_modules`, if given, is used verbatim; otherwise it's guessed
+        from each entrypoint's namespace."""
         if not entrypoints:
             raise ManifestError("verification package needs at least one entrypoint")
         root = Path(lean_project)
@@ -92,12 +85,10 @@ def load_package(path: str | Path) -> dict[str, Any]:
 def add_binding_choice(
     path: str | Path, *, entrypoint: str, binder_path: str, candidate_key: str,
 ) -> str:
-    """Persist an explicit ambiguous-binding choice into the package file
-    itself (spec issue 7/9: a binding choice is authored package state,
-    not TUI-local state) -- replaces any prior choice for the same
-    (entrypoint, binder_path). Returns the package's new sha256; the
-    caller must re-run `start_session` (which re-checks Lean) to actually
-    apply it -- this never re-picks a session's node status by itself."""
+    """Persist a binding choice into the package (authored state, not
+    TUI-local), replacing any prior choice for the same (entrypoint,
+    binder_path). Returns the package's new sha256; the caller must re-run
+    `start_session` to apply it."""
     package = load_package(path)
     choices = [
         choice for choice in package["binding_choices"]
@@ -113,14 +104,10 @@ def add_binding_choice(
 def add_external_assumption(
     path: str | Path, *, premise_id: str, proposition_fingerprint: str, rationale: str,
 ) -> str:
-    """Persist an interactively-accepted assumption into the package file
-    itself (spec/theorem-centric-gaps issue E: an accepted assumption is
-    authored package state, exactly like a binding choice via
-    `add_binding_choice`, not TUI-local/session-local state that vanishes
-    the next time the session is re-derived). Replaces any prior assumption
-    for the same `premise_id`. Returns the package's new sha256; the caller
-    must re-run `start_session` (which re-checks the exact proposition
-    fingerprint against Lean) to actually apply it."""
+    """Persist an assumption into the package (authored state, like
+    `add_binding_choice`, not session-local), replacing any prior one for
+    the same `premise_id`. Returns the package's new sha256; the caller
+    must re-run `start_session` to apply it."""
     package = load_package(path)
     assumptions = [
         item for item in package["external_assumptions"] if item["premise_id"] != premise_id

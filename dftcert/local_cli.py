@@ -262,11 +262,7 @@ def _manifest(options: argparse.Namespace, policy: Policy) -> ArchitectureManife
         path=options.pt2, model_id=options.model_id,
         policy=policy, input_constraints=constraints,
     )
-    # Deferred: `dftcert.sandbox` imports the POSIX-only `resource` module
-    # at load time; only this (legacy) command path needs it, and a
-    # module-level import here would break every `vista`
-    # subcommand on Windows, including `verify` (research-readiness audit
-    # section 8).
+    # Deferred: dftcert.sandbox imports POSIX-only `resource`; a top-level import would break vista on Windows.
     from .sandbox import BubblewrapExtractor
 
     result = BubblewrapExtractor().extract(options.pt2)
@@ -488,13 +484,7 @@ def _run_assess(options: argparse.Namespace, policy: Policy) -> int:
     if not options.non_interactive and sys.stdin.isatty():
         if sys.stdout.isatty():
             try:
-                # `curses` (POSIX-only) and `dftcert.tui`, which imports it
-                # at module level, both stay deferred to exactly here -- a
-                # module-level `import curses` in *this* file would break
-                # every `vista` subcommand on Windows, not just
-                # this one (research-readiness audit section 8: caught by
-                # actually running the documented workflow's CLI
-                # entrypoint).
+                # curses and dftcert.tui (which imports it) are POSIX-only; deferred so vista works on Windows.
                 import curses
 
                 from .tui import confirm_assumptions_tui
@@ -553,12 +543,7 @@ def main(argv: list[str] | None = None) -> int:
         if options.command == "verify":
             from .verification.cli import main as verify_main
             return verify_main(options.verify_args)
-        # Deferred: `dftcert.legacy.pipeline` imports the POSIX-only
-        # `fcntl` module at load time; only the legacy (non-`verify`/
-        # `structural`/`agentic`) commands below need it, and a
-        # module-level import would break every `vista`
-        # subcommand on Windows, including `verify` (research-readiness
-        # audit section 8).
+        # Deferred: dftcert.legacy.pipeline imports POSIX-only `fcntl`; a top-level import would break vista on Windows.
         from .legacy.pipeline import LocalPipeline, LocalPipelineConfig, LocalRun, command_tuple
 
         policy = Policy.load(options.policy)

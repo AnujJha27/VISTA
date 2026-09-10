@@ -1,36 +1,15 @@
-"""Pre-training architectural-capability certification for the DFT/GNN target.
-
-This is the project's ONLY structural plugin: it certifies architectural
-*capability* before a single weight is trained, and never reads an
+"""Pre-training architectural-capability certification for the DFT/GNN
+target: the project's only structural plugin, and it never reads an
 extracted parameter's floating-point content anywhere in its derivation,
-IR, or checks. There used to be a second, post-training plugin that read
-real trained weights to check numeric locality (`operator_locality_verified`)
--- it has been removed entirely: this project's claim is a pre-training
-check, and keeping a post-training plugin alongside it made that claim
-ambiguous. See `docs/structural-v2/STRUCTURAL_CAPABILITY_CHECKS.md`.
+IR, or checks.
 
-Checks:
-
-- `all_pairs_reachable`: every ordered pair of sites is reachable from every
-  other within the message-passing depth found *strictly within the
-  operator's own ancestry* -- not a separately declared `message_state`
-  output that the operator need not depend on at all. When the operator's
-  construction recipe does not depend on message-passing (e.g. a bare or
-  symmetrized parameter -- the only recipes this plugin currently
-  recognizes), the check is `not applicable`: a message-passing-derived
-  receptive-field claim is meaningless for an operator that message passing
-  never touches, and is never silently satisfied by an unrelated branch.
-- `non_local_capacity`: when non-locality is claimed and there are at least
-  two sites, does the operator's construction recipe admit *some*
-  parameter assignment with a nonzero off-diagonal entry? `zero`/`identity`
-  never can; `symmetrized` (`B + B^T`) and `unconstrained_parameter` can,
-  provided a second site actually exists for an off-diagonal entry to live
-  at (a 1x1 matrix has none, for any recipe). A fact about the recipe and
-  site count, never about the values currently stored in it.
-- `self_adjoint`: the declared operator output is structurally zero,
-  identity, or a parameter plus its transpose -- recipe-only, no floats.
-- `xc_discontinuity_compatible`: the declared XC output path contains a
-  supported hinge construction.
+Checks: `all_pairs_reachable` (site coverage within the operator's own
+message-passing ancestry, not applicable when the recipe doesn't depend on
+message passing at all), `non_local_capacity` (recipe admits a nonzero
+off-diagonal assignment, given >=2 sites), `self_adjoint` (output is zero,
+identity, or a parameter plus its transpose), `xc_discontinuity_compatible`
+(XC path contains a supported hinge). See
+`docs/structural-v2/STRUCTURAL_CAPABILITY_CHECKS.md`.
 """
 from __future__ import annotations
 
@@ -74,7 +53,7 @@ def _derivation(
     rule: str, observed_nodes: list[dict[str, Any]], metadata: dict[str, Any] | None = None,
     rule_version: int = 1,
 ) -> dict[str, Any]:
-    """Compact, hash-bound explanation for one semantic lowering result."""
+    """Hash-bound explanation for one semantic lowering result."""
     result = {
         "claim": claim,
         "value": value,
@@ -123,18 +102,9 @@ def _direct_ref(value: Any) -> str | None:
 
 
 def _resolve_operator_layout(input_constraints: dict[str, Any]) -> dict[str, Any]:
-    """The operator's declared domain/codomain axis grouping. Default is the
-    plain n x n matrix (`output_axes=[0]`, `input_axes=[1]`), covering every
-    artifact certified before this field existed. A grouped layout -- e.g.
-    site and orbital/spin axes folded together into a shape like
-    `[N, m, N, m]`, still mathematically a linear operator on the flattened
-    Nm-dimensional space once the axis groups are known -- is opt-in via
-    `input_constraints.operator_layout`. Only the canonical contiguous
-    grouping (`output_axes=[0..r-1]`, `input_axes=[r..2r-1]`) is supported;
-    a reordered or interleaved grouping is `unsupported`, never guessed at.
-    This only matters for correctly recognizing the adjoint construction
-    (`_is_adjoint_of`) -- there is no float-reading anywhere in this plugin
-    that would need to know which axis is a "site" versus an "orbital"."""
+    """The operator's declared domain/codomain axis grouping; defaults to
+    plain n x n. Only the canonical contiguous grouping is supported -- a
+    reordered or interleaved one is rejected, never guessed at."""
     raw = input_constraints.get("operator_layout")
     if raw is None:
         return {"output_axes": [0], "input_axes": [1]}
@@ -167,13 +137,10 @@ def _adjoint_permutation(node: dict[str, Any]) -> list[Any] | None:
 
 
 def _is_adjoint_of(node: dict[str, Any], layout: dict[str, Any]) -> bool:
-    """Whether `node` actually constructs the adjoint under `layout` -- by
-    inspecting its real permutation/axis arguments, never by op name alone.
-    A `permute`/`transpose.int` call with a no-op or wrong permutation (e.g.
-    `transpose.int(x, 0, 0)`, or `permute(x, [0, 1])` -- neither actually
-    swaps anything) must not be accepted just because its op name is on the
-    reviewed list; only `.t()`/`numpy_T` have no axis arguments to check and
-    are unambiguous for a two-axis tensor."""
+    """Whether `node` actually constructs the adjoint under `layout`, by
+    checking its real permutation/axis arguments rather than trusting the
+    op name alone (a no-op permutation must not pass just because the op
+    is on the reviewed list)."""
     target = _target(node)
     if target == "aten.permute.default":
         return _adjoint_permutation(node) == layout["input_axes"] + layout["output_axes"]
@@ -187,7 +154,7 @@ def _is_adjoint_of(node: dict[str, Any], layout: dict[str, Any]) -> bool:
             return False
         dim0, dim1 = positional[1], positional[2]
         return {dim0, dim1} == {0, 1} and dim0 != dim1
-    return target in {"aten.t.default", "aten.numpy_t.default"}
+    return target in {"aten.t.default", "aten.numpy_t.default"}  # no axes to check; unambiguous for rank 2
 
 
 def _operator_state_name(inventory: dict[str, Any], node_name: str) -> str | None:
@@ -201,20 +168,32 @@ def _operator_state_name(inventory: dict[str, Any], node_name: str) -> str | Non
     return None
 
 
+def _shape_matches_site_count(inventory: dict[str, Any], node_name: str, site_count: int) -> bool:
+    """Whether `node_name`'s exported shape is literally `[site_count,
+    site_count]` -- fails CLOSED on a missing/malformed shape, so a
+    too-small parameter can never be credited with long-range capacity."""
+    state = inventory.get("state", {})
+    if not isinstance(state, dict):
+        return False
+    state_name = _operator_state_name(inventory, node_name)
+    entry = state.get(state_name) if state_name else None
+    if not isinstance(entry, dict):
+        return False
+    shape = entry.get("shape")
+    if not isinstance(shape, list) or len(shape) != 2:
+        return False
+    rows, cols = shape
+    if isinstance(rows, bool) or isinstance(cols, bool) or not isinstance(rows, int) or not isinstance(cols, int):
+        return False
+    return rows == site_count and cols == site_count
+
+
 def _is_plausible_parameter_node(inventory: dict[str, Any], node_name: str) -> bool:
     """Whether `node_name` resolves to a state entry the extractor
-    POSITIVELY classified as a genuine trainable parameter (torch export's
-    own `InputKind.PARAMETER`) -- required for the `unconstrained_parameter`
-    capacity claim (implying trainable freedom, used for `non_local_capacity`)
-    to never secretly be built from a raw activation input, a registered
-    buffer, a constant, or anything else that was never a trainable weight
-    at all (research-readiness audit issue 5). Fails CLOSED (False) on a
-    missing/unrecognized classification, a buffer, a constant, or an
-    explicit user-input signal alike -- only an explicit positive
-    "parameter" marker is accepted; there is no permissive default. Self-
-    adjointness (`guaranteedSelfAdjoint`) is a separate, unaffected
-    property -- `B + B^dagger` is self-adjoint for *any* `B`, trainable or
-    not, so the `symmetrized` recipe never calls this function at all."""
+    POSITIVELY classified as a trainable parameter (`InputKind.PARAMETER`).
+    Required for `unconstrained_parameter`, fails CLOSED on anything else
+    (buffer, constant, unrecognized). Not needed for `symmetrized`: `B +
+    B^dagger` is self-adjoint for any `B`, trainable or not."""
     state = inventory.get("state", {})
     if not isinstance(state, dict):
         return False
@@ -228,26 +207,19 @@ def _is_plausible_parameter_node(inventory: dict[str, Any], node_name: str) -> b
 
 def _operator_construction(
     nodes: list[dict[str, Any]], root: str, layout: dict[str, Any], inventory: dict[str, Any],
+    site_count: int,
 ) -> tuple[str, list[str], dict[str, Any]]:
     """Classify the operator's construction and return a `recipe` describing
     it, purely from graph shape -- never a float.
 
-    Self-adjointness (the `symmetrized` recipe, `add(base, adjoint(base))`)
-    holds for *any* `base` -- B + B^dagger is self-adjoint regardless of
-    whether B is a trained weight, so the CLASSIFICATION never needs a
-    parameter check and is never weakened here. `unconstrained_parameter`
-    is different: it claims `base` is a free, trainable matrix, which does
-    need `_is_plausible_parameter_node`.
-
-    But a `symmetrized` recipe's `non_local_capacity` claim (post-hardening-
-    pass review) is a separate matter: representational freedom to realize
-    a nonzero off-diagonal entry requires an actual free parameter to
-    choose, not merely SOME base value symmetrized with its own transpose
-    (a fixed zero buffer symmetrized with itself is still `zero + zero^T`,
-    incapable of any off-diagonal entry, for any site count). The recipe
-    therefore separately records `parameter_confirmed` -- `_non_local_
-    capacity`/`_lean_operator` gate the capacity claim and the Lean lowering
-    on it, without touching the `symmetrized` classification itself."""
+    `symmetrized` (`add(base, adjoint(base))`) is self-adjoint for any
+    `base`, so classification needs no parameter check; `unconstrained_
+    parameter` claims `base` is itself free and trainable, which does.
+    The recipe separately records `parameter_confirmed` (needed for the
+    `non_local_capacity` claim: a fixed base symmetrized with its own
+    transpose still can't realize an off-diagonal entry) and
+    `site_dimension_confirmed` (needed for long-range capacity: a 2x2
+    parameter can't represent 6-site coupling)."""
     by_name = {node["name"]: node for node in nodes if isinstance(node.get("name"), str)}
     provenance = [node["name"] for node in _ancestors(nodes, root)]
     root_node = by_name.get(root, {})
@@ -267,6 +239,7 @@ def _operator_construction(
                         return "symmetrized", provenance, {
                             "kind": "sum_transpose", "base": base, "transposed_base": transformed_base,
                             "parameter_confirmed": _is_plausible_parameter_node(inventory, base),
+                            "site_dimension_confirmed": _shape_matches_site_count(inventory, base, site_count),
                         }
                     if (
                         transformed_base in by_name
@@ -277,12 +250,17 @@ def _operator_construction(
                     ):
                         return "unconstrained_parameter", provenance, {
                             "kind": "sum_transpose", "base": base, "transposed_base": transformed_base,
-                            # already required as a precondition to reach this branch (both
-                            # operands passed _is_plausible_parameter_node above).
-                            "parameter_confirmed": True,
+                            "parameter_confirmed": True,  # both operands already checked above
+                            "site_dimension_confirmed": (
+                                _shape_matches_site_count(inventory, base, site_count)
+                                and _shape_matches_site_count(inventory, transformed_base, site_count)
+                            ),
                         }
     if root_node.get("op") in {"placeholder", "get_attr"} and _is_plausible_parameter_node(inventory, root):
-        return "unconstrained_parameter", provenance, {"kind": "param", "node": root}
+        return "unconstrained_parameter", provenance, {
+            "kind": "param", "node": root,
+            "site_dimension_confirmed": _shape_matches_site_count(inventory, root, site_count),
+        }
     return "unsupported", provenance, {"kind": "unsupported"}
 
 
@@ -365,11 +343,8 @@ def _topology(
 ) -> tuple[int, list[list[int]], list[str], str, str]:
     requested = input_constraints.get("adjacency_state_name")
     state_name = _state_name(inventory, requested)
-    # Which state entry became "the adjacency" is either exactly what the
-    # analyst declared, or a heuristic name-match fallback (any state entry
-    # whose name contains "adjacency") when they didn't -- a real
-    # interpretation choice, not an artifact fact, so it is recorded rather
-    # than left indistinguishable from a declared name.
+    # Recorded since it's an interpretation choice, not an artifact fact:
+    # either the analyst's declared name, or a heuristic name-match fallback.
     selection_provenance = "declared" if requested is not None and state_name == requested else "heuristic_name_match"
     entry = _state_entry(inventory, state_name)
     if not entry:
@@ -410,41 +385,31 @@ def _lean_xc(form: str) -> str:
 
 
 def _is_grouped_layout(layout: dict[str, Any]) -> bool:
-    """A plain `[N, N]` operator has exactly one axis per side
-    (`output_axes = [0]`); a grouped `[N, m, N, m]` layout (multiple
-    orbitals per site) has more than one. Long-range site-coupling
-    capacity (research-soundness correction, issue 5) is conservatively
-    unsupported for a grouped layout: there is no established
-    correspondence here between a flattened tensor axis and the physical
-    site index, so a flattened off-diagonal entry must never be read as
-    "coupling between two sites". This never affects self-adjoint
-    recognition, which is already layout-aware on its own terms."""
+    """A grouped `[N, m, N, m]` layout has more than one axis per side; for
+    it, long-range capacity is unsupported since a flattened off-diagonal
+    entry has no established correspondence to a site pair."""
     return len(layout.get("output_axes", [0])) != 1
 
 
 def _long_range_eligible(recipe: dict[str, Any], layout: dict[str, Any]) -> bool:
-    """Whether this recipe's base may be treated as a genuine free
-    parameter for LONG-RANGE CAPACITY specifically (research-soundness
-    correction, issues 4-5): requires BOTH positive trainability evidence
-    (`parameter_confirmed`) AND a plain, non-grouped operator layout.
-    Self-adjointness is NEVER gated on this -- `guaranteedSelfAdjoint`
-    holds for `.opaque` exactly as it does for `.parameter`; only the
-    stronger long-range-capacity claim needs a confirmed parameter AND a
-    layout where the site correspondence is actually known."""
+    """Whether this recipe's base counts as a free parameter for LONG-RANGE
+    CAPACITY: needs `parameter_confirmed`, a plain non-grouped layout, and
+    `site_dimension_confirmed` (shape must actually match site count).
+    Self-adjointness never gates on this -- `guaranteedSelfAdjoint` holds
+    for `.opaque` exactly as for `.parameter`."""
     kind = recipe.get("kind")
     confirmed = bool(recipe.get("parameter_confirmed")) if kind == "sum_transpose" else kind == "param"
-    return confirmed and not _is_grouped_layout(layout)
+    return (
+        confirmed
+        and not _is_grouped_layout(layout)
+        and bool(recipe.get("site_dimension_confirmed"))
+    )
 
 
 def _lean_operator(construction: str, recipe: dict[str, Any] | None = None, layout: dict[str, Any] | None = None) -> str:
-    """`recipe`/`layout` (research-soundness corrections) distinguish a
-    `symmetrized`/`unconstrained_parameter` base the artifact positively
-    confirms is a free, plain-layout parameter (lowered as `.parameter
-    "base"`, so `canRepresentLongRangeCoupling` can grant it capacity)
-    from one it doesn't (lowered as `.opaque "base"` -- still self-adjoint
-    via `guaranteedSelfAdjoint`, since that holds for ANY base, but never
-    granted long-range capacity, since there is no confirmed, plain-layout
-    parameter to choose)."""
+    """Lowers a confirmed, plain-layout parameter as `.parameter "base"`
+    (grantable long-range capacity); an unconfirmed one as `.opaque "base"`
+    (still self-adjoint, never granted long-range capacity)."""
     eligible = _long_range_eligible(recipe or {}, layout or {})
     if construction == "symmetrized" and not eligible:
         return '.add (.opaque "base") (.adjoint (.opaque "base"))'
@@ -460,16 +425,9 @@ def _lean_operator(construction: str, recipe: dict[str, Any] | None = None, layo
 
 
 def _locality_range(input_constraints: dict[str, Any]) -> int:
-    """Syntax validation of the DFT interface contract's `locality_range`
-    field `R` (default `4`): a SPECIFIED-INTERFACE domain parameter used
-    only to derive the operational long-range relation from the artifact's
-    own adjacency graph -- `LongRange_R(i, j) := shortestPathDistance_G(i,
-    j) > R`. VISTA never accepts a hand-supplied long-range pair list; the
-    pair set is always computed by VISTA itself from artifact-grounded
-    topology plus this one specified integer. This is a provisional
-    operational definition of "long-range" (graph-hop distance), not a
-    claim about the final physical definition of self-energy non-locality
-    -- see `docs/structural-v2/STRUCTURAL_CAPABILITY_CHECKS.md`."""
+    """The DFT interface contract's `locality_range` field `R` (default 4):
+    `LongRange_R(i, j) := shortestPathDistance_G(i, j) > R`, always computed
+    from artifact-grounded topology, never a hand-supplied pair list."""
     value = input_constraints.get("locality_range", 4)
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
         raise ManifestError("interface_contract.locality_range must be a non-negative integer")
@@ -477,13 +435,8 @@ def _locality_range(input_constraints: dict[str, Any]) -> int:
 
 
 def _lean_locality_range(locality_range: int) -> str:
-    """The anonymous-constructor form `⟨R⟩` of `Testv2.StructuralV2.
-    LocalityRange` -- a genuine wrapper `structure` around a bare `Nat`,
-    not a type alias, specifically so the theorem-centric resolver's
-    purely-type-based candidate matching (`dftcert.verification.resolver`)
-    can never confuse this SPECIFIED-INTERFACE `Nat` with the unrelated,
-    artifact-grounded `siteCount : Nat` binder -- anonymous-constructor
-    notation is type-directed and needs no namespace qualification."""
+    """`⟨R⟩` form of `LocalityRange`, a wrapper struct (not a `Nat` alias) so
+    the type-based resolver never confuses it with `siteCount : Nat`."""
     return f"⟨{locality_range}⟩"
 
 
@@ -491,17 +444,9 @@ def _long_range_capacity(
     recipe: dict[str, Any], site_count: int, layout: dict[str, Any],
     edges: list[list[int]], locality_range: int,
 ) -> bool | None:
-    """`None` means unsupported/unresolved (issue 5: a grouped operator
-    layout with no established site-axis correspondence), never a
-    confident `False`. Otherwise: does the construction actually contain a
-    confirmed free parameter (`_long_range_eligible`, plain layout only)
-    AND does the artifact-grounded adjacency graph place at least one pair
-    of distinct sites more than `locality_range` hops apart? The long-range
-    pair set is derived here (never hand-supplied) via `_unreachable_pairs`
-    -- a pair "unreachable within `locality_range` hops" is exactly a pair
-    whose shortest-path distance exceeds `locality_range` (disconnected
-    pairs included, consistently, since they are unreachable at any
-    depth)."""
+    """`None` means unsupported/unresolved (grouped layout), never a
+    confident `False`. Otherwise: eligible parameter present, and at least
+    one site pair more than `locality_range` hops apart."""
     if _is_grouped_layout(layout):
         return None
     if not _long_range_eligible(recipe, layout):
@@ -514,13 +459,7 @@ def _non_local_capacity(recipe: dict[str, Any], site_count: int) -> bool:
         return False
     kind = recipe.get("kind")
     if kind == "sum_transpose":
-        # research-readiness audit (post-hardening-pass review): a
-        # symmetrized `base + base^T` only has non-local representational
-        # capacity if `base` is actually a confirmed free parameter --
-        # `unconstrained_parameter`'s own `sum_transpose` kind already
-        # requires this at classification time (see `_operator_
-        # construction`), but `symmetrized`'s `sum_transpose` does not,
-        # since self-adjointness itself never requires it.
+        # Only has non-local capacity if `base` is a confirmed free parameter.
         return bool(recipe.get("parameter_confirmed"))
     return kind in _NON_LOCAL_CAPABLE_RECIPES
 
@@ -528,9 +467,7 @@ def _non_local_capacity(recipe: dict[str, Any], site_count: int) -> bool:
 def _unreachable_pairs(
     site_count: int, edges: list[list[int]], depth: int,
 ) -> list[dict[str, int]]:
-    """Ordered (source, target) pairs not reachable from `source` within
-    `depth` directed hops of `edges` -- empty iff the architecture places no
-    receptive-field obstruction on any pair of sites."""
+    """Ordered (source, target) pairs not reachable within `depth` hops."""
     adjacency: dict[int, set[int]] = {site: set() for site in range(site_count)}
     for source, target in edges:
         adjacency[source].add(target)
@@ -555,12 +492,9 @@ def _unreachable_pairs(
 def _operator_message_stages(
     nodes: list[dict[str, Any]], operator_root: str, adjacency_aliases: list[str],
 ) -> list[str] | None:
-    """Adjacency-fed message-passing stages found strictly within the
-    operator's OWN ancestry (never a separately declared `message_state`
-    root). `None` means the operator does not depend on message-passing at
-    all -- e.g. a bare or symmetrized parameter, the only recipes this
-    plugin currently recognizes -- so a message-passing-derived
-    receptive-field claim about it does not apply."""
+    """Adjacency-fed message-passing stages within the operator's OWN
+    ancestry. `None` means the operator doesn't depend on message-passing
+    at all, so a receptive-field claim about it doesn't apply."""
     ancestor_names = {
         node["name"] for node in _ancestors(nodes, operator_root)
         if isinstance(node.get("name"), str)
@@ -584,11 +518,9 @@ def _reachability(
 
 
 def _validate_structure_sections(value: dict[str, Any]) -> None:
-    """Shape checks for `topology`/`message_passing`/`xc`/`operator` --
-    never `capabilities`, which is each plugin's own concern. Factored out
-    (not just inlined into one class) so a future second plugin sharing this
-    same DFT-shaped topology/xc/operator IR (a different check set over the
-    same architecture facts) can reuse it instead of re-deriving it."""
+    """Shape checks for `topology`/`message_passing`/`xc`/`operator` (never
+    `capabilities`); factored out so a future plugin sharing this IR shape
+    can reuse it."""
     topology = value.get("topology")
     message = value.get("message_passing")
     xc = value.get("xc")
@@ -632,9 +564,8 @@ def _revalidate_structure(
     derivation: dict[str, Any], roles: dict[str, str],
 ) -> None:
     """Independently rechecks `topology`/`message_passing`/`xc`/`operator`/
-    `semantic_derivations` against a freshly recomputed `derivation` --
-    never `capabilities`. Factored out for the same reason as
-    `_validate_structure_sections` above."""
+    `semantic_derivations` against a freshly recomputed `derivation` (never
+    `capabilities`)."""
     translation = value["translation"]
     if translation.get("semantic_derivations") != derivation["semantic_derivations"]:
         raise ManifestError("translation semantic derivations do not match the raw exported graph")
@@ -686,16 +617,11 @@ class DFTCapabilityPlugin(StructuralPlugin):
         roles: dict[str, str], input_constraints: dict[str, Any],
     ) -> dict[str, Any]:
         """Everything computable from graph shape and construction
-        classification alone -- topology (a declared bool/int adjacency
-        buffer, never a trainable float), message-passing depth, XC form,
-        operator-construction recipe. Never reads a single extracted
-        parameter's floating-point content."""
-        # `expected_locality` is a *requirement* (what the caller wants),
-        # not an artifact fact -- optional here so a theorem-centric caller
-        # can derive pure structural facts without supplying one; the fixed
-        # legacy policy check (`checks()`, the only place that judges it)
-        # still requires a concrete value, so `vista structural` callers
-        # see no behavior change.
+        classification alone: topology, message-passing depth, XC form,
+        operator-construction recipe. Never reads a parameter's float
+        content."""
+        # A requirement, not an artifact fact -- optional here so a
+        # theorem-centric caller can skip it; checks() still requires it.
         expected_locality = input_constraints.get("expected_locality")
         if expected_locality not in {"local", "non_local", None}:
             raise ManifestError("input_constraints.expected_locality must be 'local' or 'non_local'")
@@ -705,7 +631,9 @@ class DFTCapabilityPlugin(StructuralPlugin):
         aliases = _adjacency_aliases(nodes, graph_inputs)
         stages, message_recognized = _message_chain(nodes, roles["message_state"], graph_inputs)
         xc_form, xc_nodes = _xc_form(nodes, roles["xc_energy"])
-        operator, operator_nodes, operator_recipe = _operator_construction(nodes, roles["learned_self_energy"], layout, inventory)
+        operator, operator_nodes, operator_recipe = _operator_construction(
+            nodes, roles["learned_self_energy"], layout, inventory, count,
+        )
         by_name = {node.get("name"): node for node in nodes if isinstance(node.get("name"), str)}
         stage_graph = [by_name[name] for name in stages]
         xc_graph = _ancestors(nodes, roles["xc_energy"])
@@ -786,12 +714,9 @@ class DFTCapabilityPlugin(StructuralPlugin):
             "unreachable_pairs": reachability["unreachable_pairs"],
             "operator_message_depth": reachability["depth"],
             "non_local_capacity": _non_local_capacity(derivation["operator_recipe"], derivation["site_count"]),
-            # research-soundness correction: the provisional, theorem-
-            # centric-authoritative replacement for `non_local_capacity`
-            # above (kept only as a deprecated/historical value -- see
-            # `Testv2.StructuralV2.canRepresentNonLocal`'s own docstring).
-            # `None` means unsupported/unresolved (a grouped operator
-            # layout), never a confident `False`.
+            # Theorem-centric-authoritative replacement for the above (which
+            # is kept as deprecated/historical). `None` means unresolved,
+            # never a confident `False`.
             "long_range_capacity": _long_range_capacity(
                 derivation["operator_recipe"], derivation["site_count"],
                 derivation["operator_layout"], derivation["edges"], derivation["locality_range"],
@@ -814,22 +739,13 @@ class DFTCapabilityPlugin(StructuralPlugin):
             "operator": {
                 "construction": derivation["operator"], "provenance_nodes": derivation["operator_nodes"],
                 "layout": derivation["operator_layout"],
-                # research-readiness audit (post-hardening-pass review): the
-                # recipe's `parameter_confirmed` flag is what `_lean_operator`
-                # needs to correctly lower a `symmetrized` construction --
-                # exposed here (already present, for audit only, deep inside
-                # `translation.semantic_derivations.operator.metadata.recipe`)
-                # so callers that only see this shallow `operator` dict (e.g.
-                # `formal_binding_candidates`) don't have to reach into
-                # internal derivation bookkeeping to get it.
+                # Exposed here so callers of this shallow dict (e.g.
+                # formal_binding_candidates) need not reach into
+                # translation.semantic_derivations for _lean_operator's input.
                 "recipe": derivation["operator_recipe"],
             },
-            # research-soundness correction: `locality_range` (R) is the ONLY
-            # SPECIFIED-INTERFACE locality input -- a configurable graph-hop
-            # radius, not a hand-supplied pair list. Which pairs are
-            # long-range (`LongRange_R(i, j) := shortestPathDistance_G(i, j)
-            # > R`) is always derived by VISTA from the artifact-grounded
-            # adjacency graph above, never supplied by the caller.
+            # The only specified-interface locality input (a graph-hop
+            # radius); long-range pairs are always derived, never supplied.
             "locality_range": derivation["locality_range"],
             "capabilities": derivation["capabilities"],
         }
@@ -912,9 +828,8 @@ class DFTCapabilityPlugin(StructuralPlugin):
     def checks(self, value: dict[str, Any]) -> dict[str, dict[str, Any]]:
         capabilities = value["capabilities"]
         expected = capabilities["expected_locality"]
-        # The legacy fixed-policy judgment (unlike theorem-centric
-        # `formal_binding_candidates`, which needs no locality requirement
-        # at all) genuinely cannot judge `non_local_capacity` without one.
+        # Unlike formal_binding_candidates, this fixed-policy judgment can't
+        # evaluate non_local_capacity without a concrete requirement.
         if expected not in {"local", "non_local"}:
             raise ManifestError(
                 "capabilities.expected_locality must be 'local' or 'non_local' to evaluate structural checks"
@@ -1065,10 +980,8 @@ class DFTCapabilityPlugin(StructuralPlugin):
     def formal_binding_candidates(self, value: dict[str, Any]) -> list[FormalBindingCandidate]:
         """Terms needed to instantiate the DFT theorem entrypoints in
         `examples/dft/lean/Testv2/Requirements.lean`: site count, operator
-        construction, XC form. Topology (edges/depth) is exposed too since a
-        selected theorem may genuinely need `allPairsReachable`, but the
-        current recognized self-energy recipes never depend on message
-        passing (see `all_pairs_reachable`'s `applicable` flag above)."""
+        construction, XC form, and topology in case a theorem needs
+        `allPairsReachable`."""
         topology, operator, xc = value["topology"], value["operator"], value["xc"]
         capabilities = value["capabilities"]
         candidates = [
@@ -1091,14 +1004,8 @@ class DFTCapabilityPlugin(StructuralPlugin):
             FormalBindingCandidate(
                 key="locality_range",
                 lean_expr=_lean_locality_range(value.get("locality_range", 4)),
-                # research-soundness correction: this is the ONLY SPECIFIED
-                # INTERFACE locality datum -- a configurable graph-hop
-                # radius `R`, supplied by the verification package's
-                # interface contract, never derived from the artifact.
-                # Lean itself (`isLongRangePair`/`hasLongRangePair`) derives
-                # the long-range relation from `edges` and `R` once
-                # `siteCount` is bound; this candidate carries only the raw
-                # specified integer through.
+                # The only specified-interface locality datum (a graph-hop
+                # radius `R`); Lean derives the long-range relation from it.
                 provenance="specified_interface",
                 evidence_refs=(),
                 display_label=f"localityRange = {value.get('locality_range', 4)}",
@@ -1118,12 +1025,8 @@ class DFTCapabilityPlugin(StructuralPlugin):
                 display_label=f"edges = {topology['directed_edges']}",
             ),
         ]
-        # `operator_message_depth = None` means "not applicable" (the
-        # operator's construction recipe doesn't depend on message passing
-        # at all -- see `_reachability`), not the artifact fact "depth =
-        # 0". Emitting a fabricated zero candidate here would let an
-        # unrelated theorem `Nat` binder silently receive a made-up value
-        # for a property that was never established at all.
+        # `None` means not applicable, not "depth = 0"; a fabricated zero
+        # here could silently fill an unrelated theorem's Nat binder.
         if capabilities["operator_message_depth"] is not None:
             candidates.append(FormalBindingCandidate(
                 key="operator_message_depth",
@@ -1136,8 +1039,6 @@ class DFTCapabilityPlugin(StructuralPlugin):
 
 
 DFT_CAPABILITY_PLUGIN = DFTCapabilityPlugin()
-# research-readiness audit issue 7: self-registers into the generic
-# structural/plugin-boundary registry so the theorem-centric verification
-# harness (`dftcert.verification.api`) can look this adapter up by profile
-# name without ever importing this concrete module itself.
+# Self-registers so the verification harness can look this adapter up by
+# profile name without importing this module directly.
 register_adapter(DFT_CAPABILITY_PLUGIN)

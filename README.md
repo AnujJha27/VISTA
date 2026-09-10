@@ -1,5 +1,8 @@
 # VISTA
 
+**V**erification of **I**nteratomic **S**urrogates via **T**heorem-based
+**A**ssurance
+
 > Artifact-grounded structural verification of exported ML models with Lean
 
 VISTA is a research prototype for checking whether structural facts derived
@@ -196,9 +199,11 @@ an explicit, package-declared allow-list.
 - That any external assumption on the certificate is true -- it remains a
   free, visible binder on the generated theorem, forever, never discharged
   or axiomatized by the act of certifying.
-- That a specified interface interpretation (which output means what, which
-  site pairs count as long-range, etc.) is itself artifact-derived -- it is
-  a human/domain interpretation, recorded and hash-bound, not verified.
+- That a specified interface interpretation (which output means what, the
+  graph-hop locality range `R`, etc.) is itself artifact-derived -- it is a
+  human/domain interpretation, recorded and hash-bound, not verified. Which
+  site pairs count as long-range is never itself specified -- it is derived
+  by VISTA from the artifact-grounded adjacency graph and `R`.
 - Anything about trained numerical behavior or post-training performance --
   VISTA is pre-training and structural only.
 - That the Python extractor or semantic adapter is itself formally verified

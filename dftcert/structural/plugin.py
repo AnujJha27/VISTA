@@ -1,16 +1,7 @@
-"""The domain-plugin interface. See docs/structural-v2/VISTA_GENERALIZATION.md.
-
-VISTA's harness (`dftcert.structural.core`) -- extraction plumbing, hashing,
-translation-validation re-derivation, certificate assembly/binding, Lean
-invocation -- is domain-agnostic. Everything that knows what a "claim" means
-for one verification target lives behind this interface, implemented once
-per domain. `dftcert.structural.dft_capability_plugin.DFT_CAPABILITY_PLUGIN`
-is the only implementation; it is also the harness's default, so every
-existing caller keeps working unchanged.
-
-Each plugin owns its own default Lean import (`lean_import`): the module its
-generated obligations are checked against. The harness never hardcodes a
-Lean module name -- a different domain brings its own proof base.
+"""The domain-plugin interface: everything that knows what a "claim" means
+for one verification target lives behind this, implemented once per domain.
+`DFT_CAPABILITY_PLUGIN` is the only implementation and the harness's default.
+Each plugin owns its own `lean_import` -- the harness never hardcodes one.
 """
 from __future__ import annotations
 
@@ -22,8 +13,7 @@ from ..verification.model import FormalBindingCandidate
 
 
 def _refs(value: Any) -> list[str]:
-    """Node-name references inside an exported-graph `args`/`kwargs` tree.
-    Generic to the torch-export JSON shape, not to any one domain."""
+    """Node-name references inside an exported-graph `args`/`kwargs` tree."""
     if isinstance(value, dict):
         if set(value) == {"node"} and isinstance(value["node"], str):
             return [value["node"]]
@@ -44,24 +34,15 @@ _ADAPTER_REGISTRY: dict[str, "StructuralPlugin"] = {}
 
 
 def register_adapter(plugin: "StructuralPlugin") -> None:
-    """Called by each domain plugin module itself (e.g.
-    `dft_capability_plugin.py`, at the bottom of the file, right after
-    constructing its singleton instance) -- never by a generic caller on a
-    domain plugin's behalf. This is the one place a domain plugin becomes
-    knowable to `get_adapter`/the generic verification harness (research-
-    readiness audit issue 7): the harness (`dftcert.verification.api`)
-    looks adapters up here by profile name, and never imports a concrete
-    domain plugin module by name itself -- keeping the dependency
-    direction verification-harness -> generic-registry, never
-    verification-harness -> concrete-domain-plugin."""
+    """Called by each domain plugin module itself, after constructing its
+    singleton -- keeps `dftcert.verification.api` from importing any
+    concrete plugin module directly."""
     _ADAPTER_REGISTRY[plugin.name] = plugin
 
 
 def get_adapter(profile: str) -> "StructuralPlugin | None":
-    """Look up a registered domain plugin by its declared `name`/`profile`.
-    Returns `None` (never raises) for an unknown profile -- the caller
-    (`dftcert.verification.api._resolve_adapter`) is responsible for
-    failing closed with its own `ManifestError`."""
+    """Look up a registered plugin by name; `None` (never raises) if unknown,
+    so the caller fails closed with its own `ManifestError`."""
     return _ADAPTER_REGISTRY.get(profile)
 
 
@@ -75,12 +56,8 @@ class StructuralPlugin(ABC):
 
     @property
     def semantic_identity(self) -> dict[str, str]:
-        """This adapter's own identity (spec/theorem-centric-gaps issue 4):
-        `profile` + `semantic_version` are the plugin's own declared
-        attributes; `implementation_sha256` is a hash of the adapter's own
-        source file. Derived from the executing code, never from
-        package-authored text -- a package's recorded adapter binding is
-        checked against this, not trusted at face value."""
+        """This adapter's identity, derived from the executing code (never
+        trusted from package-authored text)."""
         import hashlib
         import inspect
         from pathlib import Path
@@ -103,10 +80,8 @@ class StructuralPlugin(ABC):
     def role_roots(
         self, nodes: list[dict[str, Any]], input_constraints: dict[str, Any],
     ) -> dict[str, str]:
-        """Generic `output_contracts` resolution shared by every plugin:
-        maps this plugin's required role names to the exported graph's
-        output node names. Not abstract -- override only if a domain needs
-        different role-resolution semantics."""
+        """Generic `output_contracts` resolution: maps this plugin's
+        required role names to the exported graph's output node names."""
         roots = _output_roots(nodes)
         contracts = input_constraints.get("output_contracts")
         if not isinstance(contracts, list):
@@ -191,10 +166,8 @@ class StructuralPlugin(ABC):
         """Extra lines for `structural_model_description`."""
 
     def trust_boundary_lines(self) -> list[str]:
-        """`structural_report`'s `trust_boundary` list. Generic default for
-        any plugin that adds nothing beyond the harness's own guarantees;
-        override to disclose what THIS plugin's checks do and do not
-        establish (e.g. whether a real-weight observation exists at all)."""
+        """`structural_report`'s `trust_boundary` list; generic default,
+        override to disclose what this plugin's checks establish."""
         return [
             "The PT2 artifact is deserialized only by the extractor boundary; its SHA-256 binds this report to that file.",
             "Lean can verify the generated structural theorems, but it does not parse the PT2 binary itself.",
@@ -215,9 +188,7 @@ class StructuralPlugin(ABC):
 
     @abstractmethod
     def formal_binding_candidates(self, value: dict[str, Any]) -> list[FormalBindingCandidate]:
-        """Lean-instantiable terms this adapter can justify from `value` (a
-        validated structural IR), offered to the theorem-centric resolver
-        (`dftcert.verification`) to fill a selected theorem's data binders.
-        Every artifact-grounded candidate must carry evidence references back
-        to the IR's own provenance nodes -- never a candidate manufactured
-        merely because Python can format a Lean string."""
+        """Lean-instantiable terms this adapter can justify from `value`, for
+        the theorem-centric resolver to fill a theorem's data binders. Every
+        artifact-grounded candidate must carry evidence back to provenance
+        nodes -- never one manufactured just because Python can format it."""

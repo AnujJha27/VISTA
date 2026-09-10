@@ -24,16 +24,10 @@ from .core import (
 from .dft_capability_plugin import DFT_CAPABILITY_PLUGIN
 from .plugin import StructuralPlugin
 
-# The registry of every plugin this CLI knows how to run, by the `--profile`
-# name analyze commands select and by the `ir_schema_version` a produced IR
-# is stamped with. Only one plugin is registered today, but VISTA is meant
-# to grow more (a different verification domain entirely, or a second DFT
-# variant) -- this stays a registry, not a hardcoded single-plugin path, so
-# adding one is "add an entry here", not "redesign the CLI". `_resolve_plugin`
-# below reads a loaded IR's OWN schema version to pick the plugin back up --
-# the choice is certificate-bound (covered by `ir_sha256`/`report_sha256`),
-# not a separate flag `generate`/`report`/`assemble` could be pointed at the
-# wrong plugin with after the fact.
+# Registry of every plugin this CLI can run, keyed by `--profile` name and by
+# `ir_schema_version`. `_resolve_plugin` picks the plugin back up from a
+# loaded IR's own schema version, so the choice is certificate-bound rather
+# than a separate flag that could point at the wrong plugin later.
 PROFILES: dict[str, StructuralPlugin] = {DFT_CAPABILITY_PLUGIN.name: DFT_CAPABILITY_PLUGIN}
 PLUGINS_BY_SCHEMA_VERSION: dict[int, StructuralPlugin] = {
     plugin.ir_schema_version: plugin for plugin in PROFILES.values()
@@ -84,7 +78,7 @@ def _write(path: str | Path, value: Any) -> None:
 
 
 def _atomic_claims(claims: dict[str, Any], *, description: str, reviewed: bool) -> list[dict[str, Any]]:
-    """Keep each human-reviewable specification claim separate from the IR blob."""
+    """Split each specification claim into its own human-reviewable record."""
     aliases = {
         "topology": ("topology", "graph", "site", "edge", "ring", "chain", "adjacency"),
         "message_passing": ("message", "layer", "stage", "depth", "propagation"),

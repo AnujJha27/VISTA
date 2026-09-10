@@ -1,6 +1,5 @@
 import Mathlib
 
--- Abstract types for quantum setting
 axiom Wavefunc : Type
 axiom Density : Type
 def Potential : Type := ℝ → ℝ
@@ -19,19 +18,15 @@ axiom ground_energy : Potential → ℝ
 axiom ground_energy_def (v : Potential) :
   ground_energy v = energy_expectation (ground_state v) v
 
--- Strict Rayleigh-Ritz: any ψ ≠ ground state has strictly higher energy
 axiom rayleigh_ritz_strict (v : Potential) (ψ : Wavefunc) :
   ψ ≠ ground_state v → energy_expectation ψ v > ground_energy v
 
--- Different potentials (mod constant) yield different ground states
 axiom distinct_potentials_distinct_states (v₁ v₂ : Potential) :
   (¬ ∃ c : ℝ, ∀ x, v₁ x = v₂ x + c) → ground_state v₁ ≠ ground_state v₂
 
--- Integral is linear in potential
 axiom integral_diff (v₁ v₂ : Potential) (n : Density) :
   integral v₁ n - integral v₂ n = integral (fun x => v₁ x - v₂ x) n
 
--- The universal density functional
 noncomputable def F (n : Density) : ℝ :=
   sInf (Set.image kinetic_interaction {ψ : Wavefunc | density_of ψ = n})
 
@@ -45,7 +40,6 @@ theorem Hohenberg_Kohn1
   let ψ₂ := ground_state v₂
   have states_distinct : ψ₁ ≠ ψ₂ := distinct_potentials_distinct_states v₁ v₂ h_distinct
 
-  -- Apply strict Rayleigh-Ritz
   have rr₁_strict : energy_expectation ψ₂ v₁ > ground_energy v₁ := by
     apply rayleigh_ritz_strict
     intro h
@@ -56,7 +50,6 @@ theorem Hohenberg_Kohn1
     intro h
     exact states_distinct h
 
-  -- Expand energies using energy_def
   have exp₁ : energy_expectation ψ₂ v₁ = kinetic_interaction ψ₂ + integral v₁ (density_of ψ₂) :=
     energy_def ψ₂ v₁
   have exp₂ : energy_expectation ψ₁ v₂ = kinetic_interaction ψ₁ + integral v₂ (density_of ψ₁) :=
@@ -82,5 +75,4 @@ theorem Hohenberg_Kohn1
   have ineq₂' : ground_energy v₁ > ground_energy v₂ + integral v₁ n - integral v₂ n := by
     rw [E₁_expand]; linarith
 
-  -- Add the inequalities to get a contradiction: E₁ + E₂ > E₁ + E₂
   linarith

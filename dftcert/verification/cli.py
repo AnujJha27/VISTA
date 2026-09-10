@@ -1,9 +1,6 @@
-"""`vista verify ...`: the generic theorem-centric command family (spec
-section 22), alongside -- never replacing -- the existing `vista
-structural` commands. A thin argument-parsing shell over
-`dftcert.verification.api` -- the CLI and the public Python API call the
-same trusted implementation (spec/theorem-centric-gaps issue 14).
-"""
+"""`vista verify ...`: the theorem-centric command family, alongside the
+existing `vista structural` commands. A thin argument-parsing shell over
+`dftcert.verification.api`, shared with the public Python API."""
 from __future__ import annotations
 
 import argparse
@@ -69,8 +66,7 @@ def parser() -> argparse.ArgumentParser:
     resume.add_argument("--session", required=True)
     resume.add_argument(
         "--package", default=None,
-        help="validate freshness against this package (spec/theorem-centric-gaps issue D); "
-             "omit for a plain read-only load",
+        help="validate freshness against this package; omit for a plain read-only load",
     )
     resume.add_argument("--project", default=None, help="validate Lean project/toolchain freshness")
     resume.add_argument("--artifact", default=None, help="validate artifact hash freshness (via BubblewrapExtractor)")
@@ -80,10 +76,7 @@ def parser() -> argparse.ArgumentParser:
     resume.add_argument("--trusted-local", action="store_true")
 
     certify = commands.add_parser("certify", help="generate + verify the final certificate theorem")
-    # No --lean-import: the package's own hash-bound `lean_theory.
-    # entry_modules` is the sole formal environment certification runs
-    # under (spec/theorem-centric-gaps issue 1) -- there is no second,
-    # caller-suppliable import set that could diverge from it.
+    # No --lean-import: the package's own entry_modules is the sole formal environment.
     certify.add_argument("--session", required=True, help="overwritten with a freshly re-derived session before certifying")
     certify.add_argument("--package", required=True)
     certify.add_argument("--project", required=True)
@@ -100,12 +93,11 @@ def parser() -> argparse.ArgumentParser:
     certify.add_argument("--bubblewrap", default="bwrap")
     certify.add_argument("--extractor-python", default="/usr/bin/python3")
     certify.add_argument("--entrypoint", action="append", dest="entrypoints",
-                          help="repeatable; omit to certify every selected target (spec section 11)")
+                          help="repeatable; omit to certify every selected target")
     certify.add_argument(
         "--allow-subset-certificate", action="store_true",
-        help="required to certify only some of --entrypoint when the package selected more "
-             "(spec/theorem-centric-gaps issue G): the resulting bundle is marked "
-             "certificate_scope=selected_subset, never claimed as a full package certificate",
+        help="required to certify only some of --entrypoint; marks the bundle "
+             "certificate_scope=selected_subset, never a full package certificate",
     )
     certify.add_argument("--namespace", default=None)
     certify.add_argument("--output-dir", required=True, help="directory to write the certificate bundle into")
@@ -127,11 +119,9 @@ def parser() -> argparse.ArgumentParser:
     verify_bundle.add_argument("--trusted-local", action="store_true")
     verify_bundle.add_argument(
         "--full", action="store_true",
-        help="research-readiness audit issue 9: strictly stronger than the default lightweight "
-             "self-consistency check -- actually recompiles each certificate with the live Lean "
-             "toolchain and reapplies the live axiom policy to the freshly-recomputed axiom "
-             "closure. Requires --package and --project (nothing to recompile against without a "
-             "live Lean project). Never a substitute for --package/--project on their own.",
+        help="recompiles each certificate with the live Lean toolchain and reapplies the "
+             "live axiom policy; stronger than the default lightweight check. Requires "
+             "--package and --project.",
     )
     verify_bundle.add_argument("--lean-command", default="lake env lean -j 1")
     verify_bundle.add_argument("--timeout-s", type=int, default=300)
@@ -196,8 +186,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             raise ManifestError(f"unknown command {options.command!r}")
         print(json.dumps(output, sort_keys=True, default=str))
-        # A blocked/in-progress session is a successful, valid, resumable
-        # production (spec section 22) -- never an error exit on its own.
+        # A blocked/in-progress session is a valid, resumable result, not an error.
         return 0 if output.get("status") not in {"invalid", "verification_error"} else 1
     except (ManifestError, OSError, ValueError, json.JSONDecodeError) as error:
         print(json.dumps({"status": "invalid", "diagnostics": str(error)}, sort_keys=True))

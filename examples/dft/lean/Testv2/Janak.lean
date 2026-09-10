@@ -8,20 +8,14 @@ noncomputable section
 
 variable (X : Type*) [Fintype X]
 
--- ─────────────────────────────────────────────────────────────────────────────
--- Janak's Theorem  (J.F. Janak, Phys. Rev. B 18, 7165, 1978)
--- ─────────────────────────────────────────────────────────────────────────────
-
 /-- **Janak's Theorem – Single Orbital** (Janak, PRB 18, 7165, 1978)
     The derivative of the orbital energy E_i(f) = f * ⟨φ | H_KS | φ⟩ is ε. -/
 theorem janak_single (H_KS : Op X) (φ : H X) (ε : ℝ)
     (hNorm : ‖φ‖ = 1) (hEig : H_KS φ = ε • φ) (f₀ : ℝ) :
     HasDerivAt (fun f => f * @inner ℝ _ _ φ (H_KS φ)) ε f₀ := by
-  -- Step 1: ⟨φ|H_KS|φ⟩ = ε is a constant w.r.t. f
   have h_inner : @inner ℝ _ _ φ (H_KS φ) = ε :=
     ks_expectation_eq_eigenvalue X H_KS φ ε hNorm hEig
   simp only [h_inner]
-  -- Step 2: d/df [f * ε] = ε  (linear function, slope = ε)
   have hid : HasDerivAt (fun f : ℝ => f) 1 f₀ := hasDerivAt_id f₀
   simpa [one_mul] using hid.mul_const ε
 

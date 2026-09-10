@@ -1,12 +1,8 @@
-"""The domain-agnostic VISTA structural-verification harness.
-
-Extraction plumbing, hashing, translation-validation re-derivation,
-certificate assembly/binding, and Lean invocation live here and know nothing
-about any one verification domain. Everything domain-specific is behind the
-`StructuralPlugin` interface (`dftcert.structural.plugin`); every public
-function below takes a `plugin` argument defaulting to `DFT_CAPABILITY_PLUGIN`
-(`dftcert.structural.dft_capability_plugin`), the project's only plugin, so
-existing callers keep working unchanged. See `docs/structural-v2/VISTA_GENERALIZATION.md`.
+"""The domain-agnostic VISTA structural-verification harness: extraction,
+hashing, translation-validation re-derivation, certificate assembly/binding,
+and Lean invocation, with everything domain-specific behind `StructuralPlugin`
+(`dftcert.structural.plugin`; every function here defaults `plugin` to
+`DFT_CAPABILITY_PLUGIN`).
 """
 from __future__ import annotations
 
@@ -44,12 +40,8 @@ def structural_ir_from_inventory(
     derivation = plugin.derive(inventory=inventory, nodes=nodes, roles=roles, input_constraints=input_constraints)
     inventory_sha256 = sha256_value(inventory)
     state = inventory.get("state", {})
-    # Deliberately excludes each tensor's own `sha256` (a content hash of its
-    # raw bytes -- for a float parameter, its actual trained values). This
-    # fingerprints only the architecture -- shape, dtype, extractor-declared
-    # kind, storage aliasing -- so it is unaffected by training and cannot
-    # be used, even indirectly through a hash, as evidence about what a
-    # parameter's trained values are.
+    # Excludes each tensor's own `sha256` (a hash of its trained values) so
+    # this fingerprints architecture only, never trained content.
     parameter_structure = {
         name: {
             "shape": value.get("shape"),
@@ -370,12 +362,8 @@ def verify_structural_certificate(
     with tempfile.TemporaryDirectory(prefix="dftcert-v2-") as directory:
         check = Path(directory) / "StructuralCertificateCheck.lean"
         check.write_text(source, encoding="utf-8")
-        # `lake env lean` forks a `lean` child rather than exec-ing into it,
-        # so killing only the direct child on timeout leaks a runaway `lean`
-        # process that then contends with later invocations. Run it in its
-        # own process group (POSIX only) so a timeout can take the whole
-        # group down via Popen directly (subprocess.run's timeout only kills
-        # the immediate child).
+        # `lake env lean` forks a `lean` child; run in its own process group
+        # so a timeout can kill the whole group, not just the direct child.
         popen_kwargs: dict[str, Any] = {}
         if hasattr(os, "setsid"):
             popen_kwargs["start_new_session"] = True
@@ -417,33 +405,18 @@ def confirmed_description_ir(
     confirmed_claims: list[dict[str, Any]] | None = None,
     plugin: StructuralPlugin = DFT_CAPABILITY_PLUGIN,
 ) -> dict[str, Any]:
-    """Human-confirmed (no artifact) specification path. Not yet routed
-    through the plugin interface -- still DFT-shaped regardless of `plugin`.
-    See docs/structural-v2/VISTA_GENERALIZATION.md open questions.
-
-    `locality` is the human's confirmed claim (`{"expected": "local" |
-    "non_local"}`) -- kept as the parameter/CLI name since that is the
-    property a human is actually attesting to, but it is lowered here into
-    the `capabilities` shape the (pre-training) plugin's IR actually uses,
-    not a real-weight `locality` observation (there are no extracted values
-    in this path at all)."""
+    """Human-confirmed (no artifact) specification path; not yet routed
+    through the plugin interface, still DFT-shaped regardless of `plugin`.
+    `locality` is the human's confirmed claim, lowered here into the
+    `capabilities` shape the IR uses -- not a real-weight observation."""
     description_hash = hashlib.sha256(description.encode()).hexdigest()
     expected_locality = locality.get("expected")
     if expected_locality not in {"local", "non_local"}:
         raise ManifestError("locality.expected must be 'local' or 'non_local'")
-    # A human-confirmed specification has no real extracted tensor to declare
-    # a grouped domain/codomain axis layout for; default to the plain n x n
-    # matrix layout unless the confirmed claims say otherwise, so existing
-    # confirmed-description operator claims (which never mentioned a layout)
-    # keep working unchanged.
+    # No real tensor here to declare a layout for; default to plain n x n.
     operator = {"layout": {"output_axes": [0], "input_axes": [1]}, **operator}
-    # A pure English-description specification has no message-passing graph
-    # to trace either: the coverage claim is vacuously true/not-applicable,
-    # exactly like every recipe this plugin currently recognizes from a real
-    # artifact. A human confirms non-local capacity directly, mirroring how
-    # they already confirm topology/xc/operator in this path -- a different
-    # (weaker) trust level than an artifact's derived facts, which the
-    # certificate_kind ("confirmed_specification") already communicates.
+    # No message-passing graph either: coverage is vacuously true/not-applicable,
+    # and non-local capacity is the human's direct confirmation, not a derivation.
     capabilities = {
         "expected_locality": expected_locality,
         "all_pairs_reachable": True,

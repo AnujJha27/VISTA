@@ -1,6 +1,6 @@
 cff-version: 1.2.0
 message: "If you use this research prototype, please cite it using this metadata."
-title: "VISTA: artifact-grounded structural verification of exported ML models with Lean"
+title: "VISTA (Verification of Interatomic Surrogates via Theorem-based Assurance): artifact-grounded structural verification of exported ML models with Lean"
 authors:
   - given-names: "Anuj"
 date-released: 2026-07-29
